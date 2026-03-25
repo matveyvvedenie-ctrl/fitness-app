@@ -1,0 +1,386 @@
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqpppW2wnxH4nAYrZDaIu0XedFB5wfOeUXXokxFz4TpslB-GqD24B9GsPp0i_nTJ4GVA/exec';
+ 
+let tg;
+let workoutData = [];
+let completedCount = 0;
+let totalExercises = 0;
+ 
+try {
+    tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+} catch (e) {
+    console.error('Telegram WebApp not loaded:', e);
+    tg = {
+        initDataUnsafe: { user: { id: '739299264' } },
+        showAlert: (msg) => alert(msg),
+        openLink: (url) => window.open(url, '_blank'),
+        openTelegramLink: (url) => window.open(url, '_blank'),
+        HapticFeedback: null
+    };
+}
+ 
+document.addEventListener('DOMContentLoaded', init);
+ 
+async function init() {
+    console.log('Init started...');
+    try {
+        const response = await loadWorkoutData();
+        console.log('Data received:', response);
+        if (response.weekTitle) {
+            const weekNum = response.weekTitle.replace('Неделя ', '');
+            document.getElementById('week-number').textContent = weekNum;
+        }
+        workoutData = response.days || [];
+        totalExercises = 0;
+        completedCount = 0;
+        workoutData.forEach(day => {
+            day.exercises.forEach(exercise => {
+                totalExercises++;
+                if (exercise.weightFact || exercise.repsFact) {
+                    completedCount++;
+                }
+            });
+        });
+        renderWorkout();
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('main-screen').classList.remove('hidden');
+        initializeTabs();
+    } catch (error) {
+        console.error('ERROR:', error);
+        document.getElementById('loading').innerHTML =
+            '<div style="color: red; padding: 20px; text-align: center;">' +
+            '<h3>Ошибка загрузки</h3>' +
+            '<p>' + error.message + '</p>' +
+            '<button onclick="location.reload()" style="padding: 10px 20px; margin-top: 10px;">Перезагрузить</button>' +
+            '</div>';
+    }
+}
+ 
+async function loadWorkoutData() {
+    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+    var url = APPS_SCRIPT_URL + '?action=read&chatId=' + chatId;
+    var response = await fetch(url);
+    if (!response.ok) throw new Error('HTTP error ' + response.status);
+    var data = await response.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+}
+ 
+function renderWorkout() {
+    var container = document.getElementById('exercises-container');
+    container.innerHTML = '';
+    workoutData.forEach(function(day, dayIndex) {
+        var dayHeader = document.createElement('div');
+        dayHeader.className = 'day-header';
+        dayHeader.textContent = day.day;
+        container.appendChild(dayHeader);
+        day.exercises.forEach(function(exercise, exIndex) {
+            var card = createExerciseCard(exercise, dayIndex, exIndex);
+            container.appendChild(card);
+        });
+    });
+    updateProgress();
+}
+ 
+function createExerciseCard(exercise, dayIndex, exIndex) {
+    var card = document.createElement('div');
+    card.className = 'exercise-card';
+    var hasVideo = exercise.video && (exercise.video.indexOf('http') !== -1 || exercise.video.indexOf('📽️') !== -1);
+    var photo1 = exercise.photo1 || '';
+    var photo2 = exercise.photo2 || '';
+    var photoHtml1 = photo1 ? '<img src="' + photo1 + '" alt="Photo 1" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'🏋️\'">' : '🏋️';
+    var photoHtml2 = photo2 ? '<img src="' + photo2 + '" alt="Photo 2" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'💪\'">' : '💪';
+    var noteHtml = exercise.note ? '<div class="trainer-note">💬 ' + exercise.note + '</div>' : '';
+    var videoHtml = hasVideo ? '<button class="video-btn" onclick="openVideo(\'' + exercise.video + '\')">📹 ВИДЕО ТЕХНИКИ</button>' : '';
+    var commentValue = exercise.comment || '';
+    card.innerHTML =
+        '<div class="exercise-photos">' +
+            '<div class="exercise-photo">' + photoHtml1 + '</div>' +
+            '<div class="exercise-photo">' + photoHtml2 + '</div>' +
+        '</div>' +
+        '<div class="exercise-body">' +
+            '<div class="exercise-name">' + exercise.exercise + '</div>' +
+            noteHtml +
+            '<div class="exercise-params">' +
+                '<div class="param"><div class="param-label">Подх</div><div class="param-value">' + exercise.sets + '</div></div>' +
+                '<div class="param"><div class="param-label">Повт</div><div class="param-value">' + exercise.reps + '</div></div>' +
+                '<div class="param"><div class="param-label">Вес</div><div class="param-value plan">' + exercise.weightPlan + 'кг</div></div>' +
+                '<div class="param"><div class="param-label">RPE</div><div class="param-value rpe">' + exercise.rpe + '</div></div>' +
+            '</div>' +
+            videoHtml +
+            '<div class="input-row">' +
+                '<input type="number" class="input-field" placeholder="Вес (кг)" value="' + (exercise.weightFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="weight" onchange="handleInput(this)">' +
+                '<input type="number" class="input-field" placeholder="Повторения" value="' + (exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" onchange="handleInput(this)">' +
+            '</div>' +
+            '<textarea class="comment-field" placeholder="Комментарий к упражнению (опционально)" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="comment" onchange="handleInput(this)">' + commentValue + '</textarea>' +
+        '</div>';
+    return card;
+}
+ 
+function handleInput(input) {
+    var dayIndex = input.dataset.day;
+    var exIndex = input.dataset.exercise;
+    var field = input.dataset.field;
+    var value = input.value;
+    var exercise = workoutData[dayIndex].exercises[exIndex];
+    if (field === 'weight') exercise.weightFact = value;
+    else if (field === 'reps') exercise.repsFact = value;
+    else if (field === 'comment') exercise.comment = value;
+    if (value && (field === 'weight' || field === 'reps')) {
+        input.classList.add('filled');
+        if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    } else {
+        input.classList.remove('filled');
+    }
+    if (field === 'weight' || field === 'reps') {
+        var wasCompleted = exercise.completed;
+        exercise.completed = !!(exercise.weightFact || exercise.repsFact);
+        if (!wasCompleted && exercise.completed) {
+            completedCount++;
+            updateProgress(true);
+        } else if (wasCompleted && !exercise.completed) {
+            completedCount--;
+            updateProgress(false);
+        }
+    }
+}
+ 
+function updateProgress(animate) {
+    document.getElementById('completed-count').textContent = completedCount;
+    document.getElementById('total-count').textContent = totalExercises;
+    var percentage = totalExercises > 0 ? (completedCount / totalExercises) * 100 : 0;
+    document.getElementById('progress-fill').style.width = percentage + '%';
+    if (animate) {
+        var progressInfo = document.querySelector('.progress-info');
+        progressInfo.classList.add('pulse');
+        setTimeout(function() { progressInfo.classList.remove('pulse'); }, 500);
+        if (percentage === 100 && tg.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+    }
+}
+ 
+document.getElementById('save-btn').addEventListener('click', async function() {
+    var exercisesToSave = [];
+    var btn = document.getElementById('save-btn');
+    var originalText = btn.textContent;
+    btn.textContent = '⏳ Сохранение...';
+    btn.classList.add('saving');
+    btn.disabled = true;
+    try {
+        for (var d = 0; d < workoutData.length; d++) {
+            for (var ex = 0; ex < workoutData[d].exercises.length; ex++) {
+                var exercise = workoutData[d].exercises[ex];
+                if (exercise.weightFact || exercise.repsFact || (exercise.comment && exercise.comment.trim())) {
+                    exercisesToSave.push({
+                        rowIndex: exercise.rowIndex,
+                        weightFact: exercise.weightFact || '',
+                        repsFact: exercise.repsFact || '',
+                        completed: !!(exercise.weightFact || exercise.repsFact),
+                        comment: (exercise.comment && exercise.comment.trim()) ? exercise.comment.trim() : '',
+                        exercise: exercise.exercise,
+                        sets: exercise.sets,
+                        reps: exercise.reps,
+                        weightPlan: exercise.weightPlan,
+                        rpe: exercise.rpe
+                    });
+                }
+            }
+        }
+        if (exercisesToSave.length === 0) {
+            tg.showAlert('Нечего сохранять! Заполни вес или повторы 📝');
+        } else {
+            var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+            var url = APPS_SCRIPT_URL + '?action=write&chatId=' + chatId + '&exercises=' + encodeURIComponent(JSON.stringify(exercisesToSave));
+            var data = null;
+            for (var attempt = 0; attempt < 3; attempt++) {
+                try {
+                    var response = await fetch(url);
+                    data = await response.json();
+                    if (data && data.success) break;
+                } catch (err) {
+                    console.log('Attempt ' + (attempt + 1) + ' failed, retrying...');
+                    await new Promise(function(r) { setTimeout(r, 2000); });
+                }
+            }
+            if (data && data.success) {
+                btn.classList.remove('saving');
+                btn.classList.add('success');
+                btn.textContent = '✅ Сохранено!';
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                setTimeout(function() {
+                    tg.showAlert('Сохранено ' + exercisesToSave.length + ' упражнений! ✅\n\nТренеру придёт уведомление.');
+                    btn.classList.remove('success');
+                    btn.textContent = originalText;
+                }, 1000);
+            } else {
+                tg.showAlert('Не удалось сохранить данные ❌\nПопробуй ещё раз');
+            }
+        }
+    } catch (error) {
+        console.error('Save error:', error);
+        tg.showAlert('Ошибка при сохранении данных ❌');
+    } finally {
+        setTimeout(function() {
+            btn.classList.remove('saving', 'success');
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }, 1500);
+    }
+});
+ 
+function openVideo(url) {
+    if (!url || url === '📽️') {
+        tg.showAlert('Ссылка на видео отсутствует');
+        return;
+    }
+    if (url.indexOf('t.me') !== -1) {
+        tg.openTelegramLink(url);
+    } else if (url.indexOf('http') !== -1) {
+        tg.openLink(url);
+    } else {
+        tg.showAlert('Неверный формат ссылки');
+    }
+}
+ 
+var progressChart = null;
+var historyData = [];
+ 
+function initializeTabs() {
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var tabName = btn.dataset.tab;
+            document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(function(content) { content.classList.remove('active'); });
+            document.getElementById(tabName + '-tab').classList.add('active');
+            if (tabName === 'progress') loadProgressData();
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        });
+    });
+}
+ 
+async function loadProgressData() {
+    try {
+        var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+        var statsUrl = APPS_SCRIPT_URL + '?action=progress&chatId=' + chatId;
+        var statsResponse = await fetch(statsUrl);
+        var stats = await statsResponse.json();
+        document.getElementById('stat-weeks').textContent = stats.weeksCompleted || 0;
+        document.getElementById('stat-exercises').textContent = stats.totalExercises || 0;
+        document.getElementById('stat-avg-weight').textContent = (stats.avgWeight || 0) + ' кг';
+        await loadExerciseHistory();
+    } catch (error) {
+        console.error('Progress load error:', error);
+    }
+}
+ 
+async function loadExerciseHistory() {
+    try {
+        var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+        var url = APPS_SCRIPT_URL + '?action=history&chatId=' + chatId;
+        var response = await fetch(url);
+        var data = await response.json();
+        if (data.error) {
+            console.error('History error:', data.error);
+            historyData = [];
+            return;
+        }
+        historyData = data.history || [];
+        var exercises = [];
+        historyData.forEach(function(d) {
+            if (exercises.indexOf(d.exercise) === -1) exercises.push(d.exercise);
+        });
+        var select = document.getElementById('exercise-select');
+        select.innerHTML = '<option value="">Выберите упражнение...</option>';
+        exercises.forEach(function(ex) {
+            var option = document.createElement('option');
+            option.value = ex;
+            option.textContent = ex;
+            select.appendChild(option);
+        });
+        select.addEventListener('change', function(e) {
+            if (e.target.value) renderChart(e.target.value);
+        });
+        renderRecords();
+    } catch (error) {
+        console.error('History load error:', error);
+        historyData = [];
+    }
+}
+ 
+function renderChart(exerciseName) {
+    var data = historyData.filter(function(d) { return d.exercise === exerciseName; });
+    if (data.length === 0) return;
+    if (progressChart) progressChart.destroy();
+    var ctx = document.getElementById('progress-chart').getContext('2d');
+    progressChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(function(d) { return d.week || d.date; }),
+            datasets: [{
+                label: 'Вес (кг)',
+                data: data.map(function(d) { return d.weight; }),
+                borderColor: '#E53935',
+                backgroundColor: 'rgba(229, 57, 53, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 6,
+                pointBackgroundColor: '#E53935',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1a1a1a',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    padding: 12,
+                    cornerRadius: 8,
+                    displayColors: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f0f0f0' },
+                    ticks: { callback: function(value) { return value + ' кг'; } }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+}
+ 
+function renderRecords() {
+    var recordsList = document.getElementById('records-list');
+    var records = {};
+    historyData.forEach(function(d) {
+        if (!records[d.exercise] || d.weight > records[d.exercise].weight) {
+            records[d.exercise] = d;
+        }
+    });
+    var top5 = Object.values(records).sort(function(a, b) { return b.weight - a.weight; }).slice(0, 5);
+    if (top5.length === 0) {
+        recordsList.innerHTML = '<div class="no-data">Пока нет данных о рекордах 📊<br><br>Заполни несколько тренировок!</div>';
+        return;
+    }
+    recordsList.innerHTML = top5.map(function(record, index) {
+        var icon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏆';
+        return '<div class="record-item">' +
+            '<div class="record-icon">' + icon + '</div>' +
+            '<div class="record-name">' + record.exercise + '</div>' +
+            '<div class="record-weight">' + record.weight + ' кг</div>' +
+        '</div>';
+    }).join('');
+}
+ 

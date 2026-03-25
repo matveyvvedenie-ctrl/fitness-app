@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Фитнес Тренер</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading" class="loading-screen">
+        <div class="spinner"></div>
+        <p>Загрузка тренировки...</p>
+    </div>
+
+    <!-- Main App -->
+    <div id="main-screen" class="hidden">
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="workout">💪 Тренировка</button>
+            <button class="tab-btn" data-tab="progress">📊 Прогресс</button>
+        </div>
+
+        <!-- Workout Tab -->
+        <div id="workout-tab" class="tab-content active">
+            <!-- Header -->
+            <div class="header">
+                <div class="week-badge">
+                    💪 Неделя <span id="week-number">-</span>
+                </div>
+                <div class="progress-info">
+                    <span id="completed-count">0</span> / <span id="total-count">0</span>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+
+            <!-- Exercises Container -->
+            <div id="exercises-container" class="exercises-container"></div>
+
+            <!-- Save Button -->
+            <button id="save-btn" class="save-btn">
+                💾 Сохранить результаты
+            </button>
+        </div>
+
+        <!-- Progress Tab -->
+        <div id="progress-tab" class="tab-content">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🏆</div>
+                    <div class="stat-value" id="stat-weeks">-</div>
+                    <div class="stat-label">Недель завершено</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💪</div>
+                    <div class="stat-value" id="stat-exercises">-</div>
+                    <div class="stat-label">Упражнений выполнено</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-value" id="stat-avg-weight">-</div>
+                    <div class="stat-label">Средний вес</div>
+                </div>
+            </div>
+
+            <!-- Exercise Selector -->
+            <div class="chart-section">
+                <h3 class="section-title">📈 График прогресса по упражнению</h3>
+                <select id="exercise-select" class="exercise-select">
+                    <option value="">Выберите упражнение...</option>
+                </select>
+                <div class="chart-container">
+                    <canvas id="progress-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Records -->
+            <div class="records-section">
+                <h3 class="section-title">🏆 Личные рекорды</h3>
+                <div id="records-list" class="records-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
