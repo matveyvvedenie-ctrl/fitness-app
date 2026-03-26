@@ -18,9 +18,10 @@
     <!-- Main App -->
     <div id="main-screen" class="hidden">
         <!-- Tabs -->
-        <div class="tabs">
+        <div class="tabs" id="tabs-container">
             <button class="tab-btn active" data-tab="workout">💪 Тренировка</button>
             <button class="tab-btn" data-tab="progress">📊 Прогресс</button>
+            <button class="tab-btn hidden" data-tab="admin" id="admin-tab-btn">👑 Админ</button>
         </div>
 
         <!-- Workout Tab -->
@@ -85,6 +86,41 @@
             <div class="records-section">
                 <h3 class="section-title">🏆 Личные рекорды</h3>
                 <div id="records-list" class="records-list"></div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard Tab -->
+        <div id="admin-tab" class="tab-content">
+            <div class="dashboard-header">
+                <h2 class="dashboard-title">👑 Дашборд тренера</h2>
+                <div class="dashboard-date" id="dashboard-date"></div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="dashboard-summary">
+                <div class="summary-card">
+                    <div class="summary-icon">👥</div>
+                    <div class="summary-value" id="dash-total-clients">-</div>
+                    <div class="summary-label">Клиентов</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-icon">⚠️</div>
+                    <div class="summary-value" id="dash-need-attention">-</div>
+                    <div class="summary-label">Требуют внимания</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-icon">🍽️</div>
+                    <div class="summary-value" id="dash-avg-food-score">-</div>
+                    <div class="summary-label">Ср. оценка питания</div>
+                </div>
+            </div>
+
+            <!-- Client Cards -->
+            <div class="clients-section">
+                <h3 class="section-title">📋 Клиенты</h3>
+                <div id="clients-list" class="clients-list">
+                    <div class="no-data">Загрузка данных...</div>
+                </div>
             </div>
         </div>
     </div>

@@ -1,5 +1,7 @@
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqpppW2wnxH4nAYrZDaIu0XedFB5wfOeUXXokxFz4TpslB-GqD24B9GsPp0i_nTJ4GVA/exec';
  
+const TRAINER_CHAT_ID = '739299264';
+
 let tg;
 let workoutData = [];
 let completedCount = 0;
@@ -46,6 +48,7 @@ async function init() {
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('main-screen').classList.remove('hidden');
         initializeTabs();
+        initAdminTab();
     } catch (error) {
         console.error('ERROR:', error);
         document.getElementById('loading').innerHTML =
@@ -256,6 +259,7 @@ function initializeTabs() {
             document.querySelectorAll('.tab-content').forEach(function(content) { content.classList.remove('active'); });
             document.getElementById(tabName + '-tab').classList.add('active');
             if (tabName === 'progress') loadProgressData();
+            if (tabName === 'admin') loadDashboardData();
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         });
     });
@@ -380,6 +384,98 @@ function renderRecords() {
             '<div class="record-icon">' + icon + '</div>' +
             '<div class="record-name">' + record.exercise + '</div>' +
             '<div class="record-weight">' + record.weight + ' кг</div>' +
+        '</div>';
+    }).join('');
+}
+
+// ========== ADMIN DASHBOARD ==========
+
+function initAdminTab() {
+    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '';
+    if (chatId === TRAINER_CHAT_ID) {
+        document.getElementById('admin-tab-btn').classList.remove('hidden');
+        document.getElementById('tabs-container').classList.add('tabs-3');
+    }
+}
+
+async function loadDashboardData() {
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getFoodDashboard&chatId=' + TRAINER_CHAT_ID;
+        var response = await fetch(url);
+        var data = await response.json();
+        if (data.error) {
+            console.error('Dashboard error:', data.error);
+            document.getElementById('clients-list').innerHTML = '<div class="no-data">Ошибка загрузки: ' + data.error + '</div>';
+            return;
+        }
+        renderDashboard(data);
+    } catch (error) {
+        console.error('Dashboard load error:', error);
+        document.getElementById('clients-list').innerHTML = '<div class="no-data">Ошибка загрузки данных</div>';
+    }
+}
+
+function renderDashboard(data) {
+    var now = new Date();
+    document.getElementById('dashboard-date').textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    var clients = data.clients || [];
+    var alerts = data.alerts || [];
+    var stats = data.stats || {};
+
+    document.getElementById('dash-total-clients').textContent = stats.total_clients || clients.length;
+    document.getElementById('dash-need-attention').textContent = alerts.length;
+
+    var totalScore = 0, scoreCount = 0;
+    clients.forEach(function(c) {
+        if (c.avgFoodScore && c.avgFoodScore > 0) { totalScore += c.avgFoodScore; scoreCount++; }
+        else if (c.score && c.score > 0) { totalScore += c.score; scoreCount++; }
+    });
+    document.getElementById('dash-avg-food-score').textContent = scoreCount > 0 ? (totalScore / scoreCount).toFixed(1) : '-';
+
+    var clientsList = document.getElementById('clients-list');
+    if (clients.length === 0) {
+        clientsList.innerHTML = '<div class="no-data">Нет данных о клиентах</div>';
+        return;
+    }
+
+    clientsList.innerHTML = clients.map(function(client) {
+        var status = client.status || 'inactive';
+        var statusClass, statusIcon;
+        if (status === 'green' || status === 'good') { statusClass = 'status-green'; statusIcon = '🟢'; }
+        else if (status === 'yellow') { statusClass = 'status-yellow'; statusIcon = '🟡'; }
+        else { statusClass = 'status-red'; statusIcon = '🔴'; }
+
+        var workoutPercent = client.workoutPercent != null ? client.workoutPercent + '%' : '-';
+        var foodCount = client.foodCount != null ? client.foodCount : (client.entries != null ? client.entries : '-');
+        var avgScore = (client.avgFoodScore || client.score || 0);
+        avgScore = avgScore > 0 ? avgScore.toFixed ? avgScore.toFixed(1) : avgScore : '-';
+
+        var alertsList = [];
+        if (client.missedWorkouts) alertsList.push('Пропускает тренировки');
+        if (client.missedFood || status === 'inactive') alertsList.push('Не записывает питание');
+        var alertHtml = alertsList.length > 0 ? '<div class="client-alert">⚠️ ' + alertsList.join(' | ') + '</div>' : '';
+
+        return '<div class="client-card ' + statusClass + '">' +
+            '<div class="client-header">' +
+                '<div class="client-status">' + statusIcon + '</div>' +
+                '<div class="client-name">' + (client.name || 'Клиент') + '</div>' +
+            '</div>' +
+            '<div class="client-stats">' +
+                '<div class="client-stat">' +
+                    '<div class="client-stat-label">Тренировки</div>' +
+                    '<div class="client-stat-value">' + workoutPercent + '</div>' +
+                '</div>' +
+                '<div class="client-stat">' +
+                    '<div class="client-stat-label">Записей еды</div>' +
+                    '<div class="client-stat-value">' + foodCount + '</div>' +
+                '</div>' +
+                '<div class="client-stat">' +
+                    '<div class="client-stat-label">AI оценка</div>' +
+                    '<div class="client-stat-value">' + avgScore + '</div>' +
+                '</div>' +
+            '</div>' +
+            alertHtml +
         '</div>';
     }).join('');
 }
