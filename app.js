@@ -113,8 +113,8 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
             '</div>' +
             videoHtml +
             '<div class="input-row">' +
-                '<input type="number" class="input-field" placeholder="Вес (кг)" value="' + (exercise.weightFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="weight" onchange="handleInput(this)">' +
-                '<input type="number" class="input-field" placeholder="Повторения" value="' + (exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" onchange="handleInput(this)">' +
+                '<input type="number" inputmode="decimal" enterkeyhint="done" class="input-field" placeholder="Вес (кг)" value="' + (exercise.weightFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="weight" onchange="handleInput(this)">' +
+                '<input type="number" inputmode="numeric" enterkeyhint="done" class="input-field" placeholder="Повторения" value="' + (exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" onchange="handleInput(this)">' +
             '</div>' +
             '<textarea class="comment-field" placeholder="Комментарий к упражнению (опционально)" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="comment" onchange="handleInput(this)">' + commentValue + '</textarea>' +
         '</div>';
@@ -195,7 +195,8 @@ document.getElementById('save-btn').addEventListener('click', async function() {
             tg.showAlert('Нечего сохранять! Заполни вес или повторы 📝');
         } else {
             var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
-            var url = APPS_SCRIPT_URL + '?action=write&chatId=' + chatId + '&exercises=' + encodeURIComponent(JSON.stringify(exercisesToSave));
+            var completionPercent = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
+            var url = APPS_SCRIPT_URL + '?action=write&chatId=' + chatId + '&completionPercent=' + completionPercent + '&exercises=' + encodeURIComponent(JSON.stringify(exercisesToSave));
             var data = null;
             for (var attempt = 0; attempt < 3; attempt++) {
                 try {
@@ -213,7 +214,11 @@ document.getElementById('save-btn').addEventListener('click', async function() {
                 btn.textContent = '✅ Сохранено!';
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 setTimeout(function() {
-                    tg.showAlert('Сохранено ' + exercisesToSave.length + ' упражнений! ✅\n\nТренеру придёт уведомление.');
+                    var alertMsg = 'Сохранено ' + exercisesToSave.length + ' упражнений! ✅';
+                    if (completionPercent === 100) {
+                        alertMsg += '\n\n🎉 Неделя выполнена на 100%! Тренеру придёт уведомление.';
+                    }
+                    tg.showAlert(alertMsg);
                     btn.classList.remove('success');
                     btn.textContent = originalText;
                 }, 1000);
@@ -387,6 +392,22 @@ function renderRecords() {
         '</div>';
     }).join('');
 }
+
+// ========== СКРЫТИЕ КЛАВИАТУРЫ ==========
+// Тап вне input/textarea скрывает клавиатуру
+document.addEventListener('click', function(e) {
+    var tag = e.target.tagName.toLowerCase();
+    if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+        document.activeElement.blur();
+    }
+});
+
+// Enter на input — скрывает клавиатуру
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.target.tagName.toLowerCase() === 'input') {
+        e.target.blur();
+    }
+});
 
 // ========== ADMIN DASHBOARD ==========
 
