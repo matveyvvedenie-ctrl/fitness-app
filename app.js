@@ -411,12 +411,28 @@ document.addEventListener('keydown', function(e) {
 
 // ========== ADMIN DASHBOARD ==========
 
+var dashboardClients = [];
+var currentFilter = 'all';
+
 function initAdminTab() {
     var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '';
     if (chatId === TRAINER_CHAT_ID) {
         document.getElementById('admin-tab-btn').classList.remove('hidden');
         document.getElementById('tabs-container').classList.add('tabs-3');
+        initFilters();
     }
+}
+
+function initFilters() {
+    document.querySelectorAll('.filter-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            currentFilter = btn.dataset.filter;
+            renderClientCards();
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        });
+    });
 }
 
 async function loadDashboardData() {
@@ -440,27 +456,47 @@ function renderDashboard(data) {
     var now = new Date();
     document.getElementById('dashboard-date').textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    var clients = data.clients || [];
+    dashboardClients = data.clients || [];
     var alerts = data.alerts || [];
     var stats = data.stats || {};
 
-    document.getElementById('dash-total-clients').textContent = stats.total_clients || clients.length;
+    document.getElementById('dash-total-clients').textContent = stats.total_clients || dashboardClients.length;
     document.getElementById('dash-need-attention').textContent = alerts.length;
 
+    // Бейдж на вкладке
+    var badge = document.getElementById('admin-badge');
+    if (alerts.length > 0) {
+        badge.textContent = alerts.length;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+
     var totalScore = 0, scoreCount = 0;
-    clients.forEach(function(c) {
+    dashboardClients.forEach(function(c) {
         if (c.avgFoodScore && c.avgFoodScore > 0) { totalScore += c.avgFoodScore; scoreCount++; }
-        else if (c.score && c.score > 0) { totalScore += c.score; scoreCount++; }
     });
     document.getElementById('dash-avg-food-score').textContent = scoreCount > 0 ? (totalScore / scoreCount).toFixed(1) : '-';
 
+    renderClientCards();
+}
+
+function renderClientCards() {
     var clientsList = document.getElementById('clients-list');
-    if (clients.length === 0) {
-        clientsList.innerHTML = '<div class="no-data">Нет данных о клиентах</div>';
+    var filtered = dashboardClients;
+
+    if (currentFilter === 'problem') {
+        filtered = dashboardClients.filter(function(c) { return c.status === 'red' || c.status === 'yellow'; });
+    } else if (currentFilter === 'active') {
+        filtered = dashboardClients.filter(function(c) { return c.status === 'green'; });
+    }
+
+    if (filtered.length === 0) {
+        clientsList.innerHTML = '<div class="no-data">Нет клиентов в этой категории</div>';
         return;
     }
 
-    clientsList.innerHTML = clients.map(function(client) {
+    clientsList.innerHTML = filtered.map(function(client) {
         var status = client.status || 'inactive';
         var statusClass, statusIcon;
         if (status === 'green' || status === 'good') { statusClass = 'status-green'; statusIcon = '🟢'; }
@@ -468,19 +504,47 @@ function renderDashboard(data) {
         else { statusClass = 'status-red'; statusIcon = '🔴'; }
 
         var workoutPercent = client.workoutPercent != null ? client.workoutPercent + '%' : '-';
-        var foodCount = client.foodCount != null ? client.foodCount : (client.entries != null ? client.entries : '-');
-        var avgScore = (client.avgFoodScore || client.score || 0);
-        avgScore = avgScore > 0 ? avgScore.toFixed ? avgScore.toFixed(1) : avgScore : '-';
+        var avgScore = (client.avgFoodScore || 0);
+        avgScore = avgScore > 0 ? avgScore.toFixed(1) : '-';
 
+        // Процент калорий
+        var calHtml = '';
+        if (client.targetCalories > 0) {
+            var calPct = client.caloriesPercent || 0;
+            var calColor = calPct >= 80 && calPct <= 120 ? '#43A047' : calPct > 120 ? '#E53935' : '#FFA726';
+            calHtml = '<div class="client-calories">' +
+                '<div class="cal-label">Калории сегодня</div>' +
+                '<div class="cal-bar-bg"><div class="cal-bar-fill" style="width:' + Math.min(calPct, 100) + '%;background:' + calColor + '"></div></div>' +
+                '<div class="cal-text">' + client.todayCalories + ' / ' + client.targetCalories + ' (' + calPct + '%)</div>' +
+            '</div>';
+        }
+
+        // Сравнение недель
+        var trendHtml = '';
+        if (client.weekTrend === 'up') trendHtml = '<span class="week-trend trend-up">📈 Лучше прошлой</span>';
+        else if (client.weekTrend === 'down') trendHtml = '<span class="week-trend trend-down">📉 Хуже прошлой</span>';
+
+        // Мини-график веса (sparkline через canvas)
+        var sparkHtml = '';
+        if (client.avgWeights && client.avgWeights.length >= 2) {
+            sparkHtml = '<canvas class="weight-spark" data-weights="' + client.avgWeights.join(',') + '" width="80" height="30"></canvas>';
+        }
+
+        // Алерты
         var alertsList = [];
         if (client.missedWorkouts) alertsList.push('Пропускает тренировки');
-        if (client.missedFood || status === 'inactive') alertsList.push('Не записывает питание');
+        if (client.missedFood) alertsList.push('Не записывает питание');
         var alertHtml = alertsList.length > 0 ? '<div class="client-alert">⚠️ ' + alertsList.join(' | ') + '</div>' : '';
+
+        // Кнопка написать
+        var msgBtn = client.chatId ? '<button class="msg-client-btn" onclick="messageClient(\'' + client.chatId + '\', \'' + (client.name || '') + '\')">✉️ Написать</button>' : '';
 
         return '<div class="client-card ' + statusClass + '">' +
             '<div class="client-header">' +
                 '<div class="client-status">' + statusIcon + '</div>' +
                 '<div class="client-name">' + (client.name || 'Клиент') + '</div>' +
+                trendHtml +
+                sparkHtml +
             '</div>' +
             '<div class="client-stats">' +
                 '<div class="client-stat">' +
@@ -489,15 +553,57 @@ function renderDashboard(data) {
                 '</div>' +
                 '<div class="client-stat">' +
                     '<div class="client-stat-label">Записей еды</div>' +
-                    '<div class="client-stat-value">' + foodCount + '</div>' +
+                    '<div class="client-stat-value">' + (client.foodCount || 0) + '</div>' +
                 '</div>' +
                 '<div class="client-stat">' +
                     '<div class="client-stat-label">AI оценка</div>' +
                     '<div class="client-stat-value">' + avgScore + '</div>' +
                 '</div>' +
             '</div>' +
+            calHtml +
             alertHtml +
+            msgBtn +
         '</div>';
     }).join('');
+
+    // Рисуем sparkline-графики
+    document.querySelectorAll('.weight-spark').forEach(function(canvas) {
+        var weights = canvas.dataset.weights.split(',').map(Number);
+        drawSparkline(canvas, weights);
+    });
+}
+
+function drawSparkline(canvas, data) {
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+    var min = Math.min.apply(null, data);
+    var max = Math.max.apply(null, data);
+    var range = max - min || 1;
+    ctx.clearRect(0, 0, w, h);
+    ctx.beginPath();
+    ctx.strokeStyle = '#E53935';
+    ctx.lineWidth = 2;
+    data.forEach(function(val, i) {
+        var x = (i / (data.length - 1)) * w;
+        var y = h - ((val - min) / range) * (h - 4) - 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+}
+
+function messageClient(chatId, name) {
+    var msg = prompt('Сообщение для ' + name + ':');
+    if (!msg || !msg.trim()) return;
+    var url = 'https://api.telegram.org/bot' + '8752235431:AAHuCD1j65HCVd233kG1EvBm8sQX_dX9eW0' + '/sendMessage';
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: '💬 Сообщение от тренера:\n\n' + msg })
+    }).then(function(resp) { return resp.json(); })
+    .then(function(data) {
+        if (data.ok) tg.showAlert('Сообщение отправлено! ✅');
+        else tg.showAlert('Ошибка отправки ❌');
+    }).catch(function() { tg.showAlert('Ошибка отправки ❌'); });
 }
  

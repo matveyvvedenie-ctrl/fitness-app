@@ -21,7 +21,7 @@
         <div class="tabs" id="tabs-container">
             <button class="tab-btn active" data-tab="workout">💪 Тренировка</button>
             <button class="tab-btn" data-tab="progress">📊 Прогресс</button>
-            <button class="tab-btn hidden" data-tab="admin" id="admin-tab-btn">👑 Админ</button>
+            <button class="tab-btn hidden" data-tab="admin" id="admin-tab-btn">👑 Админ <span class="tab-badge hidden" id="admin-badge">0</span></button>
         </div>
 
         <!-- Workout Tab -->
@@ -113,6 +113,13 @@
                     <div class="summary-value" id="dash-avg-food-score">-</div>
                     <div class="summary-label">Ср. оценка питания</div>
                 </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-bar">
+                <button class="filter-btn active" data-filter="all">Все</button>
+                <button class="filter-btn" data-filter="problem">⚠️ Проблемные</button>
+                <button class="filter-btn" data-filter="active">✅ Активные</button>
             </div>
 
             <!-- Client Cards -->
