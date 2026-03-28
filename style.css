@@ -408,7 +408,7 @@ body {
 /* Tabs */
 .tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     background: white;
     border-bottom: 2px solid #e0e0e0;
 }
@@ -604,9 +604,14 @@ body {
     font-size: 14px;
 }
 
-/* 3-column tabs for admin */
-.tabs.tabs-3 {
-    grid-template-columns: 1fr 1fr 1fr;
+/* 4-column tabs for admin */
+.tabs.tabs-4 {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+.tabs.tabs-4 .tab-btn {
+    font-size: 12px;
+    padding: 14px 4px;
 }
 
 /* ========== ADMIN DASHBOARD ========== */
@@ -896,5 +901,159 @@ body {
 .msg-client-btn:active {
     transform: scale(0.97);
     opacity: 0.9;
+}
+
+/* ========== MEASUREMENTS TAB ========== */
+
+.measurements-latest {
+    padding: 12px 8px;
+}
+
+.latest-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.latest-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+}
+
+.latest-card-date {
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 12px;
+}
+
+.latest-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.latest-item {
+    background: #f5f5f5;
+    border-radius: 10px;
+    padding: 12px 6px;
+    text-align: center;
+}
+
+.latest-item-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #E53935;
+    margin-bottom: 2px;
+}
+
+.latest-item-label {
+    font-size: 10px;
+    color: #666;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.latest-item-diff {
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.diff-down {
+    color: #43A047;
+}
+
+.diff-up {
+    color: #E53935;
+}
+
+.diff-neutral {
+    color: #999;
+}
+
+/* Body Figure */
+.body-figure-section {
+    background: white;
+    margin: 12px 8px;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.body-figure {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0;
+}
+
+.body-svg {
+    width: 220px;
+    height: auto;
+}
+
+.body-label {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.body-weight {
+    font-size: 16px;
+    font-weight: 800;
+}
+
+/* Measurements History */
+.measurements-history {
+    background: white;
+    margin: 12px 8px;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 80px;
+}
+
+.measurements-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.measurement-row {
+    background: #f5f5f5;
+    border-radius: 10px;
+    padding: 12px;
+    animation: fadeInUp 0.4s ease backwards;
+}
+
+.measurement-row-date {
+    font-size: 13px;
+    font-weight: 700;
+    color: #E53935;
+    margin-bottom: 8px;
+}
+
+.measurement-row-values {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.measurement-row-item {
+    text-align: center;
+}
+
+.measurement-row-label {
+    font-size: 9px;
+    color: #999;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.measurement-row-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1a1a1a;
 }
 

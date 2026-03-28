@@ -264,6 +264,7 @@ function initializeTabs() {
             document.querySelectorAll('.tab-content').forEach(function(content) { content.classList.remove('active'); });
             document.getElementById(tabName + '-tab').classList.add('active');
             if (tabName === 'progress') loadProgressData();
+            if (tabName === 'measurements') loadMeasurementsData();
             if (tabName === 'admin') loadDashboardData();
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         });
@@ -418,7 +419,7 @@ function initAdminTab() {
     var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '';
     if (chatId === TRAINER_CHAT_ID) {
         document.getElementById('admin-tab-btn').classList.remove('hidden');
-        document.getElementById('tabs-container').classList.add('tabs-3');
+        document.getElementById('tabs-container').classList.add('tabs-4');
         initFilters();
     }
 }
@@ -590,6 +591,160 @@ function drawSparkline(canvas, data) {
         else ctx.lineTo(x, y);
     });
     ctx.stroke();
+}
+
+// ========== MEASUREMENTS TAB ==========
+
+var measurementsData = [];
+var measurementsChart = null;
+
+var MEAS_LABELS = {
+    weight: 'Вес', chest: 'Грудь', waist: 'Талия',
+    hips: 'Бёдра', bicep: 'Бицепс', thigh: 'Бедро'
+};
+var MEAS_UNITS = {
+    weight: 'кг', chest: 'см', waist: 'см',
+    hips: 'см', bicep: 'см', thigh: 'см'
+};
+
+async function loadMeasurementsData() {
+    try {
+        var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+        var url = APPS_SCRIPT_URL + '?action=getMeasurements&chatId=' + chatId;
+        var response = await fetch(url);
+        var data = await response.json();
+        if (data.error) {
+            document.getElementById('measurements-latest').innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
+            return;
+        }
+        measurementsData = data.measurements || [];
+        if (measurementsData.length === 0) {
+            document.getElementById('measurements-latest').innerHTML =
+                '<div class="no-data">Пока нет замеров 📏<br><br>Отправь /measurements в боте чтобы записать первые замеры!</div>';
+            document.getElementById('measurements-list').innerHTML = '';
+            return;
+        }
+        renderLatestMeasurements();
+        renderBodyFigure();
+        renderMeasurementsChart('weight');
+        renderMeasurementsHistory();
+        document.getElementById('measurement-select').addEventListener('change', function(e) {
+            renderMeasurementsChart(e.target.value);
+        });
+    } catch (error) {
+        console.error('Measurements load error:', error);
+        document.getElementById('measurements-latest').innerHTML = '<div class="no-data">Ошибка загрузки замеров</div>';
+    }
+}
+
+function renderLatestMeasurements() {
+    var latest = measurementsData[measurementsData.length - 1];
+    var prev = measurementsData.length >= 2 ? measurementsData[measurementsData.length - 2] : null;
+    var keys = ['weight', 'chest', 'waist', 'hips', 'bicep', 'thigh'];
+    var items = keys.map(function(key) {
+        var val = latest[key];
+        var diffHtml = '';
+        if (prev && prev[key] != null && val != null) {
+            var diff = (val - prev[key]).toFixed(1);
+            if (diff > 0) diffHtml = '<div class="latest-item-diff diff-up">+' + diff + '</div>';
+            else if (diff < 0) diffHtml = '<div class="latest-item-diff diff-down">' + diff + '</div>';
+            else diffHtml = '<div class="latest-item-diff diff-neutral">0</div>';
+        }
+        return '<div class="latest-item">' +
+            '<div class="latest-item-value">' + (val != null ? val : '—') + '</div>' +
+            '<div class="latest-item-label">' + MEAS_LABELS[key] + ' (' + MEAS_UNITS[key] + ')</div>' +
+            diffHtml +
+        '</div>';
+    }).join('');
+
+    document.getElementById('measurements-latest').innerHTML =
+        '<div class="latest-card">' +
+            '<div class="latest-card-title">Последние замеры</div>' +
+            '<div class="latest-card-date">' + latest.date + '</div>' +
+            '<div class="latest-grid">' + items + '</div>' +
+        '</div>';
+}
+
+function renderBodyFigure() {
+    var latest = measurementsData[measurementsData.length - 1];
+    document.getElementById('fig-weight').textContent = latest.weight != null ? latest.weight + ' кг' : '— кг';
+    document.getElementById('fig-chest').textContent = latest.chest != null ? latest.chest + ' см' : '—';
+    document.getElementById('fig-waist').textContent = latest.waist != null ? latest.waist + ' см' : '—';
+    document.getElementById('fig-hips').textContent = latest.hips != null ? latest.hips + ' см' : '—';
+    document.getElementById('fig-bicep').textContent = latest.bicep != null ? latest.bicep + ' см' : '—';
+    document.getElementById('fig-thigh').textContent = latest.thigh != null ? latest.thigh + ' см' : '—';
+}
+
+function renderMeasurementsChart(key) {
+    var filtered = measurementsData.filter(function(m) { return m[key] != null; });
+    if (filtered.length === 0) return;
+    if (measurementsChart) measurementsChart.destroy();
+    var ctx = document.getElementById('measurements-chart').getContext('2d');
+    var colors = {
+        weight: '#E53935', chest: '#1565C0', waist: '#F57C00',
+        hips: '#7B1FA2', bicep: '#2E7D32', thigh: '#C62828'
+    };
+    var color = colors[key] || '#E53935';
+    measurementsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: filtered.map(function(m) { return m.date; }),
+            datasets: [{
+                label: MEAS_LABELS[key] + ' (' + MEAS_UNITS[key] + ')',
+                data: filtered.map(function(m) { return m[key]; }),
+                borderColor: color,
+                backgroundColor: color + '1A',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 6,
+                pointBackgroundColor: color,
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1a1a1a',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    padding: 12,
+                    cornerRadius: 8,
+                    displayColors: false
+                }
+            },
+            scales: {
+                y: {
+                    grid: { color: '#f0f0f0' },
+                    ticks: { callback: function(v) { return v + ' ' + MEAS_UNITS[key]; } }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+function renderMeasurementsHistory() {
+    var list = document.getElementById('measurements-list');
+    var keys = ['weight', 'chest', 'waist', 'hips', 'bicep', 'thigh'];
+    var reversed = measurementsData.slice().reverse();
+    list.innerHTML = reversed.map(function(m, i) {
+        var values = keys.map(function(key) {
+            return '<div class="measurement-row-item">' +
+                '<div class="measurement-row-label">' + MEAS_LABELS[key] + '</div>' +
+                '<div class="measurement-row-value">' + (m[key] != null ? m[key] + ' ' + MEAS_UNITS[key] : '—') + '</div>' +
+            '</div>';
+        }).join('');
+        return '<div class="measurement-row" style="animation-delay:' + (i * 0.05) + 's">' +
+            '<div class="measurement-row-date">📅 ' + m.date + '</div>' +
+            '<div class="measurement-row-values">' + values + '</div>' +
+        '</div>';
+    }).join('');
 }
 
 function messageClient(chatId, name) {
