@@ -1002,6 +1002,7 @@ body {
     padding: 16px;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
 }
 
 .meas-form-grid {
@@ -1009,6 +1010,8 @@ body {
     grid-template-columns: 1fr 1fr;
     gap: 10px;
     margin-bottom: 14px;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .meas-input-group {
@@ -1033,6 +1036,9 @@ body {
     color: #1a1a1a;
     text-align: center;
     transition: all 0.3s ease;
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
 }
 
 .meas-input:focus {
