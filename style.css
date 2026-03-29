@@ -989,19 +989,94 @@ body {
     padding: 10px 0;
 }
 
-.body-svg {
-    width: 220px;
+#body-canvas {
+    width: 100%;
+    max-width: 300px;
     height: auto;
 }
 
-.body-label {
-    font-size: 12px;
-    font-weight: 700;
+/* Measurements Form */
+.meas-form-section {
+    background: white;
+    margin: 12px 8px;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-.body-weight {
+.meas-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.meas-input-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.meas-input-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.meas-input {
+    background: #f5f5f5;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 12px;
     font-size: 16px;
-    font-weight: 800;
+    font-weight: 600;
+    color: #1a1a1a;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.meas-input:focus {
+    outline: none;
+    border-color: #E53935;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(229, 57, 53, 0.1);
+}
+
+.meas-input.filled {
+    border-color: #43A047;
+    background: #E8F5E9;
+    color: #2E7D32;
+}
+
+.meas-save-btn {
+    background: linear-gradient(135deg, #E53935, #C62828);
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    width: 100%;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.meas-save-btn:active {
+    transform: scale(0.97);
+}
+
+.meas-save-btn.saving {
+    background: linear-gradient(135deg, #FFA726, #F57C00);
+    animation: savePulse 1.5s infinite;
+}
+
+.meas-save-btn.success {
+    background: linear-gradient(135deg, #66BB6A, #43A047);
+}
+
+.meas-save-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* Measurements History */

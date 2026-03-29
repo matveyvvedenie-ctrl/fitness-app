@@ -97,6 +97,9 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
     var noteHtml = exercise.note ? '<div class="trainer-note">💬 ' + exercise.note + '</div>' : '';
     var videoHtml = hasVideo ? '<button class="video-btn" onclick="openVideo(\'' + exercise.video + '\')">📹 ВИДЕО ТЕХНИКИ</button>' : '';
     var commentValue = exercise.comment || '';
+    // Filter out timestamp values that accidentally got into comment field
+    if (commentValue && /^\d{4}-\d{2}-\d{2}T/.test(commentValue)) commentValue = '';
+    if (commentValue && /^\d{2}\.\d{2}\.\d{4}/.test(commentValue)) commentValue = '';
     card.innerHTML =
         '<div class="exercise-photos">' +
             '<div class="exercise-photo">' + photoHtml1 + '</div>' +
@@ -597,6 +600,7 @@ function drawSparkline(canvas, data) {
 
 var measurementsData = [];
 var measurementsChart = null;
+var measSelectInitialized = false;
 
 var MEAS_LABELS = {
     weight: 'Вес', chest: 'Грудь', waist: 'Талия',
@@ -615,25 +619,33 @@ async function loadMeasurementsData() {
         var data = await response.json();
         if (data.error) {
             document.getElementById('measurements-latest').innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
+            initMeasForm();
             return;
         }
         measurementsData = data.measurements || [];
         if (measurementsData.length === 0) {
             document.getElementById('measurements-latest').innerHTML =
-                '<div class="no-data">Пока нет замеров 📏<br><br>Отправь /measurements в боте чтобы записать первые замеры!</div>';
+                '<div class="no-data">Пока нет замеров 📏<br><br>Заполни форму ниже чтобы записать первые замеры!</div>';
             document.getElementById('measurements-list').innerHTML = '';
+            drawBodyFigure(null);
+            initMeasForm();
             return;
         }
         renderLatestMeasurements();
-        renderBodyFigure();
+        drawBodyFigure(measurementsData[measurementsData.length - 1]);
         renderMeasurementsChart('weight');
         renderMeasurementsHistory();
-        document.getElementById('measurement-select').addEventListener('change', function(e) {
-            renderMeasurementsChart(e.target.value);
-        });
+        initMeasForm();
+        if (!measSelectInitialized) {
+            measSelectInitialized = true;
+            document.getElementById('measurement-select').addEventListener('change', function(e) {
+                renderMeasurementsChart(e.target.value);
+            });
+        }
     } catch (error) {
         console.error('Measurements load error:', error);
         document.getElementById('measurements-latest').innerHTML = '<div class="no-data">Ошибка загрузки замеров</div>';
+        initMeasForm();
     }
 }
 
@@ -665,14 +677,338 @@ function renderLatestMeasurements() {
         '</div>';
 }
 
-function renderBodyFigure() {
-    var latest = measurementsData[measurementsData.length - 1];
-    document.getElementById('fig-weight').textContent = latest.weight != null ? latest.weight + ' кг' : '— кг';
-    document.getElementById('fig-chest').textContent = latest.chest != null ? latest.chest + ' см' : '—';
-    document.getElementById('fig-waist').textContent = latest.waist != null ? latest.waist + ' см' : '—';
-    document.getElementById('fig-hips').textContent = latest.hips != null ? latest.hips + ' см' : '—';
-    document.getElementById('fig-bicep').textContent = latest.bicep != null ? latest.bicep + ' см' : '—';
-    document.getElementById('fig-thigh').textContent = latest.thigh != null ? latest.thigh + ' см' : '—';
+// ===== REALISTIC BODY FIGURE ON CANVAS =====
+
+function drawBodyFigure(data) {
+    var canvas = document.getElementById('body-canvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // Default proportions (baseline: chest=90, waist=70, hips=95, bicep=30, thigh=50)
+    var chest = 90, waist = 70, hips = 95, bicep = 30, thigh = 50, weight = null;
+    if (data) {
+        chest = data.chest || 90;
+        waist = data.waist || 70;
+        hips = data.hips || 95;
+        bicep = data.bicep || 30;
+        thigh = data.thigh || 50;
+        weight = data.weight;
+    }
+
+    // Scale measurements to pixel widths (relative to canvas)
+    var cx = W / 2; // center x
+    var scale = 0.55;
+    var chestW = chest * scale;
+    var waistW = waist * scale;
+    var hipsW = hips * scale;
+    var bicepW = bicep * scale * 0.45;
+    var thighW = thigh * scale * 0.42;
+
+    // Key Y positions
+    var headY = 35, headR = 22;
+    var neckY = headY + headR + 5;
+    var shoulderY = neckY + 18;
+    var chestY = shoulderY + 30;
+    var waistY = chestY + 50;
+    var hipY = waistY + 35;
+    var kneeY = hipY + 80;
+    var footY = kneeY + 75;
+
+    // Colors
+    var skinColor = '#FFD4B8';
+    var outlineColor = '#C6846E';
+    var labelBg = 'rgba(255,255,255,0.9)';
+
+    // Draw body silhouette using bezier curves
+    ctx.save();
+
+    // Fill body shape
+    ctx.beginPath();
+    // Start at left shoulder
+    ctx.moveTo(cx - chestW / 2 - 8, shoulderY);
+    // Left arm (bicep width affects arm thickness)
+    // Upper arm
+    ctx.lineTo(cx - chestW / 2 - 25, shoulderY + 5);
+    ctx.quadraticCurveTo(cx - chestW / 2 - 25 - bicepW, shoulderY + 50, cx - chestW / 2 - 20 - bicepW * 0.7, shoulderY + 75);
+    // Elbow
+    ctx.quadraticCurveTo(cx - chestW / 2 - 18 - bicepW * 0.5, shoulderY + 85, cx - chestW / 2 - 22, shoulderY + 95);
+    // Forearm
+    ctx.quadraticCurveTo(cx - chestW / 2 - 28, shoulderY + 130, cx - chestW / 2 - 18, shoulderY + 150);
+    // Hand
+    ctx.quadraticCurveTo(cx - chestW / 2 - 12, shoulderY + 160, cx - chestW / 2 - 8, shoulderY + 150);
+    // Back up forearm
+    ctx.quadraticCurveTo(cx - chestW / 2 - 5, shoulderY + 130, cx - chestW / 2 - 5, shoulderY + 95);
+    ctx.quadraticCurveTo(cx - chestW / 2 - 3, shoulderY + 80, cx - chestW / 2 + 2, shoulderY + 55);
+    // Back to torso left side
+    ctx.lineTo(cx - chestW / 2, chestY);
+    // Left torso - chest to waist to hip
+    ctx.quadraticCurveTo(cx - waistW / 2, (chestY + waistY) / 2, cx - waistW / 2, waistY);
+    ctx.quadraticCurveTo(cx - hipsW / 2, (waistY + hipY) / 2, cx - hipsW / 2, hipY);
+    // Left leg
+    ctx.quadraticCurveTo(cx - thighW - 5, hipY + 15, cx - thighW - 2, hipY + 40);
+    ctx.quadraticCurveTo(cx - thighW, kneeY - 10, cx - thighW * 0.7, kneeY);
+    ctx.quadraticCurveTo(cx - thighW * 0.55, kneeY + 15, cx - thighW * 0.5, kneeY + 40);
+    ctx.quadraticCurveTo(cx - thighW * 0.55, footY - 15, cx - thighW * 0.6, footY);
+    // Left foot
+    ctx.quadraticCurveTo(cx - thighW * 0.8, footY + 10, cx - thighW * 0.6, footY + 12);
+    ctx.lineTo(cx - thighW * 0.1, footY + 12);
+    ctx.quadraticCurveTo(cx - thighW * 0.05, footY + 5, cx - thighW * 0.1, footY);
+    // Inner left leg back up
+    ctx.quadraticCurveTo(cx - thighW * 0.15, footY - 15, cx - thighW * 0.1, kneeY + 40);
+    ctx.quadraticCurveTo(cx - thighW * 0.1, kneeY + 15, cx - thighW * 0.2, kneeY);
+    ctx.quadraticCurveTo(cx - thighW * 0.3, kneeY - 10, cx - 5, hipY + 15);
+    // Crotch
+    ctx.quadraticCurveTo(cx, hipY + 25, cx + 5, hipY + 15);
+    // Right inner leg
+    ctx.quadraticCurveTo(cx + thighW * 0.3, kneeY - 10, cx + thighW * 0.2, kneeY);
+    ctx.quadraticCurveTo(cx + thighW * 0.1, kneeY + 15, cx + thighW * 0.1, kneeY + 40);
+    ctx.quadraticCurveTo(cx + thighW * 0.15, footY - 15, cx + thighW * 0.1, footY);
+    // Right foot
+    ctx.quadraticCurveTo(cx + thighW * 0.05, footY + 5, cx + thighW * 0.1, footY + 12);
+    ctx.lineTo(cx + thighW * 0.6, footY + 12);
+    ctx.quadraticCurveTo(cx + thighW * 0.8, footY + 10, cx + thighW * 0.6, footY);
+    // Right outer leg
+    ctx.quadraticCurveTo(cx + thighW * 0.55, footY - 15, cx + thighW * 0.5, kneeY + 40);
+    ctx.quadraticCurveTo(cx + thighW * 0.55, kneeY + 15, cx + thighW * 0.7, kneeY);
+    ctx.quadraticCurveTo(cx + thighW, kneeY - 10, cx + thighW + 2, hipY + 40);
+    ctx.quadraticCurveTo(cx + thighW + 5, hipY + 15, cx + hipsW / 2, hipY);
+    // Right torso
+    ctx.quadraticCurveTo(cx + hipsW / 2, (waistY + hipY) / 2, cx + waistW / 2, waistY);
+    ctx.quadraticCurveTo(cx + waistW / 2, (chestY + waistY) / 2, cx + chestW / 2, chestY);
+    // Right arm back
+    ctx.lineTo(cx + chestW / 2 + 2, shoulderY + 55);
+    ctx.quadraticCurveTo(cx + chestW / 2 + 3, shoulderY + 80, cx + chestW / 2 + 5, shoulderY + 95);
+    ctx.quadraticCurveTo(cx + chestW / 2 + 5, shoulderY + 130, cx + chestW / 2 + 8, shoulderY + 150);
+    // Right hand
+    ctx.quadraticCurveTo(cx + chestW / 2 + 12, shoulderY + 160, cx + chestW / 2 + 18, shoulderY + 150);
+    ctx.quadraticCurveTo(cx + chestW / 2 + 28, shoulderY + 130, cx + chestW / 2 + 22, shoulderY + 95);
+    ctx.quadraticCurveTo(cx + chestW / 2 + 18 + bicepW * 0.5, shoulderY + 85, cx + chestW / 2 + 20 + bicepW * 0.7, shoulderY + 75);
+    ctx.quadraticCurveTo(cx + chestW / 2 + 25 + bicepW, shoulderY + 50, cx + chestW / 2 + 25, shoulderY + 5);
+    ctx.lineTo(cx + chestW / 2 + 8, shoulderY);
+    // Shoulders top
+    ctx.quadraticCurveTo(cx + 12, shoulderY - 8, cx, neckY + 8);
+    ctx.quadraticCurveTo(cx - 12, shoulderY - 8, cx - chestW / 2 - 8, shoulderY);
+    ctx.closePath();
+
+    // Fill with skin color
+    var gradient = ctx.createLinearGradient(cx - 50, 0, cx + 50, 0);
+    gradient.addColorStop(0, '#FFD0B0');
+    gradient.addColorStop(0.5, skinColor);
+    gradient.addColorStop(1, '#FFD0B0');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Draw head
+    ctx.beginPath();
+    ctx.arc(cx, headY, headR, 0, Math.PI * 2);
+    ctx.fillStyle = skinColor;
+    ctx.fill();
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Neck
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, headY + headR - 2);
+    ctx.lineTo(cx - 10, neckY + 8);
+    ctx.lineTo(cx + 10, neckY + 8);
+    ctx.lineTo(cx + 8, headY + headR - 2);
+    ctx.fillStyle = skinColor;
+    ctx.fill();
+
+    // Face features
+    ctx.fillStyle = '#8B6F5E';
+    // Eyes
+    ctx.beginPath();
+    ctx.arc(cx - 7, headY - 2, 2, 0, Math.PI * 2);
+    ctx.arc(cx + 7, headY - 2, 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Mouth
+    ctx.beginPath();
+    ctx.arc(cx, headY + 8, 5, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.strokeStyle = '#8B6F5E';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.restore();
+
+    // ===== MEASUREMENT LINES & LABELS =====
+
+    function drawMeasLine(y, halfW, color, label, value, side) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 3]);
+        ctx.beginPath();
+        ctx.moveTo(cx - halfW, y);
+        ctx.lineTo(cx + halfW, y);
+        ctx.stroke();
+        // Arrow ends
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(cx - halfW, y - 4);
+        ctx.lineTo(cx - halfW, y + 4);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + halfW, y - 4);
+        ctx.lineTo(cx + halfW, y + 4);
+        ctx.stroke();
+        // Label
+        var text = label + ': ' + (value != null ? value : '—');
+        ctx.font = 'bold 11px -apple-system, sans-serif';
+        var tw = ctx.measureText(text).width;
+        var lx = side === 'left' ? 4 : W - tw - 8;
+        var ly = y - 6;
+        ctx.fillStyle = labelBg;
+        ctx.fillRect(lx - 2, ly - 10, tw + 4, 14);
+        ctx.fillStyle = color;
+        ctx.fillText(text, lx, ly);
+        ctx.restore();
+    }
+
+    if (data) {
+        drawMeasLine(chestY, chestW / 2, '#1565C0', 'Грудь', data.chest ? data.chest + ' см' : null, 'right');
+        drawMeasLine(waistY, waistW / 2, '#F57C00', 'Талия', data.waist ? data.waist + ' см' : null, 'left');
+        drawMeasLine(hipY, hipsW / 2, '#7B1FA2', 'Бёдра', data.hips ? data.hips + ' см' : null, 'right');
+
+        // Bicep label
+        var bicepY = shoulderY + 50;
+        ctx.save();
+        ctx.strokeStyle = '#2E7D32';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 2]);
+        ctx.beginPath();
+        ctx.arc(cx - chestW / 2 - 15, bicepY, bicepW + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = 'bold 11px -apple-system, sans-serif';
+        var bText = 'Бицепс: ' + (data.bicep ? data.bicep + ' см' : '—');
+        ctx.fillStyle = labelBg;
+        var btw = ctx.measureText(bText).width;
+        ctx.fillRect(2, bicepY - 22, btw + 4, 14);
+        ctx.fillStyle = '#2E7D32';
+        ctx.fillText(bText, 4, bicepY - 10);
+        ctx.restore();
+
+        // Thigh label
+        var thighLabelY = hipY + 55;
+        ctx.save();
+        ctx.strokeStyle = '#C62828';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 2]);
+        ctx.beginPath();
+        ctx.arc(cx + thighW * 0.4, thighLabelY, thighW * 0.6 + 3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = 'bold 11px -apple-system, sans-serif';
+        var tText = 'Бедро: ' + (data.thigh ? data.thigh + ' см' : '—');
+        var ttw = ctx.measureText(tText).width;
+        ctx.fillStyle = labelBg;
+        ctx.fillRect(W - ttw - 8, thighLabelY - 22, ttw + 4, 14);
+        ctx.fillStyle = '#C62828';
+        ctx.fillText(tText, W - ttw - 6, thighLabelY - 10);
+        ctx.restore();
+
+        // Weight label at bottom
+        ctx.save();
+        ctx.font = 'bold 16px -apple-system, sans-serif';
+        var wText = weight != null ? '⚖️ ' + weight + ' кг' : '⚖️ — кг';
+        var wtw = ctx.measureText(wText).width;
+        ctx.fillStyle = '#E53935';
+        ctx.textAlign = 'center';
+        ctx.fillText(wText, cx, footY + 35);
+        ctx.restore();
+    }
+}
+
+// ===== MEASUREMENTS INPUT FORM =====
+
+var measFormInitialized = false;
+
+function initMeasForm() {
+    if (measFormInitialized) return;
+    measFormInitialized = true;
+
+    // Green highlight on filled inputs
+    document.querySelectorAll('.meas-input').forEach(function(input) {
+        input.addEventListener('input', function() {
+            if (input.value) input.classList.add('filled');
+            else input.classList.remove('filled');
+        });
+    });
+
+    // Save button
+    document.getElementById('meas-save-btn').addEventListener('click', saveMeasurements);
+}
+
+async function saveMeasurements() {
+    var btn = document.getElementById('meas-save-btn');
+    var fields = {
+        weight: document.getElementById('meas-weight').value,
+        chest: document.getElementById('meas-chest').value,
+        waist: document.getElementById('meas-waist').value,
+        hips: document.getElementById('meas-hips').value,
+        bicep: document.getElementById('meas-bicep').value,
+        thigh: document.getElementById('meas-thigh').value
+    };
+
+    // Check at least one field filled
+    var hasAny = Object.values(fields).some(function(v) { return v && v.trim() !== ''; });
+    if (!hasAny) {
+        tg.showAlert('Заполни хотя бы одно поле! 📏');
+        return;
+    }
+
+    btn.textContent = '⏳ Сохранение...';
+    btn.classList.add('saving');
+    btn.disabled = true;
+
+    try {
+        var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+        var params = 'action=saveMeasurements&chatId=' + chatId;
+        Object.keys(fields).forEach(function(key) {
+            if (fields[key]) params += '&' + key + '=' + encodeURIComponent(fields[key]);
+        });
+        var url = APPS_SCRIPT_URL + '?' + params;
+        var response = await fetch(url);
+        var data = await response.json();
+
+        if (data.success) {
+            btn.classList.remove('saving');
+            btn.classList.add('success');
+            btn.textContent = '✅ Сохранено!';
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            // Clear form
+            document.querySelectorAll('.meas-input').forEach(function(input) {
+                input.value = '';
+                input.classList.remove('filled');
+            });
+            // Reload data
+            setTimeout(function() {
+                btn.classList.remove('success');
+                btn.textContent = '💾 Сохранить замеры';
+                btn.disabled = false;
+                measSelectInitialized = false;
+                loadMeasurementsData();
+            }, 1500);
+        } else {
+            tg.showAlert('Ошибка сохранения: ' + (data.error || 'Попробуй ещё раз'));
+            btn.classList.remove('saving');
+            btn.textContent = '💾 Сохранить замеры';
+            btn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Save measurements error:', error);
+        tg.showAlert('Ошибка сохранения ❌');
+        btn.classList.remove('saving');
+        btn.textContent = '💾 Сохранить замеры';
+        btn.disabled = false;
+    }
 }
 
 function renderMeasurementsChart(key) {
