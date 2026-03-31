@@ -654,12 +654,12 @@ async function loadMeasurementsData() {
             document.getElementById('measurements-latest').innerHTML =
                 '<div class="no-data">Пока нет замеров 📏<br><br>Заполни форму ниже чтобы записать первые замеры!</div>';
             document.getElementById('measurements-list').innerHTML = '';
-            drawBodyFigure(null);
+            // body figure is now a static image
             initMeasForm();
             return;
         }
         renderLatestMeasurements();
-        drawBodyFigure(measurementsData[measurementsData.length - 1]);
+        // body figure is now a static image
         renderMeasurementsChart('weight');
         renderMeasurementsHistory();
         initMeasForm();
@@ -705,18 +705,6 @@ function renderLatestMeasurements() {
 }
 
 // ===== BODY FIGURE LABELS =====
-
-function drawBodyFigure(data) {
-    if (!data) return;
-    var el = function(id) { return document.getElementById(id); };
-    if (el('fig-shoulders')) el('fig-shoulders').textContent = data.shoulders ? data.shoulders + ' см' : '—';
-    if (el('fig-chest')) el('fig-chest').textContent = data.chest ? data.chest + ' см' : '—';
-    if (el('fig-waist')) el('fig-waist').textContent = data.waist ? data.waist + ' см' : '—';
-    if (el('fig-hips')) el('fig-hips').textContent = data.hips ? data.hips + ' см' : '—';
-    if (el('fig-bicep')) el('fig-bicep').textContent = data.bicep ? data.bicep + ' см' : '—';
-    if (el('fig-thigh')) el('fig-thigh').textContent = data.thigh ? data.thigh + ' см' : '—';
-    if (el('fig-weight')) el('fig-weight').textContent = data.weight ? data.weight + ' кг' : '— кг';
-}
 
 // ===== MEASUREMENTS INPUT FORM =====
 

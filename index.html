@@ -97,113 +97,11 @@
                 <div class="no-data">Загрузка замеров...</div>
             </div>
 
-            <!-- Body Figure -->
+            <!-- Body Figure Image -->
             <div class="body-figure-section">
                 <h3 class="section-title">📏 Последние замеры</h3>
                 <div class="body-figure" id="body-figure">
-                    <div class="body-figure-wrapper">
-                        <svg id="body-svg" viewBox="0 0 200 480" class="body-svg-figure">
-                            <!-- Clean male body silhouette -->
-                            <path d="
-                                M100,10 C112,10 122,20 122,34 C122,44 116,52 108,56
-                                L109,62 L112,66
-                                C120,68 134,72 148,78 C158,82 166,88 170,96
-                                C174,104 175,112 174,120
-                                L170,145 C168,155 164,162 160,170
-                                L155,185 C152,195 150,205 148,215
-                                L146,230 C145,238 146,244 148,248
-                                L152,262 C154,268 153,274 150,280
-                                L145,295 C143,302 143,310 144,318
-                                L146,335 C147,345 145,355 140,360
-                                L135,365 C132,368 130,375 128,385
-                                L125,400 C123,412 120,420 116,425
-                                L114,430 C112,434 112,438 114,442
-                                L118,448 L118,452 L95,452 L95,448
-                                L98,442 C100,438 99,434 97,430
-                                L95,425 C93,420 92,412 93,400
-                                L95,385 C96,375 97,365 98,355
-                                L100,338 C101,328 101,318 100,310
-                                L99,300
-                                L100,295
-                                L101,300
-                                L100,310 C99,318 99,328 100,338
-                                L102,355 C103,365 104,375 105,385
-                                L107,400 C108,412 107,420 105,425
-                                L103,430 C101,434 100,438 102,442
-                                L105,448 L105,452 L82,452 L82,448
-                                L86,442 C88,438 88,434 86,430
-                                L84,425 C80,420 77,412 75,400
-                                L72,385 C70,375 68,368 65,365
-                                L60,360 C55,355 53,345 54,335
-                                L56,318 C57,310 57,302 55,295
-                                L50,280 C47,274 46,268 48,262
-                                L52,248 C54,244 55,238 54,230
-                                L52,215 C50,205 48,195 45,185
-                                L40,170 C36,162 32,155 30,145
-                                L26,120 C25,112 26,104 30,96
-                                C34,88 42,82 52,78
-                                C66,72 80,68 88,66
-                                L91,62 L92,56
-                                C84,52 78,44 78,34
-                                C78,20 88,10 100,10 Z
-                            " fill="#90CAF9" stroke="#64B5F6" stroke-width="0.8" opacity="0.85"/>
-
-                            <!-- Measurement lines -->
-                            <!-- Shoulders -->
-                            <line x1="25" y1="82" x2="175" y2="82" stroke="#546E7A" stroke-width="1" stroke-dasharray="5,3"/>
-                            <line x1="25" y1="78" x2="25" y2="86" stroke="#546E7A" stroke-width="1.5"/>
-                            <line x1="175" y1="78" x2="175" y2="86" stroke="#546E7A" stroke-width="1.5"/>
-                            <!-- Chest -->
-                            <line x1="30" y1="115" x2="170" y2="115" stroke="#546E7A" stroke-width="1" stroke-dasharray="5,3"/>
-                            <line x1="30" y1="111" x2="30" y2="119" stroke="#546E7A" stroke-width="1.5"/>
-                            <line x1="170" y1="111" x2="170" y2="119" stroke="#546E7A" stroke-width="1.5"/>
-                            <!-- Waist -->
-                            <line x1="40" y1="170" x2="160" y2="170" stroke="#546E7A" stroke-width="1" stroke-dasharray="5,3"/>
-                            <line x1="40" y1="166" x2="40" y2="174" stroke="#546E7A" stroke-width="1.5"/>
-                            <line x1="160" y1="166" x2="160" y2="174" stroke="#546E7A" stroke-width="1.5"/>
-                            <!-- Hips -->
-                            <line x1="42" y1="210" x2="158" y2="210" stroke="#546E7A" stroke-width="1" stroke-dasharray="5,3"/>
-                            <line x1="42" y1="206" x2="42" y2="214" stroke="#546E7A" stroke-width="1.5"/>
-                            <line x1="158" y1="206" x2="158" y2="214" stroke="#546E7A" stroke-width="1.5"/>
-                            <!-- Bicep -->
-                            <line x1="22" y1="140" x2="42" y2="140" stroke="#546E7A" stroke-width="1" stroke-dasharray="3,2"/>
-                            <line x1="22" y1="136" x2="22" y2="144" stroke="#546E7A" stroke-width="1"/>
-                            <line x1="42" y1="136" x2="42" y2="144" stroke="#546E7A" stroke-width="1"/>
-                            <!-- Thigh -->
-                            <line x1="107" y1="305" x2="145" y2="305" stroke="#546E7A" stroke-width="1" stroke-dasharray="3,2"/>
-                            <line x1="107" y1="301" x2="107" y2="309" stroke="#546E7A" stroke-width="1"/>
-                            <line x1="145" y1="301" x2="145" y2="309" stroke="#546E7A" stroke-width="1"/>
-                        </svg>
-
-                        <!-- Measurement labels -->
-                        <div class="body-labels">
-                            <div class="body-label-item" style="top:14%;right:0">
-                                <span class="label-name">Плечи</span>
-                                <span class="label-value" id="fig-shoulders">—</span>
-                            </div>
-                            <div class="body-label-item" style="top:21%;left:0">
-                                <span class="label-name">Грудь</span>
-                                <span class="label-value" id="fig-chest">—</span>
-                            </div>
-                            <div class="body-label-item" style="top:28%;left:0">
-                                <span class="label-name">Бицепс</span>
-                                <span class="label-value" id="fig-bicep">—</span>
-                            </div>
-                            <div class="body-label-item" style="top:33%;right:0">
-                                <span class="label-name">Талия</span>
-                                <span class="label-value" id="fig-waist">—</span>
-                            </div>
-                            <div class="body-label-item" style="top:41%;left:0">
-                                <span class="label-name">Бёдра</span>
-                                <span class="label-value" id="fig-hips">—</span>
-                            </div>
-                            <div class="body-label-item" style="top:61%;right:0">
-                                <span class="label-name">Бедро</span>
-                                <span class="label-value" id="fig-thigh">—</span>
-                            </div>
-                            <div class="body-weight-label" id="fig-weight">— кг</div>
-                        </div>
-                    </div>
+                    <img src="body.png" alt="Замеры тела" class="body-image">
                 </div>
             </div>
 
