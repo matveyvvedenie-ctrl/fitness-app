@@ -180,15 +180,14 @@ document.getElementById('save-btn').addEventListener('click', async function() {
                 var exercise = workoutData[d].exercises[ex];
                 if (exercise.weightFact || exercise.repsFact || (exercise.comment && exercise.comment.trim())) {
                     exercisesToSave.push({
-                        rowIndex: exercise.rowIndex,
-                        weightFact: exercise.weightFact || '',
-                        repsFact: exercise.repsFact || '',
-                        completed: !!(exercise.weightFact || exercise.repsFact),
-                        comment: (exercise.comment && exercise.comment.trim()) ? exercise.comment.trim() : '',
-                        exercise: exercise.exercise,
-                        sets: exercise.sets,
-                        reps: exercise.reps,
-                        weightPlan: exercise.weightPlan,
+                        r: exercise.rowIndex,
+                        w: exercise.weightFact || '',
+                        p: exercise.repsFact || '',
+                        c: (exercise.comment && exercise.comment.trim()) ? exercise.comment.trim() : '',
+                        e: exercise.exercise,
+                        s: exercise.sets,
+                        rp: exercise.reps,
+                        wp: exercise.weightPlan,
                         rpe: exercise.rpe
                     });
                 }
@@ -204,16 +203,21 @@ document.getElementById('save-btn').addEventListener('click', async function() {
             var lastError = '';
             for (var attempt = 0; attempt < 3; attempt++) {
                 try {
-                    // Google Apps Script redirects POST to GET — send data in URL for reliability
-                    var postUrl = url + '&exercises=' + encodeURIComponent(JSON.stringify(exercisesToSave));
+                    var encoded = encodeURIComponent(JSON.stringify(exercisesToSave));
+                    var fullUrl = url + '&exercises=' + encoded;
                     var response;
-                    if (postUrl.length > 8000) {
-                        // Too long for URL — use POST with no-cors workaround
-                        var formData = new FormData();
-                        formData.append('exercises', JSON.stringify(exercisesToSave));
-                        response = await fetch(url, { method: 'POST', body: formData });
+                    if (fullUrl.length > 7500) {
+                        // Split into 2 batches if URL too long
+                        var half = Math.ceil(exercisesToSave.length / 2);
+                        var batch1 = exercisesToSave.slice(0, half);
+                        var batch2 = exercisesToSave.slice(half);
+                        var url1 = url + '&exercises=' + encodeURIComponent(JSON.stringify(batch1));
+                        var url2 = url + '&exercises=' + encodeURIComponent(JSON.stringify(batch2));
+                        response = await fetch(url1);
+                        await response.text();
+                        response = await fetch(url2);
                     } else {
-                        response = await fetch(postUrl);
+                        response = await fetch(fullUrl);
                     }
                     var text = await response.text();
                     try {
