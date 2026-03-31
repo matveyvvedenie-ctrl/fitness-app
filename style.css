@@ -989,10 +989,69 @@ body {
     padding: 10px 0;
 }
 
-#body-canvas {
+.body-figure-wrapper {
+    position: relative;
     width: 100%;
-    max-width: 300px;
+    max-width: 320px;
+    margin: 0 auto;
+}
+
+.body-svg-figure {
+    width: 100%;
     height: auto;
+    display: block;
+}
+
+.body-labels {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.body-label-item {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    padding: 3px 8px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.label-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.label-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.label-name.label-green { color: #2E7D32; }
+.label-value.label-green { color: #2E7D32; }
+.label-name.label-red { color: #C62828; }
+.label-value.label-red { color: #C62828; }
+
+.body-weight-label {
+    position: absolute;
+    bottom: 2%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+    font-weight: 800;
+    color: #E53935;
+    background: rgba(255,255,255,0.9);
+    padding: 4px 16px;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(229,57,53,0.2);
 }
 
 /* Measurements Form */
@@ -1012,6 +1071,12 @@ body {
     margin-bottom: 14px;
     max-width: 100%;
     box-sizing: border-box;
+    overflow: hidden;
+}
+
+.meas-input-group:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    max-width: 50%;
 }
 
 .meas-input-group {

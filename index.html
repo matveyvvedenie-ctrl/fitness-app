@@ -97,11 +97,152 @@
                 <div class="no-data">Загрузка замеров...</div>
             </div>
 
-            <!-- Body Figure with dynamic proportions -->
+            <!-- Body Figure -->
             <div class="body-figure-section">
                 <h3 class="section-title">📏 Последние замеры</h3>
                 <div class="body-figure" id="body-figure">
-                    <canvas id="body-canvas" width="300" height="480"></canvas>
+                    <div class="body-figure-wrapper">
+                        <svg id="body-svg" viewBox="0 0 280 520" class="body-svg-figure">
+                            <!-- FRONT VIEW - Anatomical body silhouette -->
+                            <defs>
+                                <linearGradient id="skinGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#E0E0E0"/>
+                                    <stop offset="100%" stop-color="#BDBDBD"/>
+                                </linearGradient>
+                                <linearGradient id="muscleGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#D5D5D5"/>
+                                    <stop offset="100%" stop-color="#C0C0C0"/>
+                                </linearGradient>
+                            </defs>
+
+                            <!-- Body outline -->
+                            <path id="body-outline" d="
+                                M140,8
+                                C158,8 172,22 172,40 C172,52 165,62 155,67
+                                L157,72 C157,72 160,75 160,78
+                                L160,82
+                                C170,85 185,90 200,96
+                                C210,100 218,104 222,110
+                                C228,118 230,125 230,132
+                                L228,150 C226,158 222,165 220,170
+                                C218,176 215,184 214,190
+                                L210,210 C208,218 207,225 206,232
+                                L204,245 C203,250 202,254 204,258
+                                L208,268 C210,274 209,280 206,285
+                                L202,295 C200,300 200,305 200,310
+                                L200,318
+                                C195,320 192,318 190,312
+                                L188,300 C186,292 185,285 186,278
+                                L188,268
+                                C184,262 180,254 178,248
+                                L174,240 C172,236 170,232 168,228
+                                L166,222 C164,216 162,208 160,200
+                                L158,188 C156,180 155,174 154,170
+                                C152,164 150,158 150,152
+                                L148,142 C146,138 144,135 142,134
+                                L140,132
+                                L138,134 C136,135 134,138 132,142
+                                L130,152 C130,158 128,164 126,170
+                                C125,174 124,180 122,188
+                                L120,200 C118,208 116,216 114,222
+                                L112,228 C110,232 108,236 106,240
+                                L102,248 C100,254 96,262 92,268
+                                L94,278 C95,285 94,292 92,300
+                                L90,312 C88,318 85,320 80,318
+                                L80,310 C80,305 80,300 78,295
+                                L74,285 C71,280 70,274 72,268
+                                L76,258 C78,254 77,250 76,245
+                                L74,232 C73,225 72,218 70,210
+                                L66,190 C65,184 62,176 60,170
+                                C58,165 54,158 52,150
+                                L50,132 C50,125 52,118 58,110
+                                C62,104 70,100 80,96
+                                C95,90 110,85 120,82
+                                L120,78 C120,75 123,72 123,72
+                                L125,67 C115,62 108,52 108,40
+                                C108,22 122,8 140,8 Z
+                            " fill="url(#skinGrad)" stroke="#9E9E9E" stroke-width="1.2"/>
+
+                            <!-- Muscle definition lines -->
+                            <!-- Chest split -->
+                            <line x1="140" y1="100" x2="140" y2="145" stroke="#B0B0B0" stroke-width="0.8"/>
+                            <!-- Left pec -->
+                            <path d="M137,104 Q122,108 118,128 Q128,138 137,135" fill="none" stroke="#B0B0B0" stroke-width="0.8"/>
+                            <!-- Right pec -->
+                            <path d="M143,104 Q158,108 162,128 Q152,138 143,135" fill="none" stroke="#B0B0B0" stroke-width="0.8"/>
+                            <!-- Abs -->
+                            <line x1="140" y1="148" x2="140" y2="195" stroke="#B0B0B0" stroke-width="0.8"/>
+                            <path d="M128,155 Q140,157 152,155" fill="none" stroke="#B0B0B0" stroke-width="0.6"/>
+                            <path d="M127,165 Q140,167 153,165" fill="none" stroke="#B0B0B0" stroke-width="0.6"/>
+                            <path d="M126,175 Q140,177 154,175" fill="none" stroke="#B0B0B0" stroke-width="0.6"/>
+                            <path d="M125,185 Q140,187 155,185" fill="none" stroke="#B0B0B0" stroke-width="0.6"/>
+                            <!-- Deltoid lines -->
+                            <path d="M118,100 Q108,115 112,130" fill="none" stroke="#B0B0B0" stroke-width="0.8"/>
+                            <path d="M162,100 Q172,115 168,130" fill="none" stroke="#B0B0B0" stroke-width="0.8"/>
+                            <!-- Quad lines -->
+                            <path d="M125,220 Q122,270 120,310" fill="none" stroke="#B0B0B0" stroke-width="0.6"/>
+                            <path d="M155,220 Q158,270 160,310" fill="none" stroke="#B0B0B0" stroke-width="0.6"/>
+
+                            <!-- Measurement lines - dynamically positioned -->
+                            <!-- Shoulders -->
+                            <g id="meas-line-shoulders" class="meas-line-group">
+                                <line x1="48" y1="96" x2="232" y2="96" stroke="#455A64" stroke-width="1" stroke-dasharray="4,3"/>
+                                <line x1="48" y1="92" x2="48" y2="100" stroke="#455A64" stroke-width="1.5"/>
+                                <line x1="232" y1="92" x2="232" y2="100" stroke="#455A64" stroke-width="1.5"/>
+                            </g>
+                            <!-- Chest -->
+                            <g id="meas-line-chest" class="meas-line-group">
+                                <line x1="58" y1="125" x2="222" y2="125" stroke="#1565C0" stroke-width="1" stroke-dasharray="4,3"/>
+                                <line x1="58" y1="121" x2="58" y2="129" stroke="#1565C0" stroke-width="1.5"/>
+                                <line x1="222" y1="121" x2="222" y2="129" stroke="#1565C0" stroke-width="1.5"/>
+                            </g>
+                            <!-- Waist -->
+                            <g id="meas-line-waist" class="meas-line-group">
+                                <line x1="65" y1="170" x2="215" y2="170" stroke="#F57C00" stroke-width="1" stroke-dasharray="4,3"/>
+                                <line x1="65" y1="166" x2="65" y2="174" stroke="#F57C00" stroke-width="1.5"/>
+                                <line x1="215" y1="166" x2="215" y2="174" stroke="#F57C00" stroke-width="1.5"/>
+                            </g>
+                            <!-- Hips -->
+                            <g id="meas-line-hips" class="meas-line-group">
+                                <line x1="62" y1="205" x2="218" y2="205" stroke="#7B1FA2" stroke-width="1" stroke-dasharray="4,3"/>
+                                <line x1="62" y1="201" x2="62" y2="209" stroke="#7B1FA2" stroke-width="1.5"/>
+                                <line x1="218" y1="201" x2="218" y2="209" stroke="#7B1FA2" stroke-width="1.5"/>
+                            </g>
+                            <!-- Bicep circle left -->
+                            <ellipse id="meas-circle-bicep" cx="62" cy="155" rx="14" ry="18" fill="none" stroke="#2E7D32" stroke-width="1" stroke-dasharray="3,2"/>
+                            <!-- Thigh circle right -->
+                            <ellipse id="meas-circle-thigh" cx="160" cy="270" rx="18" ry="22" fill="none" stroke="#C62828" stroke-width="1" stroke-dasharray="3,2"/>
+                        </svg>
+
+                        <!-- Measurement labels overlay -->
+                        <div class="body-labels">
+                            <div class="body-label-item" style="top:15%;left:0" id="label-shoulders">
+                                <span class="label-name">Плечи</span>
+                                <span class="label-value" id="fig-shoulders">—</span>
+                            </div>
+                            <div class="body-label-item" style="top:22%;right:0" id="label-chest">
+                                <span class="label-name">Грудь</span>
+                                <span class="label-value" id="fig-chest">—</span>
+                            </div>
+                            <div class="body-label-item" style="top:30%;left:0" id="label-waist">
+                                <span class="label-name">Талия</span>
+                                <span class="label-value" id="fig-waist">—</span>
+                            </div>
+                            <div class="body-label-item" style="top:37%;right:0" id="label-hips">
+                                <span class="label-name">Бёдра</span>
+                                <span class="label-value" id="fig-hips">—</span>
+                            </div>
+                            <div class="body-label-item" style="top:27%;left:0" id="label-bicep">
+                                <span class="label-name label-green">Бицепс</span>
+                                <span class="label-value label-green" id="fig-bicep">—</span>
+                            </div>
+                            <div class="body-label-item" style="top:50%;right:0" id="label-thigh">
+                                <span class="label-name label-red">Бедро</span>
+                                <span class="label-value label-red" id="fig-thigh">—</span>
+                            </div>
+                            <div class="body-weight-label" id="fig-weight">— кг</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

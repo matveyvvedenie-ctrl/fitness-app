@@ -199,15 +199,34 @@ document.getElementById('save-btn').addEventListener('click', async function() {
         } else {
             var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
             var completionPercent = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
-            var url = APPS_SCRIPT_URL + '?action=write&chatId=' + chatId + '&completionPercent=' + completionPercent + '&exercises=' + encodeURIComponent(JSON.stringify(exercisesToSave));
+            var url = APPS_SCRIPT_URL + '?action=write&chatId=' + chatId + '&completionPercent=' + completionPercent;
             var data = null;
+            var lastError = '';
             for (var attempt = 0; attempt < 3; attempt++) {
                 try {
-                    var response = await fetch(url);
-                    data = await response.json();
+                    // Google Apps Script redirects POST to GET — send data in URL for reliability
+                    var postUrl = url + '&exercises=' + encodeURIComponent(JSON.stringify(exercisesToSave));
+                    var response;
+                    if (postUrl.length > 8000) {
+                        // Too long for URL — use POST with no-cors workaround
+                        var formData = new FormData();
+                        formData.append('exercises', JSON.stringify(exercisesToSave));
+                        response = await fetch(url, { method: 'POST', body: formData });
+                    } else {
+                        response = await fetch(postUrl);
+                    }
+                    var text = await response.text();
+                    try {
+                        data = JSON.parse(text);
+                    } catch (parseErr) {
+                        lastError = 'Ответ сервера не JSON: ' + text.substring(0, 100);
+                        data = null;
+                    }
                     if (data && data.success) break;
+                    if (data && data.error) lastError = data.error;
                 } catch (err) {
-                    console.log('Attempt ' + (attempt + 1) + ' failed, retrying...');
+                    lastError = err.message || 'Сетевая ошибка';
+                    console.log('Attempt ' + (attempt + 1) + ' failed: ' + lastError);
                     await new Promise(function(r) { setTimeout(r, 2000); });
                 }
             }
@@ -226,12 +245,16 @@ document.getElementById('save-btn').addEventListener('click', async function() {
                     btn.textContent = originalText;
                 }, 1000);
             } else {
-                tg.showAlert('Не удалось сохранить данные ❌\nПопробуй ещё раз');
+                var errMsg = 'Не удалось сохранить ❌\n';
+                if (lastError) errMsg += '\nПричина: ' + lastError;
+                else if (data && data.error) errMsg += '\nПричина: ' + data.error;
+                else errMsg += '\nСервер не ответил. Проверь интернет.';
+                tg.showAlert(errMsg);
             }
         }
     } catch (error) {
         console.error('Save error:', error);
-        tg.showAlert('Ошибка при сохранении данных ❌');
+        tg.showAlert('Ошибка при сохранении ❌\n\n' + (error.message || 'Неизвестная ошибка'));
     } finally {
         setTimeout(function() {
             btn.classList.remove('saving', 'success');
@@ -677,327 +700,18 @@ function renderLatestMeasurements() {
         '</div>';
 }
 
-// ===== ANATOMICAL BODY FIGURE ON CANVAS =====
+// ===== BODY FIGURE LABELS =====
 
 function drawBodyFigure(data) {
-    var canvas = document.getElementById('body-canvas');
-    if (!canvas) return;
-    var ctx = canvas.getContext('2d');
-    var W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-
-    // Default proportions (cm)
-    var sh = 110, ch = 90, wa = 70, hp = 95, bi = 30, th = 50, wt = null;
-    if (data) {
-        sh = data.shoulders || 110;
-        ch = data.chest || 90;
-        wa = data.waist || 70;
-        hp = data.hips || 95;
-        bi = data.bicep || 30;
-        th = data.thigh || 50;
-        wt = data.weight;
-    }
-
-    var cx = W / 2;
-    // Scale measurements to pixel half-widths
-    var s = 0.28;
-    var shW = sh * s;  // shoulder half-width
-    var chW = ch * s * 0.48;
-    var waW = wa * s * 0.48;
-    var hpW = hp * s * 0.48;
-    var biW = bi * s * 0.22;
-    var thW = th * s * 0.22;
-
-    // Y positions (anatomical proportions: 8-head canon)
-    var headTop = 12, headR = 16;
-    var headCY = headTop + headR;
-    var neckTop = headCY + headR;
-    var shoulderY = neckTop + 14;
-    var chestY = shoulderY + 28;
-    var waistY = chestY + 42;
-    var hipY = waistY + 28;
-    var crotchY = hipY + 18;
-    var kneeY = crotchY + 75;
-    var ankleY = kneeY + 72;
-    var footY = ankleY + 10;
-
-    // Colors
-    var bodyFill = '#E8E8E8';
-    var bodyStroke = '#9E9E9E';
-    var muscleLine = '#BDBDBD';
-
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    // ===== DRAW BODY OUTLINE =====
-    ctx.beginPath();
-
-    // LEFT SIDE — top of left shoulder
-    ctx.moveTo(cx - 8, neckTop);
-    // Trap slope to shoulder
-    ctx.quadraticCurveTo(cx - shW * 0.4, shoulderY - 12, cx - shW, shoulderY);
-    // Deltoid cap
-    ctx.quadraticCurveTo(cx - shW - 8, shoulderY + 10, cx - shW - 6, shoulderY + 22);
-    // Outer upper arm
-    ctx.quadraticCurveTo(cx - shW - 3 - biW, shoulderY + 45, cx - shW - 2 - biW, shoulderY + 60);
-    // Elbow
-    ctx.quadraticCurveTo(cx - shW - 1 - biW * 0.8, shoulderY + 80, cx - shW - biW * 0.6, shoulderY + 85);
-    // Outer forearm
-    ctx.quadraticCurveTo(cx - shW - biW * 0.7, shoulderY + 110, cx - shW + 2 - biW * 0.3, shoulderY + 140);
-    // Wrist
-    ctx.quadraticCurveTo(cx - shW + 4, shoulderY + 148, cx - shW + 5, shoulderY + 145);
-    // Inner forearm back up
-    ctx.quadraticCurveTo(cx - shW + 8, shoulderY + 130, cx - shW + 6 + biW * 0.3, shoulderY + 95);
-    // Inner upper arm
-    ctx.quadraticCurveTo(cx - shW + 5 + biW * 0.5, shoulderY + 75, cx - shW + 8 + biW * 0.3, shoulderY + 50);
-    // Armpit to torso
-    ctx.quadraticCurveTo(cx - shW + 10, shoulderY + 30, cx - chW, chestY);
-    // Torso left: chest -> waist -> hip
-    ctx.quadraticCurveTo(cx - chW + 2, chestY + 15, cx - waW, waistY);
-    ctx.quadraticCurveTo(cx - waW - 2, waistY + 10, cx - hpW, hipY);
-    // Hip to outer thigh
-    ctx.quadraticCurveTo(cx - hpW - 3, hipY + 8, cx - thW - 8, crotchY);
-    ctx.quadraticCurveTo(cx - thW - 6, crotchY + 30, cx - thW - 4, kneeY - 20);
-    // Knee
-    ctx.quadraticCurveTo(cx - thW - 2, kneeY, cx - thW * 0.7, kneeY + 5);
-    // Calf
-    ctx.quadraticCurveTo(cx - thW * 0.8, kneeY + 25, cx - thW * 0.7, kneeY + 45);
-    ctx.quadraticCurveTo(cx - thW * 0.5, ankleY - 10, cx - thW * 0.35, ankleY);
-    // Ankle & foot
-    ctx.quadraticCurveTo(cx - thW * 0.5, footY, cx - thW * 0.6, footY + 5);
-    ctx.lineTo(cx - thW * 0.05, footY + 5);
-    ctx.quadraticCurveTo(cx - thW * 0.02, footY, cx - thW * 0.05, ankleY);
-    // Inner left leg up
-    ctx.quadraticCurveTo(cx - thW * 0.1, ankleY - 10, cx - thW * 0.2, kneeY + 45);
-    ctx.quadraticCurveTo(cx - thW * 0.25, kneeY + 25, cx - thW * 0.15, kneeY + 5);
-    ctx.quadraticCurveTo(cx - thW * 0.1, kneeY - 10, cx - 6, crotchY + 10);
-    // Crotch
-    ctx.quadraticCurveTo(cx, crotchY + 18, cx + 6, crotchY + 10);
-    // Inner right leg down
-    ctx.quadraticCurveTo(cx + thW * 0.1, kneeY - 10, cx + thW * 0.15, kneeY + 5);
-    ctx.quadraticCurveTo(cx + thW * 0.25, kneeY + 25, cx + thW * 0.2, kneeY + 45);
-    ctx.quadraticCurveTo(cx + thW * 0.1, ankleY - 10, cx + thW * 0.05, ankleY);
-    // Right foot
-    ctx.quadraticCurveTo(cx + thW * 0.02, footY, cx + thW * 0.05, footY + 5);
-    ctx.lineTo(cx + thW * 0.6, footY + 5);
-    ctx.quadraticCurveTo(cx + thW * 0.5, footY, cx + thW * 0.35, ankleY);
-    // Outer right leg up
-    ctx.quadraticCurveTo(cx + thW * 0.5, ankleY - 10, cx + thW * 0.7, kneeY + 45);
-    ctx.quadraticCurveTo(cx + thW * 0.8, kneeY + 25, cx + thW * 0.7, kneeY + 5);
-    ctx.quadraticCurveTo(cx + thW + 2, kneeY, cx + thW + 4, kneeY - 20);
-    ctx.quadraticCurveTo(cx + thW + 6, crotchY + 30, cx + thW + 8, crotchY);
-    // Right hip up
-    ctx.quadraticCurveTo(cx + hpW + 3, hipY + 8, cx + hpW, hipY);
-    ctx.quadraticCurveTo(cx + waW + 2, waistY + 10, cx + waW, waistY);
-    ctx.quadraticCurveTo(cx + chW - 2, chestY + 15, cx + chW, chestY);
-    // Right armpit to arm
-    ctx.quadraticCurveTo(cx + shW - 10, shoulderY + 30, cx + shW - 8 - biW * 0.3, shoulderY + 50);
-    ctx.quadraticCurveTo(cx + shW - 5 - biW * 0.5, shoulderY + 75, cx + shW - 6 - biW * 0.3, shoulderY + 95);
-    ctx.quadraticCurveTo(cx + shW - 8, shoulderY + 130, cx + shW - 5, shoulderY + 145);
-    // Right wrist
-    ctx.quadraticCurveTo(cx + shW - 4, shoulderY + 148, cx + shW - 2 + biW * 0.3, shoulderY + 140);
-    // Right outer forearm
-    ctx.quadraticCurveTo(cx + shW + biW * 0.7, shoulderY + 110, cx + shW + biW * 0.6, shoulderY + 85);
-    ctx.quadraticCurveTo(cx + shW + 1 + biW * 0.8, shoulderY + 80, cx + shW + 2 + biW, shoulderY + 60);
-    ctx.quadraticCurveTo(cx + shW + 3 + biW, shoulderY + 45, cx + shW + 6, shoulderY + 22);
-    ctx.quadraticCurveTo(cx + shW + 8, shoulderY + 10, cx + shW, shoulderY);
-    // Right trap
-    ctx.quadraticCurveTo(cx + shW * 0.4, shoulderY - 12, cx + 8, neckTop);
-    ctx.closePath();
-
-    ctx.fillStyle = bodyFill;
-    ctx.fill();
-    ctx.strokeStyle = bodyStroke;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // ===== HEAD =====
-    ctx.beginPath();
-    ctx.ellipse(cx, headCY, headR * 0.82, headR, 0, 0, Math.PI * 2);
-    ctx.fillStyle = bodyFill;
-    ctx.fill();
-    ctx.strokeStyle = bodyStroke;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Neck
-    ctx.beginPath();
-    ctx.moveTo(cx - 7, headCY + headR - 3);
-    ctx.lineTo(cx - 8, neckTop);
-    ctx.lineTo(cx + 8, neckTop);
-    ctx.lineTo(cx + 7, headCY + headR - 3);
-    ctx.fillStyle = bodyFill;
-    ctx.fill();
-
-    // ===== MUSCLE DEFINITION LINES =====
-    ctx.strokeStyle = muscleLine;
-    ctx.lineWidth = 1;
-
-    // Pec line (chest split)
-    ctx.beginPath();
-    ctx.moveTo(cx, shoulderY + 5);
-    ctx.lineTo(cx, chestY + 5);
-    ctx.stroke();
-
-    // Left pec outline
-    ctx.beginPath();
-    ctx.moveTo(cx - 3, shoulderY + 8);
-    ctx.quadraticCurveTo(cx - chW * 0.7, shoulderY + 15, cx - chW + 3, chestY - 5);
-    ctx.quadraticCurveTo(cx - chW * 0.5, chestY + 8, cx - 2, chestY + 5);
-    ctx.stroke();
-
-    // Right pec outline
-    ctx.beginPath();
-    ctx.moveTo(cx + 3, shoulderY + 8);
-    ctx.quadraticCurveTo(cx + chW * 0.7, shoulderY + 15, cx + chW - 3, chestY - 5);
-    ctx.quadraticCurveTo(cx + chW * 0.5, chestY + 8, cx + 2, chestY + 5);
-    ctx.stroke();
-
-    // Abs lines (6-pack)
-    var absTop = chestY + 8;
-    var absBot = waistY - 3;
-    var absStep = (absBot - absTop) / 4;
-    ctx.beginPath();
-    ctx.moveTo(cx, absTop);
-    ctx.lineTo(cx, absBot + 8);
-    ctx.stroke();
-    for (var ai = 0; ai < 4; ai++) {
-        var ay = absTop + ai * absStep + absStep * 0.5;
-        var aw = waW * 0.55 - ai * 1;
-        ctx.beginPath();
-        ctx.moveTo(cx - aw, ay);
-        ctx.quadraticCurveTo(cx, ay + 2, cx + aw, ay);
-        ctx.stroke();
-    }
-
-    // Oblique lines
-    ctx.beginPath();
-    ctx.moveTo(cx - waW - 1, waistY - 5);
-    ctx.quadraticCurveTo(cx - waW + 3, waistY + 10, cx - hpW + 5, hipY - 5);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx + waW + 1, waistY - 5);
-    ctx.quadraticCurveTo(cx + waW - 3, waistY + 10, cx + hpW - 5, hipY - 5);
-    ctx.stroke();
-
-    // Quad lines on thighs
-    // Left quad
-    ctx.beginPath();
-    ctx.moveTo(cx - thW * 0.5, crotchY + 5);
-    ctx.quadraticCurveTo(cx - thW * 0.5, kneeY - 30, cx - thW * 0.4, kneeY - 5);
-    ctx.stroke();
-    // Right quad
-    ctx.beginPath();
-    ctx.moveTo(cx + thW * 0.5, crotchY + 5);
-    ctx.quadraticCurveTo(cx + thW * 0.5, kneeY - 30, cx + thW * 0.4, kneeY - 5);
-    ctx.stroke();
-
-    // Deltoid separation lines
-    ctx.beginPath();
-    ctx.moveTo(cx - shW + 5, shoulderY + 2);
-    ctx.quadraticCurveTo(cx - shW + 2, shoulderY + 18, cx - shW + 8, shoulderY + 30);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx + shW - 5, shoulderY + 2);
-    ctx.quadraticCurveTo(cx + shW - 2, shoulderY + 18, cx + shW - 8, shoulderY + 30);
-    ctx.stroke();
-
-    // Bicep line
-    ctx.beginPath();
-    ctx.moveTo(cx - shW + 5, shoulderY + 35);
-    ctx.quadraticCurveTo(cx - shW + 3, shoulderY + 55, cx - shW + 6, shoulderY + 70);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx + shW - 5, shoulderY + 35);
-    ctx.quadraticCurveTo(cx + shW - 3, shoulderY + 55, cx + shW - 6, shoulderY + 70);
-    ctx.stroke();
-
-    ctx.restore();
-
-    // ===== MEASUREMENT LINES & LABELS =====
     if (!data) return;
-
-    var labelBg = 'rgba(255,255,255,0.92)';
-
-    function drawMeasLabel(y, halfW, color, label, value, side) {
-        ctx.save();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 3]);
-        // Horizontal dashed line across body
-        ctx.beginPath();
-        ctx.moveTo(cx - halfW - 5, y);
-        ctx.lineTo(cx + halfW + 5, y);
-        ctx.stroke();
-        // Arrow ends
-        ctx.setLineDash([]);
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(cx - halfW - 5, y - 4); ctx.lineTo(cx - halfW - 5, y + 4); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(cx + halfW + 5, y - 4); ctx.lineTo(cx + halfW + 5, y + 4); ctx.stroke();
-        // Label with bg
-        var text = label + ': ' + (value != null ? value : '—');
-        ctx.font = 'bold 10px -apple-system, sans-serif';
-        var tw = ctx.measureText(text).width;
-        var lx = side === 'left' ? 2 : W - tw - 6;
-        var ly = y - 5;
-        ctx.fillStyle = labelBg;
-        ctx.fillRect(lx - 2, ly - 10, tw + 4, 14);
-        ctx.fillStyle = color;
-        ctx.fillText(text, lx, ly);
-        ctx.restore();
-    }
-
-    drawMeasLabel(shoulderY + 3, shW + 3, '#455A64', 'Плечи', data.shoulders ? data.shoulders + ' см' : null, 'left');
-    drawMeasLabel(chestY, chW, '#1565C0', 'Грудь', data.chest ? data.chest + ' см' : null, 'right');
-    drawMeasLabel(waistY, waW, '#F57C00', 'Талия', data.waist ? data.waist + ' см' : null, 'left');
-    drawMeasLabel(hipY, hpW, '#7B1FA2', 'Бёдра', data.hips ? data.hips + ' см' : null, 'right');
-
-    // Bicep circle + label
-    var bicepLY = shoulderY + 50;
-    ctx.save();
-    ctx.strokeStyle = '#2E7D32';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 2]);
-    ctx.beginPath();
-    ctx.ellipse(cx - shW + 2, bicepLY, biW + 4, biW + 6, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.font = 'bold 10px -apple-system, sans-serif';
-    var bText = 'Бицепс: ' + (data.bicep ? data.bicep + ' см' : '—');
-    var btw = ctx.measureText(bText).width;
-    ctx.fillStyle = labelBg;
-    ctx.fillRect(1, bicepLY - 20, btw + 4, 14);
-    ctx.fillStyle = '#2E7D32';
-    ctx.fillText(bText, 3, bicepLY - 8);
-    ctx.restore();
-
-    // Thigh circle + label
-    var thighLY = crotchY + 35;
-    ctx.save();
-    ctx.strokeStyle = '#C62828';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 2]);
-    ctx.beginPath();
-    ctx.ellipse(cx + thW * 0.4, thighLY, thW + 5, thW + 8, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.font = 'bold 10px -apple-system, sans-serif';
-    var tText = 'Бедро: ' + (data.thigh ? data.thigh + ' см' : '—');
-    var ttw = ctx.measureText(tText).width;
-    ctx.fillStyle = labelBg;
-    ctx.fillRect(W - ttw - 6, thighLY - 20, ttw + 4, 14);
-    ctx.fillStyle = '#C62828';
-    ctx.fillText(tText, W - ttw - 4, thighLY - 8);
-    ctx.restore();
-
-    // Weight at bottom
-    ctx.save();
-    ctx.font = 'bold 14px -apple-system, sans-serif';
-    ctx.fillStyle = '#E53935';
-    ctx.textAlign = 'center';
-    ctx.fillText(wt != null ? '⚖️ ' + wt + ' кг' : '⚖️ — кг', cx, footY + 25);
-    ctx.restore();
+    var el = function(id) { return document.getElementById(id); };
+    if (el('fig-shoulders')) el('fig-shoulders').textContent = data.shoulders ? data.shoulders + ' см' : '—';
+    if (el('fig-chest')) el('fig-chest').textContent = data.chest ? data.chest + ' см' : '—';
+    if (el('fig-waist')) el('fig-waist').textContent = data.waist ? data.waist + ' см' : '—';
+    if (el('fig-hips')) el('fig-hips').textContent = data.hips ? data.hips + ' см' : '—';
+    if (el('fig-bicep')) el('fig-bicep').textContent = data.bicep ? data.bicep + ' см' : '—';
+    if (el('fig-thigh')) el('fig-thigh').textContent = data.thigh ? data.thigh + ' см' : '—';
+    if (el('fig-weight')) el('fig-weight').textContent = data.weight ? data.weight + ' кг' : '— кг';
 }
 
 // ===== MEASUREMENTS INPUT FORM =====
