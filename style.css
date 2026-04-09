@@ -115,6 +115,61 @@ body {
     animation: slideInLeft 0.4s ease-out;
 }
 
+/* Collapsible day header */
+.day-collapsible {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s, border-radius 0.3s;
+}
+.day-collapsible:active {
+    background: linear-gradient(135deg, #C62828 0%, #B71C1C 100%);
+}
+.day-collapsible.collapsed {
+    border-radius: 0 0 12px 12px;
+    margin-bottom: 4px;
+}
+.day-title {
+    flex: 1;
+}
+.day-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.day-counter {
+    background: rgba(255,255,255,0.2);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+}
+.day-chevron {
+    font-size: 12px;
+    transition: transform 0.3s ease;
+    width: 16px;
+    text-align: center;
+}
+
+/* Day body (exercises container per day) */
+.day-body {
+    overflow: hidden;
+    max-height: 5000px;
+    transition: max-height 0.4s ease-in-out, opacity 0.3s ease;
+    opacity: 1;
+}
+.day-body.collapsed {
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.35s ease-in-out, opacity 0.2s ease;
+}
+
 @keyframes slideInLeft {
     from {
         opacity: 0;

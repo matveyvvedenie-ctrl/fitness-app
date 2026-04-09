@@ -74,13 +74,44 @@ function renderWorkout() {
     var container = document.getElementById('exercises-container');
     container.innerHTML = '';
     workoutData.forEach(function(day, dayIndex) {
+        // Считаем выполненные упражнения в этом дне
+        var dayCompleted = 0;
+        var dayTotal = day.exercises.length;
+        day.exercises.forEach(function(ex) {
+            if (ex.weightFact || ex.repsFact) dayCompleted++;
+        });
+        var dayDone = dayCompleted === dayTotal && dayTotal > 0;
+
+        // Заголовок дня (кликабельный)
         var dayHeader = document.createElement('div');
-        dayHeader.className = 'day-header';
-        dayHeader.textContent = day.day;
+        dayHeader.className = 'day-header day-collapsible';
+        dayHeader.dataset.dayIndex = dayIndex;
+        dayHeader.innerHTML = '<span class="day-title">' + day.day + '</span>' +
+            '<span class="day-status">' +
+                '<span class="day-counter">' + dayCompleted + '/' + dayTotal + '</span>' +
+                (dayDone ? ' ✅' : '') +
+                '<span class="day-chevron">▼</span>' +
+            '</span>';
         container.appendChild(dayHeader);
+
+        // Контейнер упражнений (сворачиваемый)
+        var dayBody = document.createElement('div');
+        dayBody.className = 'day-body';
+        dayBody.id = 'day-body-' + dayIndex;
         day.exercises.forEach(function(exercise, exIndex) {
             var card = createExerciseCard(exercise, dayIndex, exIndex);
-            container.appendChild(card);
+            dayBody.appendChild(card);
+        });
+        container.appendChild(dayBody);
+
+        // Клик по заголовку — свернуть/развернуть
+        dayHeader.addEventListener('click', function() {
+            var body = document.getElementById('day-body-' + this.dataset.dayIndex);
+            var chevron = this.querySelector('.day-chevron');
+            var isCollapsed = body.classList.toggle('collapsed');
+            this.classList.toggle('collapsed', isCollapsed);
+            chevron.textContent = isCollapsed ? '▶' : '▼';
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         });
     });
     updateProgress();
@@ -149,6 +180,8 @@ function handleInput(input) {
             completedCount--;
             updateProgress(false);
         }
+        // Обновляем счётчик дня в заголовке
+        updateDayCounter(parseInt(dayIndex));
     }
 }
  
@@ -167,6 +200,29 @@ function updateProgress(animate) {
     }
 }
  
+function updateDayCounter(dayIndex) {
+    var day = workoutData[dayIndex];
+    if (!day) return;
+    var dayCompleted = 0;
+    day.exercises.forEach(function(ex) {
+        if (ex.weightFact || ex.repsFact) dayCompleted++;
+    });
+    var dayTotal = day.exercises.length;
+    var dayDone = dayCompleted === dayTotal && dayTotal > 0;
+    var header = document.querySelector('.day-header[data-day-index="' + dayIndex + '"]');
+    if (header) {
+        var counter = header.querySelector('.day-counter');
+        if (counter) counter.textContent = dayCompleted + '/' + dayTotal;
+        // Обновляем галочку
+        var status = header.querySelector('.day-status');
+        var chevron = header.querySelector('.day-chevron');
+        var chevronText = chevron ? chevron.textContent : '▼';
+        status.innerHTML = '<span class="day-counter">' + dayCompleted + '/' + dayTotal + '</span>' +
+            (dayDone ? ' ✅' : '') +
+            '<span class="day-chevron">' + chevronText + '</span>';
+    }
+}
+
 document.getElementById('save-btn').addEventListener('click', async function() {
     var exercisesToSave = [];
     var btn = document.getElementById('save-btn');
