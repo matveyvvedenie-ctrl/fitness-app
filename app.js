@@ -372,6 +372,30 @@ async function loadProgressData() {
     }
 }
  
+function cleanExerciseName(name) {
+    if (!name) return '';
+    return name.replace(/^сет:\s*/i, '').replace(/\(сет\)/gi, '').trim();
+}
+
+function getMuscleGroup(exerciseName) {
+    var name = exerciseName.toLowerCase();
+    // Грудь
+    if (/жим.*(лёж|леж|горизонт|наклон|гантел.*на\s*(горизонт|наклон))|разводк|кроссовер|сведен.*рук|бабочка|отжим/i.test(name)) return 'Грудь';
+    // Спина
+    if (/тяг.*(верхн|нижн|горизонт|блок|штанг.*в\s*наклон|гантел.*в\s*наклон)|подтяг|гипер|пуловер|рычаж/i.test(name)) return 'Спина';
+    // Ноги
+    if (/присед|жим.*платформ|жим.*ног|выпад|разгиб.*ног|сгиб.*ног|икр|голен|гак|станов/i.test(name)) return 'Ноги';
+    // Плечи
+    if (/жим.*(сид|стоя|арнольд|плеч)|мах|тяг.*подбородк|разводк.*стоя|дельт|протяжк/i.test(name)) return 'Плечи';
+    // Бицепс
+    if (/бицепс|сгиб.*рук|молот|концентр/i.test(name)) return 'Бицепс';
+    // Трицепс
+    if (/трицепс|разгиб.*рук|франц|жим.*узк/i.test(name)) return 'Трицепс';
+    // Пресс
+    if (/пресс|скруч|подъ[её]м.*ног|планк/i.test(name)) return 'Пресс';
+    return 'Другое';
+}
+
 async function loadExerciseHistory() {
     try {
         var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
@@ -384,18 +408,46 @@ async function loadExerciseHistory() {
             return;
         }
         historyData = data.history || [];
+        // Чистим названия от "Сет:"
+        historyData.forEach(function(d) {
+            d.exercise = cleanExerciseName(d.exercise);
+        });
+
+        // Собираем уникальные упражнения
         var exercises = [];
         historyData.forEach(function(d) {
             if (exercises.indexOf(d.exercise) === -1) exercises.push(d.exercise);
         });
+
+        // Группируем по мышцам
+        var groups = {};
+        var groupOrder = ['Грудь', 'Спина', 'Ноги', 'Плечи', 'Бицепс', 'Трицепс', 'Пресс', 'Другое'];
+        exercises.forEach(function(ex) {
+            var group = getMuscleGroup(ex);
+            if (!groups[group]) groups[group] = [];
+            groups[group].push(ex);
+        });
+
         var select = document.getElementById('exercise-select');
         select.innerHTML = '<option value="">Выберите упражнение...</option>';
-        exercises.forEach(function(ex) {
-            var option = document.createElement('option');
-            option.value = ex;
-            option.textContent = ex;
-            select.appendChild(option);
+        groupOrder.forEach(function(groupName) {
+            if (!groups[groupName] || groups[groupName].length === 0) return;
+            var optgroup = document.createElement('optgroup');
+            var groupEmoji = {
+                'Грудь': '🫁', 'Спина': '🔙', 'Ноги': '🦵',
+                'Плечи': '🤷', 'Бицепс': '💪', 'Трицепс': '💪',
+                'Пресс': '🎯', 'Другое': '🏋️'
+            };
+            optgroup.label = (groupEmoji[groupName] || '') + ' ' + groupName;
+            groups[groupName].sort().forEach(function(ex) {
+                var option = document.createElement('option');
+                option.value = ex;
+                option.textContent = ex;
+                optgroup.appendChild(option);
+            });
+            select.appendChild(optgroup);
         });
+
         select.addEventListener('change', function(e) {
             if (e.target.value) renderChart(e.target.value);
         });
@@ -406,6 +458,24 @@ async function loadExerciseHistory() {
     }
 }
  
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    // Если уже в формате dd.MM.yyyy — возвращаем как есть
+    if (/^\d{2}\.\d{2}\.\d{4}/.test(dateStr)) return dateStr.substring(0, 10);
+    // Если "dd.MM.yyyy HH:mm" — берём только дату
+    if (/^\d{2}\.\d{2}\.\d{4}\s/.test(dateStr)) return dateStr.split(' ')[0];
+    // Если ISO формат или другой — пробуем распарсить
+    try {
+        var d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+            var dd = ('0' + d.getDate()).slice(-2);
+            var mm = ('0' + (d.getMonth() + 1)).slice(-2);
+            return dd + '.' + mm + '.' + d.getFullYear();
+        }
+    } catch (e) {}
+    return String(dateStr);
+}
+
 function renderChart(exerciseName) {
     var data = historyData.filter(function(d) { return d.exercise === exerciseName; });
     if (data.length === 0) return;
@@ -414,7 +484,7 @@ function renderChart(exerciseName) {
     progressChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: data.map(function(d) { return d.week || d.date; }),
+            labels: data.map(function(d) { return formatDate(d.date); }),
             datasets: [{
                 label: 'Вес (кг)',
                 data: data.map(function(d) { return d.weight; }),
@@ -474,7 +544,7 @@ function renderRecords() {
         var icon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏆';
         return '<div class="record-item">' +
             '<div class="record-icon">' + icon + '</div>' +
-            '<div class="record-name">' + record.exercise + '</div>' +
+            '<div class="record-name">' + cleanExerciseName(record.exercise) + '</div>' +
             '<div class="record-weight">' + record.weight + ' кг</div>' +
         '</div>';
     }).join('');
