@@ -120,13 +120,14 @@ function renderWorkout() {
 function createExerciseCard(exercise, dayIndex, exIndex) {
     var card = document.createElement('div');
     card.className = 'exercise-card';
-    var hasVideo = exercise.video && (exercise.video.indexOf('http') !== -1 || exercise.video.indexOf('📽️') !== -1);
+    var videoStr = exercise.video != null ? String(exercise.video) : '';
+    var hasVideo = videoStr && (videoStr.indexOf('http') !== -1 || videoStr.indexOf('📽️') !== -1);
     var photo1 = exercise.photo1 || '';
     var photo2 = exercise.photo2 || '';
     var photoHtml1 = photo1 ? '<img src="' + photo1 + '" alt="Photo 1" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'🏋️\'">' : '🏋️';
     var photoHtml2 = photo2 ? '<img src="' + photo2 + '" alt="Photo 2" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'💪\'">' : '💪';
     var noteHtml = exercise.note ? '<div class="trainer-note">💬 ' + exercise.note + '</div>' : '';
-    var videoHtml = hasVideo ? '<button class="video-btn" onclick="openVideo(\'' + exercise.video + '\')">📹 ВИДЕО ТЕХНИКИ</button>' : '';
+    var videoHtml = hasVideo ? '<button class="video-btn" onclick="openVideo(\'' + videoStr + '\')">📹 ВИДЕО ТЕХНИКИ</button>' : '';
     var commentValue = exercise.comment || '';
     // Filter out timestamp values that accidentally got into comment field
     if (commentValue && /^\d{4}-\d{2}-\d{2}T/.test(commentValue)) commentValue = '';
