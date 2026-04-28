@@ -19,14 +19,52 @@
     <div id="main-screen" class="hidden">
         <!-- Tabs -->
         <div class="tabs" id="tabs-container">
-            <button class="tab-btn active" data-tab="workout">💪 Тренировка</button>
+            <button class="tab-btn active" data-tab="home">🏠 Главная</button>
+            <button class="tab-btn" data-tab="workout">💪 Тренировка</button>
             <button class="tab-btn" data-tab="progress">📊 Прогресс</button>
             <button class="tab-btn" data-tab="measurements">📏 Замеры</button>
             <button class="tab-btn hidden" data-tab="admin" id="admin-tab-btn">👑 Админ <span class="tab-badge hidden" id="admin-badge">0</span></button>
         </div>
 
+        <!-- Home Tab -->
+        <div id="home-tab" class="tab-content active">
+            <!-- Hero: приветствие + неделя/день -->
+            <div class="home-hero">
+                <div class="home-greet" id="home-greet">Привет!</div>
+                <div class="home-subtitle" id="home-subtitle">Готов к тренировке?</div>
+            </div>
+
+            <!-- Прогресс недели: кружки по дням -->
+            <div class="home-card">
+                <div class="home-card-title">📅 Неделя <span id="home-week-num">-</span></div>
+                <div class="home-week-dots" id="home-week-dots"></div>
+                <div class="home-week-summary" id="home-week-summary">— из —</div>
+            </div>
+
+            <!-- Большая кнопка "Начать тренировку" -->
+            <button id="home-start-btn" class="home-start-btn">
+                🔥 Начать тренировку
+            </button>
+
+            <!-- Карточки: последний рекорд + последний вес -->
+            <div class="home-info-grid">
+                <div class="home-info-card">
+                    <div class="home-info-icon">🏆</div>
+                    <div class="home-info-label">Последний рекорд</div>
+                    <div class="home-info-value" id="home-last-pr">—</div>
+                    <div class="home-info-sub" id="home-last-pr-sub"></div>
+                </div>
+                <div class="home-info-card">
+                    <div class="home-info-icon">⚖️</div>
+                    <div class="home-info-label">Текущий вес</div>
+                    <div class="home-info-value" id="home-weight">—</div>
+                    <div class="home-info-sub" id="home-weight-sub"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Workout Tab -->
-        <div id="workout-tab" class="tab-content active">
+        <div id="workout-tab" class="tab-content">
             <!-- Header -->
             <div class="header">
                 <div class="week-badge">

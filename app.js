@@ -24,11 +24,16 @@ try {
  
 document.addEventListener('DOMContentLoaded', init);
  
+var clientName = '';
+var weekTitle = '';
+
 async function init() {
     console.log('Init started...');
     try {
         const response = await loadWorkoutData();
         console.log('Data received:', response);
+        clientName = response.clientName || '';
+        weekTitle = response.weekTitle || '';
         if (response.weekTitle) {
             const weekNum = response.weekTitle.replace('Неделя ', '');
             document.getElementById('week-number').textContent = weekNum;
@@ -45,6 +50,9 @@ async function init() {
             });
         });
         renderWorkout();
+        renderHome();
+        // Подгружаем рекорды и вес в фоне (для карточек на главной)
+        loadHomeExtras();
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('main-screen').classList.remove('hidden');
         initializeTabs();
@@ -356,6 +364,118 @@ function initializeTabs() {
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         });
     });
+
+    // Кнопка "Начать тренировку" на главной — переключает на вкладку Тренировка
+    var startBtn = document.getElementById('home-start-btn');
+    if (startBtn) {
+        startBtn.addEventListener('click', function() {
+            var workoutTab = document.querySelector('.tab-btn[data-tab="workout"]');
+            if (workoutTab) workoutTab.click();
+        });
+    }
+}
+
+// Главный экран: имя, неделя, кружки прогресса по дням, кнопка
+function renderHome() {
+    // Приветствие
+    var displayName = clientName || (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) || '';
+    document.getElementById('home-greet').textContent = displayName ? ('Привет, ' + displayName + '!') : 'Привет!';
+
+    // Подзаголовок: процент готовности недели
+    var pct = totalExercises > 0 ? Math.round(completedCount / totalExercises * 100) : 0;
+    var subtitle;
+    if (totalExercises === 0) {
+        subtitle = 'На этой неделе тренировок ещё нет';
+    } else if (pct === 0) {
+        subtitle = 'Готов начать неделю? 💪';
+    } else if (pct < 100) {
+        subtitle = 'Неделя выполнена на ' + pct + '%';
+    } else {
+        subtitle = 'Неделя выполнена! 🎉';
+    }
+    document.getElementById('home-subtitle').textContent = subtitle;
+
+    // Номер недели
+    var weekNum = (weekTitle || '').replace(/^Неделя\s+/i, '').trim() || (weekTitle || '—');
+    document.getElementById('home-week-num').textContent = weekNum;
+
+    // Кружки по дням: один кружок = один тренировочный день
+    var dotsContainer = document.getElementById('home-week-dots');
+    dotsContainer.innerHTML = '';
+    var doneDays = 0;
+    workoutData.forEach(function(day) {
+        var total = day.exercises.length;
+        var done = 0;
+        day.exercises.forEach(function(ex) {
+            if (ex.weightFact || ex.repsFact) done++;
+        });
+        var dot = document.createElement('div');
+        dot.className = 'home-dot';
+        if (total > 0 && done >= total) { dot.classList.add('full'); doneDays++; }
+        else if (done > 0) dot.classList.add('partial');
+        dot.title = day.day + ': ' + done + '/' + total;
+        dot.textContent = (day.day || '').toString().substring(0, 2);
+        dotsContainer.appendChild(dot);
+    });
+
+    document.getElementById('home-week-summary').textContent =
+        doneDays + ' из ' + workoutData.length + ' дней выполнено';
+}
+
+// Подгружает рекорды и текущий вес для карточек на главной — асинхронно, не блокирует UI
+async function loadHomeExtras() {
+    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+    try {
+        // Последний рекорд
+        var histRes = await fetch(APPS_SCRIPT_URL + '?action=history&chatId=' + chatId);
+        var histJson = await histRes.json();
+        var history = histJson.history || [];
+        if (history.length) {
+            // Чистим имена и ищем максимум по каждому упражнению
+            var bestByEx = {};
+            history.forEach(function(d) {
+                var name = cleanExerciseName(d.exercise);
+                var w = parseFloat(d.weight) || 0;
+                if (!bestByEx[name] || w > bestByEx[name].weight) {
+                    bestByEx[name] = { weight: w, date: d.date };
+                }
+            });
+            // Самый тяжёлый
+            var topName = '', topW = 0, topDate = '';
+            for (var k in bestByEx) {
+                if (bestByEx[k].weight > topW) {
+                    topW = bestByEx[k].weight; topName = k; topDate = bestByEx[k].date;
+                }
+            }
+            if (topW > 0) {
+                document.getElementById('home-last-pr').textContent = topW + ' кг';
+                document.getElementById('home-last-pr-sub').textContent = topName;
+            }
+        }
+    } catch (e) { console.warn('home extras (history) fail:', e); }
+
+    try {
+        // Текущий вес — последний замер
+        var measRes = await fetch(APPS_SCRIPT_URL + '?action=getMeasurements&chatId=' + chatId);
+        var measJson = await measRes.json();
+        var meas = measJson.measurements || [];
+        if (meas.length) {
+            var last = meas[meas.length - 1];
+            if (last.weight) {
+                document.getElementById('home-weight').textContent = last.weight + ' кг';
+                if (meas.length >= 2) {
+                    var prev = meas[meas.length - 2];
+                    if (prev.weight) {
+                        var diff = (parseFloat(last.weight) - parseFloat(prev.weight));
+                        var sign = diff > 0 ? '+' : '';
+                        var arrow = diff > 0 ? '📈' : (diff < 0 ? '📉' : '➡️');
+                        document.getElementById('home-weight-sub').textContent =
+                            arrow + ' ' + sign + diff.toFixed(1) + ' кг с прошлого замера';
+                    }
+                }
+            }
+        }
+    } catch (e) { console.warn('home extras (meas) fail:', e); }
 }
  
 async function loadProgressData() {
