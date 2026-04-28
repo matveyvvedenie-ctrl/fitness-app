@@ -399,11 +399,15 @@ function renderHome() {
     var weekNum = (weekTitle || '').replace(/^Неделя\s+/i, '').trim() || (weekTitle || '—');
     document.getElementById('home-week-num').textContent = weekNum;
 
-    // Кружки по дням: один кружок = один тренировочный день
+    // Кружки по дням: только реальные тренировочные дни (с упражнениями).
+    // Строки-разделители (📝 заметки, 🍽️ питание, 📊 план и т.п.) пропускаем.
     var dotsContainer = document.getElementById('home-week-dots');
     dotsContainer.innerHTML = '';
+    var trainingDays = workoutData.filter(function(d) {
+        return d.exercises && d.exercises.length > 0;
+    });
     var doneDays = 0;
-    workoutData.forEach(function(day) {
+    trainingDays.forEach(function(day) {
         var total = day.exercises.length;
         var done = 0;
         day.exercises.forEach(function(ex) {
@@ -413,13 +417,17 @@ function renderHome() {
         dot.className = 'home-dot';
         if (total > 0 && done >= total) { dot.classList.add('full'); doneDays++; }
         else if (done > 0) dot.classList.add('partial');
+        // Метка кружка: первые 2 буквы названия дня без эмодзи и пробелов
+        var label = (day.day || '').toString()
+            .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '') // убираем эмодзи
+            .trim().substring(0, 2);
         dot.title = day.day + ': ' + done + '/' + total;
-        dot.textContent = (day.day || '').toString().substring(0, 2);
+        dot.textContent = label || '?';
         dotsContainer.appendChild(dot);
     });
 
     document.getElementById('home-week-summary').textContent =
-        doneDays + ' из ' + workoutData.length + ' дней выполнено';
+        doneDays + ' из ' + trainingDays.length + ' дней выполнено';
 }
 
 // Подгружает рекорды и текущий вес для карточек на главной — асинхронно, не блокирует UI
