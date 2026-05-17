@@ -267,11 +267,14 @@ function handleInput(input) {
         if (!wasCompleted && exercise.completed) {
             completedCount++;
             updateProgress(true);
-            // Предложить RPE-фидбэк (один раз на упражнение)
-            maybeAutoOpenRpe(parseInt(dayIndex), parseInt(exIndex));
         } else if (wasCompleted && !exercise.completed) {
             completedCount--;
             updateProgress(false);
+        }
+        // Модалка RPE — только когда заполнены ОБЕ ячейки (вес И повторы),
+        // чтобы не доставать после первого ввода
+        if (exercise.weightFact && exercise.repsFact) {
+            maybeAutoOpenRpe(parseInt(dayIndex), parseInt(exIndex));
         }
         // Обновляем счётчик дня в заголовке
         updateDayCounter(parseInt(dayIndex));
