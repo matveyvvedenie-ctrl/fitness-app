@@ -1349,3 +1349,149 @@ body {
     min-height: 14px;
 }
 
+
+/* ─── RPE-фидбэк: модалка и кнопка-индикатор ──────────────────────────── */
+
+/* Кнопка-индикатор фидбэка в карточке упражнения */
+.rpe-feedback-row {
+    margin-top: 10px;
+}
+.rpe-feedback-btn {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px dashed #cbd5e1;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.rpe-feedback-btn:active {
+    transform: scale(0.98);
+}
+.rpe-feedback-btn.rpe-set {
+    border-style: solid;
+    border-width: 2px;
+    background: #fff;
+    color: #1e293b;
+}
+.rpe-feedback-btn.rpe-set.rpe-easy   { border-color: #22c55e; background: #f0fdf4; }
+.rpe-feedback-btn.rpe-set.rpe-normal { border-color: #3b82f6; background: #eff6ff; }
+.rpe-feedback-btn.rpe-set.rpe-hard   { border-color: #f97316; background: #fff7ed; }
+.rpe-feedback-btn.rpe-set.rpe-failed { border-color: #ef4444; background: #fef2f2; }
+
+/* Модалка-оверлей */
+.rpe-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+.rpe-modal.hidden { display: none; }
+.rpe-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+}
+.rpe-modal-content {
+    position: relative;
+    width: 100%;
+    max-width: 460px;
+    background: #ffffff;
+    border-radius: 18px 18px 0 0;
+    padding: 18px 16px 24px;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: rpeSlideUp 0.18s ease-out;
+}
+@keyframes rpeSlideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+
+.rpe-modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    text-align: center;
+    margin-bottom: 4px;
+}
+.rpe-modal-exname {
+    font-size: 14px;
+    color: #64748b;
+    text-align: center;
+    margin-bottom: 4px;
+    font-style: italic;
+}
+.rpe-modal-summary {
+    font-size: 13px;
+    color: #94a3b8;
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+/* Кнопки выбора фидбэка */
+.rpe-btn {
+    width: 100%;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    border: 2px solid #e2e8f0;
+    background: #ffffff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: all 0.15s ease;
+    text-align: left;
+}
+.rpe-btn:active {
+    transform: scale(0.98);
+}
+.rpe-btn-emoji {
+    font-size: 28px;
+    line-height: 1;
+    width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.rpe-btn-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+.rpe-btn-text strong {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+}
+.rpe-btn-text small {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 2px;
+}
+.rpe-btn.rpe-easy:active   { background: #f0fdf4; border-color: #22c55e; }
+.rpe-btn.rpe-normal:active { background: #eff6ff; border-color: #3b82f6; }
+.rpe-btn.rpe-hard:active   { background: #fff7ed; border-color: #f97316; }
+.rpe-btn.rpe-failed:active { background: #fef2f2; border-color: #ef4444; }
+
+.rpe-skip-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    color: #64748b;
+    font-size: 14px;
+    cursor: pointer;
+}

@@ -160,8 +160,90 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
                 '<input type="number" inputmode="numeric" enterkeyhint="done" class="input-field" placeholder="Повторения" value="' + (exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" onchange="handleInput(this)">' +
             '</div>' +
             '<textarea class="comment-field" placeholder="Комментарий к упражнению (опционально)" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="comment" onchange="handleInput(this)">' + commentValue + '</textarea>' +
+            '<div class="rpe-feedback-row" id="rpe-row-' + dayIndex + '-' + exIndex + '">' +
+                renderRpeButton(exercise, dayIndex, exIndex) +
+            '</div>' +
         '</div>';
     return card;
+}
+
+// ─── RPE-фидбэк (после каждого упражнения, опционально) ───────────────
+var RPE_FEEDBACK_MAP = {
+    easy:   { rpe: 5.5, emoji: '😌', label: 'Легко' },
+    normal: { rpe: 7.5, emoji: '💪', label: 'Норм' },
+    hard:   { rpe: 9,   emoji: '🔥', label: 'Тяжело' },
+    failed: { rpe: 10,  emoji: '❌', label: 'Не вытянул' }
+};
+var rpeModalCtx = null;
+
+// Рендер кнопки-индикатора фидбэка для карточки упражнения
+function renderRpeButton(exercise, dayIndex, exIndex) {
+    var fb = exercise.feedback || '';
+    if (fb && RPE_FEEDBACK_MAP[fb]) {
+        var info = RPE_FEEDBACK_MAP[fb];
+        return '<button class="rpe-feedback-btn rpe-set rpe-' + fb + '" ' +
+               'onclick="openRpeModal(' + dayIndex + ',' + exIndex + ')">' +
+               info.emoji + ' ' + info.label + ' • тап чтобы изменить' +
+               '</button>';
+    }
+    return '<button class="rpe-feedback-btn" ' +
+           'onclick="openRpeModal(' + dayIndex + ',' + exIndex + ')">' +
+           '+ Как было упражнение?' +
+           '</button>';
+}
+
+// Обновляет кнопку фидбэка в DOM после изменения
+function refreshRpeButton(dayIndex, exIndex) {
+    var container = document.getElementById('rpe-row-' + dayIndex + '-' + exIndex);
+    if (!container) return;
+    var ex = workoutData[dayIndex].exercises[exIndex];
+    container.innerHTML = renderRpeButton(ex, dayIndex, exIndex);
+}
+
+// Открыть модалку
+function openRpeModal(dayIndex, exIndex) {
+    var ex = workoutData[dayIndex].exercises[exIndex];
+    rpeModalCtx = { dayIndex: dayIndex, exIndex: exIndex };
+    document.getElementById('rpe-modal-exname').textContent = ex.exercise || '';
+    var wf = ex.weightFact || '—';
+    var rf = ex.repsFact || '—';
+    var sets = ex.sets || '?';
+    document.getElementById('rpe-modal-summary').textContent =
+        'Ты сделал: ' + wf + ' кг × ' + rf + ' × ' + sets + ' подх.';
+    document.getElementById('rpe-modal').classList.remove('hidden');
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+}
+
+// Закрыть без выбора (трактуется как "норм" при сохранении)
+function closeRpeModal() {
+    document.getElementById('rpe-modal').classList.add('hidden');
+    rpeModalCtx = null;
+}
+
+// Выбрать фидбэк → записать в exercise, обновить кнопку, закрыть модалку
+function setRpeFeedback(kind) {
+    if (!rpeModalCtx || !RPE_FEEDBACK_MAP[kind]) {
+        closeRpeModal();
+        return;
+    }
+    var info = RPE_FEEDBACK_MAP[kind];
+    var ex = workoutData[rpeModalCtx.dayIndex].exercises[rpeModalCtx.exIndex];
+    ex.feedback = kind;
+    ex.factualRpe = info.rpe;
+    refreshRpeButton(rpeModalCtx.dayIndex, rpeModalCtx.exIndex);
+    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    closeRpeModal();
+}
+
+// Автоматически предложить фидбэк когда упражнение становится completed
+function maybeAutoOpenRpe(dayIndex, exIndex) {
+    var ex = workoutData[dayIndex].exercises[exIndex];
+    if (!ex.completed) return;
+    if (ex.feedback) return; // уже оценил
+    if (ex._rpeAutoOpenedOnce) return; // не доставать повторно
+    ex._rpeAutoOpenedOnce = true;
+    // Лёгкая задержка — чтобы клавиатура успела скрыться
+    setTimeout(function() { openRpeModal(dayIndex, exIndex); }, 250);
 }
  
 function handleInput(input) {
@@ -185,6 +267,8 @@ function handleInput(input) {
         if (!wasCompleted && exercise.completed) {
             completedCount++;
             updateProgress(true);
+            // Предложить RPE-фидбэк (один раз на упражнение)
+            maybeAutoOpenRpe(parseInt(dayIndex), parseInt(exIndex));
         } else if (wasCompleted && !exercise.completed) {
             completedCount--;
             updateProgress(false);
@@ -244,6 +328,9 @@ document.getElementById('save-btn').addEventListener('click', async function() {
             for (var ex = 0; ex < workoutData[d].exercises.length; ex++) {
                 var exercise = workoutData[d].exercises[ex];
                 if (exercise.weightFact || exercise.repsFact || (exercise.comment && exercise.comment.trim())) {
+                    // Если клиент не выставил фидбэк — считаем «норм» (RPE 7.5) по умолчанию
+                    var fb = exercise.feedback || 'normal';
+                    var fr = exercise.factualRpe || (RPE_FEEDBACK_MAP[fb] && RPE_FEEDBACK_MAP[fb].rpe) || 7.5;
                     exercisesToSave.push({
                         r: exercise.rowIndex,
                         w: exercise.weightFact || '',
@@ -253,7 +340,9 @@ document.getElementById('save-btn').addEventListener('click', async function() {
                         s: exercise.sets,
                         rp: exercise.reps,
                         wp: exercise.weightPlan,
-                        rpe: exercise.rpe
+                        rpe: exercise.rpe,    // плановый RPE из шаблона
+                        fb: fb,               // feedback от клиента: easy/normal/hard/failed
+                        fr: fr                // фактический RPE: 5.5/7.5/9/10
                     });
                 }
             }

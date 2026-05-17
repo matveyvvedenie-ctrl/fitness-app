@@ -246,6 +246,45 @@
         </div>
     </div>
 
+    <!-- Модалка RPE-фидбэка после упражнения -->
+    <div id="rpe-modal" class="rpe-modal hidden">
+        <div class="rpe-modal-backdrop" onclick="closeRpeModal()"></div>
+        <div class="rpe-modal-content">
+            <div class="rpe-modal-title">Как было упражнение?</div>
+            <div class="rpe-modal-exname" id="rpe-modal-exname">—</div>
+            <div class="rpe-modal-summary" id="rpe-modal-summary"></div>
+            <button class="rpe-btn rpe-easy" onclick="setRpeFeedback('easy')">
+                <span class="rpe-btn-emoji">😌</span>
+                <span class="rpe-btn-text">
+                    <strong>Легко</strong>
+                    <small>мог сделать ещё 3-4 повтора</small>
+                </span>
+            </button>
+            <button class="rpe-btn rpe-normal" onclick="setRpeFeedback('normal')">
+                <span class="rpe-btn-emoji">💪</span>
+                <span class="rpe-btn-text">
+                    <strong>Норм</strong>
+                    <small>мог ещё 1-2 повтора</small>
+                </span>
+            </button>
+            <button class="rpe-btn rpe-hard" onclick="setRpeFeedback('hard')">
+                <span class="rpe-btn-emoji">🔥</span>
+                <span class="rpe-btn-text">
+                    <strong>Тяжело</strong>
+                    <small>на пределе</small>
+                </span>
+            </button>
+            <button class="rpe-btn rpe-failed" onclick="setRpeFeedback('failed')">
+                <span class="rpe-btn-emoji">❌</span>
+                <span class="rpe-btn-text">
+                    <strong>Не вытянул</strong>
+                    <small>не докрутил план</small>
+                </span>
+            </button>
+            <button class="rpe-skip-btn" onclick="closeRpeModal()">Пропустить</button>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
