@@ -1495,3 +1495,49 @@ body {
     font-size: 14px;
     cursor: pointer;
 }
+
+/* ─── Баннер самочувствия (сверху над списком упражнений) ──────────── */
+.wellness-banner {
+    margin: 10px 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    color: #9a3412;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.wellness-banner.hidden { display: none; }
+.wellness-banner-edit {
+    background: transparent;
+    border: 1px solid #fdba74;
+    color: #9a3412;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* ─── Подсказка «прошлый раз» в карточке упражнения ───────────────── */
+.last-session-info {
+    margin: 6px 0 8px;
+    padding: 6px 10px;
+    background: #f1f5f9;
+    border-left: 3px solid #64748b;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #475569;
+}
+
+/* Корректировка веса по самочувствию (мелкий зачёркнутый исходный) */
+.weight-adj {
+    font-size: 11px;
+    color: #94a3b8;
+    text-decoration: line-through;
+    font-weight: normal;
+    margin-left: 4px;
+}

@@ -57,6 +57,12 @@ async function init() {
         document.getElementById('main-screen').classList.remove('hidden');
         initializeTabs();
         initAdminTab();
+        // Опрос самочувствия — один раз при первом входе в тренировку.
+        // Если клиент закроет/пропустит — считается «Бодрый», веса как есть.
+        if (!wellnessAsked && workoutData.length > 0) {
+            wellnessAsked = true;
+            setTimeout(openWellnessModal, 400);
+        }
     } catch (error) {
         console.error('ERROR:', error);
         document.getElementById('loading').innerHTML =
@@ -137,9 +143,30 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
     var noteHtml = exercise.note ? '<div class="trainer-note">💬 ' + exercise.note + '</div>' : '';
     var videoHtml = hasVideo ? '<button class="video-btn" onclick="openVideo(\'' + videoStr + '\')">📹 ВИДЕО ТЕХНИКИ</button>' : '';
     var commentValue = exercise.comment || '';
-    // Filter out timestamp values that accidentally got into comment field
     if (commentValue && /^\d{4}-\d{2}-\d{2}T/.test(commentValue)) commentValue = '';
     if (commentValue && /^\d{2}\.\d{2}\.\d{4}/.test(commentValue)) commentValue = '';
+
+    // Вес: с учётом самочувствия (если уставший/приболел — снижаем для отображения)
+    var baseWeight = exercise.weightPlan;
+    var todayWeight = getDisplayWeight(baseWeight);
+    var weightAdjusted = (baseWeight && todayWeight !== baseWeight);
+    var weightHtml = weightAdjusted
+        ? todayWeight + 'кг <small class="weight-adj">(было ' + baseWeight + ')</small>'
+        : (baseWeight || '—') + 'кг';
+
+    // Прозрачность: показать что было в прошлый раз для контекста прогрессии
+    var lastSessionHtml = '';
+    if (exercise.lastSession && exercise.lastSession.weight) {
+        var ls = exercise.lastSession;
+        var fbEmoji = '';
+        var fbInfo = RPE_FEEDBACK_MAP[ls.feedback];
+        if (fbInfo) fbEmoji = ' ' + fbInfo.emoji;
+        var dateStr = ls.date ? ' (' + ls.date + ')' : '';
+        lastSessionHtml = '<div class="last-session-info">📊 Прошлый раз: ' +
+            ls.weight + ' × ' + ls.reps + fbEmoji + dateStr +
+            '</div>';
+    }
+
     card.innerHTML =
         '<div class="exercise-photos">' +
             '<div class="exercise-photo">' + photoHtml1 + '</div>' +
@@ -148,10 +175,11 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
         '<div class="exercise-body">' +
             '<div class="exercise-name">' + exercise.exercise + '</div>' +
             noteHtml +
+            lastSessionHtml +
             '<div class="exercise-params">' +
                 '<div class="param"><div class="param-label">Подх</div><div class="param-value">' + exercise.sets + '</div></div>' +
                 '<div class="param"><div class="param-label">Повт</div><div class="param-value">' + exercise.reps + '</div></div>' +
-                '<div class="param"><div class="param-label">Вес</div><div class="param-value plan">' + exercise.weightPlan + 'кг</div></div>' +
+                '<div class="param"><div class="param-label">Вес</div><div class="param-value plan">' + weightHtml + '</div></div>' +
                 '<div class="param"><div class="param-label">RPE</div><div class="param-value rpe">' + exercise.rpe + '</div></div>' +
             '</div>' +
             videoHtml +
@@ -167,12 +195,81 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
     return card;
 }
 
+// ─── Самочувствие клиента (per session, спрашивается при входе) ────────
+var WELLNESS_MAP = {
+    good:  { multiplier: 1.00, emoji: '💪', label: 'Бодрый',     factor: '' },
+    tired: { multiplier: 0.90, emoji: '😴', label: 'Устал',      factor: '−10%' },
+    sick:  { multiplier: 0.85, emoji: '🤧', label: 'Приболел',   factor: '−15%' },
+    pms:   { multiplier: 0.90, emoji: '🩸', label: 'ПМС',        factor: '−10%' }
+};
+var sessionWellness = 'good';
+var wellnessAsked = false;
+
+function getWellnessMultiplier() {
+    var w = WELLNESS_MAP[sessionWellness];
+    return w ? w.multiplier : 1.0;
+}
+
+function openWellnessModal() {
+    document.getElementById('wellness-modal').classList.remove('hidden');
+}
+function closeWellnessModal() {
+    document.getElementById('wellness-modal').classList.add('hidden');
+}
+function setWellness(kind) {
+    sessionWellness = WELLNESS_MAP[kind] ? kind : 'good';
+    closeWellnessModal();
+    updateWellnessBanner();
+    // Перерисовать все дни с новыми весами (мультипликатор изменился)
+    if (workoutData && workoutData.length) renderAllDaysIfNeeded();
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+}
+function skipWellness() {
+    setWellness('good');
+}
+
+function updateWellnessBanner() {
+    var b = document.getElementById('wellness-banner');
+    if (!b) return;
+    if (sessionWellness === 'good') {
+        b.classList.add('hidden');
+        return;
+    }
+    var info = WELLNESS_MAP[sessionWellness];
+    b.classList.remove('hidden');
+    b.innerHTML = info.emoji + ' ' + info.label +
+                  ' — рекомендуемые веса снижены на ' + info.factor +
+                  ' <button class="wellness-banner-edit" onclick="openWellnessModal()">изменить</button>';
+}
+
+// Перерисовка дней — поддержка обновления весов после смены самочувствия
+function renderAllDaysIfNeeded() {
+    if (typeof renderWorkout === 'function') renderWorkout();
+}
+
+// Применить мультипликатор к плановому весу для отображения
+function getDisplayWeight(weightPlan) {
+    var base = parseFloat(weightPlan);
+    if (isNaN(base) || base <= 0) return weightPlan;
+    var mult = getWellnessMultiplier();
+    if (mult >= 1) return base;
+    // Округление к 0.5 кг
+    return Math.round(base * mult * 2) / 2;
+}
+
 // ─── RPE-фидбэк (после каждого упражнения, опционально) ───────────────
 var RPE_FEEDBACK_MAP = {
     easy:   { rpe: 5.5, emoji: '😌', label: 'Легко' },
     normal: { rpe: 7.5, emoji: '💪', label: 'Норм' },
     hard:   { rpe: 9,   emoji: '🔥', label: 'Тяжело' },
     failed: { rpe: 10,  emoji: '❌', label: 'Не вытянул' }
+};
+var FAIL_REASON_LABELS = {
+    too_hard: 'слишком тяжело',
+    sleep:    'плохо спал',
+    illness:  'плохо себя чувствовал',
+    stress:   'стресс',
+    food:     'мало еды/энергии'
 };
 var rpeModalCtx = null;
 
@@ -233,6 +330,28 @@ function setRpeFeedback(kind) {
     refreshRpeButton(rpeModalCtx.dayIndex, rpeModalCtx.exIndex);
     if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
     closeRpeModal();
+    // Если "Не вытянул" — попросить уточнить причину (для умной прогрессии)
+    if (kind === 'failed') {
+        openFailReasonModal(ex);
+    }
+}
+
+// ─── Под-модалка причины провала ───────────────────────────────────────
+var failReasonCtx = null;
+function openFailReasonModal(exercise) {
+    failReasonCtx = exercise; // запомним прямую ссылку
+    document.getElementById('fail-reason-modal').classList.remove('hidden');
+}
+function closeFailReasonModal() {
+    document.getElementById('fail-reason-modal').classList.add('hidden');
+    failReasonCtx = null;
+}
+function setFailReason(reason) {
+    if (failReasonCtx) {
+        failReasonCtx.failReason = reason;
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    }
+    closeFailReasonModal();
 }
 
 // Автоматически предложить фидбэк когда упражнение становится completed
@@ -343,9 +462,11 @@ document.getElementById('save-btn').addEventListener('click', async function() {
                         s: exercise.sets,
                         rp: exercise.reps,
                         wp: exercise.weightPlan,
-                        rpe: exercise.rpe,    // плановый RPE из шаблона
-                        fb: fb,               // feedback от клиента: easy/normal/hard/failed
-                        fr: fr                // фактический RPE: 5.5/7.5/9/10
+                        rpe: exercise.rpe,           // плановый RPE из шаблона
+                        fb: fb,                      // feedback: easy/normal/hard/failed
+                        fr: fr,                      // фактический RPE: 5.5/7.5/9/10
+                        wn: sessionWellness,         // самочувствие сессии (good/tired/sick/pms)
+                        fr2: exercise.failReason || '' // причина провала (sleep/illness/stress/food/too_hard)
                     });
                 }
             }

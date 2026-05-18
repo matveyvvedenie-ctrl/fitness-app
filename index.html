@@ -80,6 +80,9 @@
                 <div id="progress-fill" class="progress-fill"></div>
             </div>
 
+            <!-- Баннер самочувствия (показывается только если выбрано не "Бодрый") -->
+            <div id="wellness-banner" class="wellness-banner hidden"></div>
+
             <!-- Exercises Container -->
             <div id="exercises-container" class="exercises-container"></div>
 
@@ -243,6 +246,89 @@
                     <div class="no-data">Загрузка данных...</div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Модалка самочувствия (показывается при входе в тренировку) -->
+    <div id="wellness-modal" class="rpe-modal hidden">
+        <div class="rpe-modal-backdrop" onclick="skipWellness()"></div>
+        <div class="rpe-modal-content">
+            <div class="rpe-modal-title">Как сегодня самочувствие?</div>
+            <div class="rpe-modal-summary">От этого зависят рекомендуемые веса на сегодня</div>
+            <button class="rpe-btn wellness-good" onclick="setWellness('good')">
+                <span class="rpe-btn-emoji">💪</span>
+                <span class="rpe-btn-text">
+                    <strong>Бодрый, готов</strong>
+                    <small>работаем по плану</small>
+                </span>
+            </button>
+            <button class="rpe-btn wellness-tired" onclick="setWellness('tired')">
+                <span class="rpe-btn-emoji">😴</span>
+                <span class="rpe-btn-text">
+                    <strong>Устал / недосып</strong>
+                    <small>веса будут снижены на 10%</small>
+                </span>
+            </button>
+            <button class="rpe-btn wellness-sick" onclick="setWellness('sick')">
+                <span class="rpe-btn-emoji">🤧</span>
+                <span class="rpe-btn-text">
+                    <strong>Приболел / выздоравливаю</strong>
+                    <small>веса будут снижены на 15%</small>
+                </span>
+            </button>
+            <button class="rpe-btn wellness-pms" onclick="setWellness('pms')">
+                <span class="rpe-btn-emoji">🩸</span>
+                <span class="rpe-btn-text">
+                    <strong>ПМС / месячные</strong>
+                    <small>веса будут снижены на 10%</small>
+                </span>
+            </button>
+            <button class="rpe-skip-btn" onclick="skipWellness()">Пропустить</button>
+        </div>
+    </div>
+
+    <!-- Модалка причины провала (показывается после тапа «❌ Не вытянул») -->
+    <div id="fail-reason-modal" class="rpe-modal hidden">
+        <div class="rpe-modal-backdrop" onclick="closeFailReasonModal()"></div>
+        <div class="rpe-modal-content">
+            <div class="rpe-modal-title">Не вытянул. Почему?</div>
+            <div class="rpe-modal-summary">Это поможет правильно скорректировать программу</div>
+            <button class="rpe-btn fail-too-hard" onclick="setFailReason('too_hard')">
+                <span class="rpe-btn-emoji">💪</span>
+                <span class="rpe-btn-text">
+                    <strong>Слишком тяжело</strong>
+                    <small>вес правда большой — снизим</small>
+                </span>
+            </button>
+            <button class="rpe-btn fail-sleep" onclick="setFailReason('sleep')">
+                <span class="rpe-btn-emoji">💤</span>
+                <span class="rpe-btn-text">
+                    <strong>Плохо спал</strong>
+                    <small>вес оставим как есть</small>
+                </span>
+            </button>
+            <button class="rpe-btn fail-illness" onclick="setFailReason('illness')">
+                <span class="rpe-btn-emoji">🤧</span>
+                <span class="rpe-btn-text">
+                    <strong>Самочувствие плохое</strong>
+                    <small>вес оставим как есть</small>
+                </span>
+            </button>
+            <button class="rpe-btn fail-stress" onclick="setFailReason('stress')">
+                <span class="rpe-btn-emoji">😟</span>
+                <span class="rpe-btn-text">
+                    <strong>Стресс / голова забита</strong>
+                    <small>вес оставим как есть</small>
+                </span>
+            </button>
+            <button class="rpe-btn fail-food" onclick="setFailReason('food')">
+                <span class="rpe-btn-emoji">🍔</span>
+                <span class="rpe-btn-text">
+                    <strong>Ел мало / нет энергии</strong>
+                    <small>вес оставим как есть</small>
+                </span>
+            </button>
+            <button class="rpe-skip-btn" onclick="closeFailReasonModal()">Пропустить</button>
         </div>
     </div>
 
