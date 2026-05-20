@@ -1531,8 +1531,8 @@ body {
 .cc-exercise {
     display: flex;
     gap: 10px;
-    padding: 10px 8px;
-    border-bottom: 1px solid #f7f7f7;
+    padding: 12px 8px;
+    border-bottom: 1px solid #f0f0f0;
     align-items: flex-start;
 }
 
@@ -1541,47 +1541,82 @@ body {
 .cc-ex-num {
     background: #1a1a2e;
     color: white;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: 4px;
 }
 
 .cc-ex-info { flex: 1; min-width: 0; }
+
+.cc-ex-row { display: block; }
+.cc-ex-row + .cc-ex-row { margin-top: 10px; }
 
 .cc-ex-name {
     font-size: 14px;
     font-weight: 700;
     color: #1a1a1a;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
+    line-height: 1.3;
 }
 
-.cc-ex-params {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 10px;
-    font-size: 12px;
-    color: #555;
+.cc-ex-suplabel {
+    display: inline-block;
+    background: #1a1a2e;
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 6px;
+    margin-right: 6px;
+    vertical-align: 2px;
 }
 
-.cc-ex-param {
+/* Сетка из ячеек: Вес / Повт / Подх / RPE */
+.cc-ex-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.cc-ex-cell {
     background: #f5f5f7;
-    padding: 3px 8px;
     border-radius: 8px;
+    padding: 6px 4px;
+    text-align: center;
+    border: 1px solid #ececf0;
+}
+
+.cc-cell-label {
+    font-size: 10px;
+    color: #888;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 2px;
+}
+
+.cc-cell-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a2e;
 }
 
 .cc-ex-fact {
-    margin-top: 6px;
+    margin-top: 8px;
     font-size: 12px;
     color: #2E7D32;
     font-weight: 600;
+    background: #e8f5e9;
+    padding: 5px 8px;
+    border-radius: 6px;
+    border-left: 3px solid #43A047;
 }
 
 .cc-ex-note {
@@ -1592,6 +1627,46 @@ body {
     padding: 6px 8px;
     border-radius: 6px;
     border-left: 3px solid #FBC02D;
+}
+
+/* ── Суперсет: общий контейнер для двух упражнений ── */
+.cc-exercise.cc-superset {
+    background: #f3f6ff;
+    border: 1.5px dashed #6A8AE0;
+    border-radius: 12px;
+    padding: 10px;
+    margin: 4px 0;
+    border-bottom: 1.5px dashed #6A8AE0;
+}
+
+.cc-exercise.cc-superset .cc-ex-num {
+    background: #3F51B5;
+}
+
+.cc-superset-header {
+    display: inline-block;
+    background: #3F51B5;
+    color: white;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.cc-superset-body {
+    background: white;
+    border-radius: 10px;
+    padding: 10px;
+    border: 1px solid #e0e6ff;
+}
+
+.cc-superset-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #c9d2f0, transparent);
+    margin: 12px 0;
 }
 
 /* На десктопе карточка клиента — по центру, ограничена по ширине */

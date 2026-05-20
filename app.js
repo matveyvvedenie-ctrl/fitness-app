@@ -1441,45 +1441,101 @@ async function loadClientProgram(sheetName) {
     }
 }
 
+// Префикс «СЕТ:» в названии означает первый элемент суперсета (следующее упражнение — пара).
+function isSupersetStart(ex) {
+    var name = (ex && ex.exercise ? ex.exercise : '').toString().trim();
+    return /^сет\s*:/i.test(name);
+}
+
+function cleanExerciseName(name) {
+    return (name || '').toString().replace(/^\s*сет\s*:\s*/i, '').trim();
+}
+
+// Превращает плоский список упражнений в массив групп:
+// { type: 'single' | 'superset', exercises: [...], number: <номер для отображения> }
+function groupExercises(exercises) {
+    var groups = [];
+    var displayNum = 0;
+    var i = 0;
+    while (i < exercises.length) {
+        var ex = exercises[i];
+        if (isSupersetStart(ex) && i + 1 < exercises.length) {
+            displayNum++;
+            groups.push({ type: 'superset', exercises: [exercises[i], exercises[i + 1]], number: displayNum });
+            i += 2;
+        } else {
+            displayNum++;
+            groups.push({ type: 'single', exercises: [ex], number: displayNum });
+            i += 1;
+        }
+    }
+    return groups;
+}
+
+// Рендер одного упражнения внутри блока (без обёртки cc-exercise — для суперсета используется cc-exercise-inner)
+function renderExerciseRow(ex, label) {
+    var weightPlan = (ex.weightPlan !== '' && ex.weightPlan != null) ? ex.weightPlan : '—';
+    var reps = (ex.reps !== '' && ex.reps != null) ? ex.reps : '—';
+    var sets = (ex.sets !== '' && ex.sets != null) ? ex.sets : '—';
+    var rpe = (ex.rpe !== '' && ex.rpe != null) ? ex.rpe : '—';
+    var done = (ex.weightFact !== '' && ex.weightFact != null && ex.weightFact !== 0)
+        || (ex.repsFact !== '' && ex.repsFact != null && ex.repsFact !== 0);
+    var factHtml = done
+        ? '<div class="cc-ex-fact">Факт: ' + (ex.weightFact || '—') + ' кг × ' + (ex.repsFact || '—') + '</div>'
+        : '';
+    var noteHtml = (ex.note && ex.note.toString().trim())
+        ? '<div class="cc-ex-note">' + ex.note + '</div>' : '';
+    var labelHtml = label
+        ? '<span class="cc-ex-suplabel">' + label + '</span>' : '';
+    return '<div class="cc-ex-row">' +
+        '<div class="cc-ex-name">' + labelHtml + cleanExerciseName(ex.exercise) + '</div>' +
+        '<div class="cc-ex-grid">' +
+            '<div class="cc-ex-cell"><div class="cc-cell-label">Вес</div><div class="cc-cell-value">' + weightPlan + ' кг</div></div>' +
+            '<div class="cc-ex-cell"><div class="cc-cell-label">Повт.</div><div class="cc-cell-value">' + reps + '</div></div>' +
+            '<div class="cc-ex-cell"><div class="cc-cell-label">Подх.</div><div class="cc-cell-value">' + sets + '</div></div>' +
+            '<div class="cc-ex-cell"><div class="cc-cell-label">RPE</div><div class="cc-cell-value">' + rpe + '</div></div>' +
+        '</div>' +
+        factHtml +
+        noteHtml +
+    '</div>';
+}
+
 function renderClientProgram(data) {
     var container = document.getElementById('cc-program-container');
     var days = data.days || [];
     if (days.length === 0) {
-        container.innerHTML = '<div class="no-data">📋 В программе пока нет упражнений</div>';
+        container.innerHTML = '<div class="no-data">В программе пока нет упражнений</div>';
         return;
     }
 
     container.innerHTML = days.map(function(day, dayIdx) {
-        var exercisesHtml = (day.exercises || []).map(function(ex, exIdx) {
-            var weightPlan = (ex.weightPlan !== '' && ex.weightPlan != null) ? ex.weightPlan : '—';
-            var reps = (ex.reps !== '' && ex.reps != null) ? ex.reps : '—';
-            var sets = (ex.sets !== '' && ex.sets != null) ? ex.sets : '—';
-            var rpe = (ex.rpe !== '' && ex.rpe != null) ? ex.rpe : '—';
-            var done = (ex.weightFact !== '' && ex.weightFact != null && ex.weightFact !== 0)
-                || (ex.repsFact !== '' && ex.repsFact != null && ex.repsFact !== 0);
-            var factHtml = done
-                ? '<div class="cc-ex-fact">✅ Факт: ' + (ex.weightFact || '—') + ' кг × ' + (ex.repsFact || '—') + '</div>'
-                : '';
-            var noteHtml = (ex.note && ex.note.toString().trim())
-                ? '<div class="cc-ex-note">📝 ' + ex.note + '</div>' : '';
-            return '<div class="cc-exercise">' +
-                '<div class="cc-ex-num">' + (exIdx + 1) + '</div>' +
-                '<div class="cc-ex-info">' +
-                    '<div class="cc-ex-name">' + (ex.exercise || '') + '</div>' +
-                    '<div class="cc-ex-params">' +
-                        '<span class="cc-ex-param">⚖️ ' + weightPlan + ' кг</span>' +
-                        '<span class="cc-ex-param">🔄 ' + reps + ' повт</span>' +
-                        '<span class="cc-ex-param">📦 ' + sets + ' подх</span>' +
-                        '<span class="cc-ex-param">🔥 RPE ' + rpe + '</span>' +
+        var groups = groupExercises(day.exercises || []);
+        var groupsHtml = groups.map(function(group) {
+            if (group.type === 'superset') {
+                return '<div class="cc-exercise cc-superset">' +
+                    '<div class="cc-ex-num">' + group.number + '</div>' +
+                    '<div class="cc-ex-info">' +
+                        '<div class="cc-superset-header">Суперсет</div>' +
+                        '<div class="cc-superset-body">' +
+                            renderExerciseRow(group.exercises[0], 'A') +
+                            '<div class="cc-superset-divider"></div>' +
+                            renderExerciseRow(group.exercises[1], 'B') +
+                        '</div>' +
                     '</div>' +
-                    factHtml +
-                    noteHtml +
+                '</div>';
+            }
+            // single
+            return '<div class="cc-exercise">' +
+                '<div class="cc-ex-num">' + group.number + '</div>' +
+                '<div class="cc-ex-info">' +
+                    renderExerciseRow(group.exercises[0], '') +
                 '</div>' +
             '</div>';
         }).join('');
+
         return '<div class="cc-day-block">' +
-            '<div class="cc-day-title">📅 ' + (day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
-            (exercisesHtml || '<div class="no-data">Нет упражнений</div>') +
+            '<div class="cc-day-title">' + (day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
+            (groupsHtml || '<div class="no-data">Нет упражнений</div>') +
         '</div>';
     }).join('');
 }
