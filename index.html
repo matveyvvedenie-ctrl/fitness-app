@@ -209,43 +209,99 @@
         <!-- Admin Dashboard Tab -->
         <div id="admin-tab" class="tab-content">
             <div class="dashboard-header">
-                <h2 class="dashboard-title">👑 Дашборд тренера</h2>
+                <h2 class="dashboard-title">👑 Тренерская</h2>
                 <div class="dashboard-date" id="dashboard-date"></div>
             </div>
 
-            <!-- Summary Cards -->
-            <div class="dashboard-summary">
-                <div class="summary-card">
-                    <div class="summary-icon">👥</div>
-                    <div class="summary-value" id="dash-total-clients">-</div>
-                    <div class="summary-label">Клиентов</div>
+            <!-- Сводные карточки по тренировкам -->
+            <div class="admin-summary">
+                <div class="admin-summary-card">
+                    <div class="admin-summary-icon">👥</div>
+                    <div class="admin-summary-value" id="admin-total">-</div>
+                    <div class="admin-summary-label">Клиентов</div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-icon">⚠️</div>
-                    <div class="summary-value" id="dash-need-attention">-</div>
-                    <div class="summary-label">Требуют внимания</div>
+                <div class="admin-summary-card admin-summary-warning">
+                    <div class="admin-summary-icon">⚠️</div>
+                    <div class="admin-summary-value" id="admin-attention">-</div>
+                    <div class="admin-summary-label">Нужно внимание</div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-icon">🍽️</div>
-                    <div class="summary-value" id="dash-avg-food-score">-</div>
-                    <div class="summary-label">Ср. оценка питания</div>
+                <div class="admin-summary-card admin-summary-ok">
+                    <div class="admin-summary-icon">✅</div>
+                    <div class="admin-summary-value" id="admin-active-week">-</div>
+                    <div class="admin-summary-label">Активны (7 дн)</div>
                 </div>
             </div>
 
-            <!-- Filters -->
-            <div class="filter-bar">
-                <button class="filter-btn active" data-filter="all">Все</button>
-                <button class="filter-btn" data-filter="problem">⚠️ Проблемные</button>
-                <button class="filter-btn" data-filter="active">✅ Активные</button>
+            <!-- Поиск + Сортировка -->
+            <div class="admin-controls">
+                <input type="text" class="admin-search" id="admin-search" placeholder="🔍 Поиск по имени...">
+                <select class="admin-sort" id="admin-sort">
+                    <option value="status">Сортировка: по статусу</option>
+                    <option value="date">Сортировка: по дате трен.</option>
+                    <option value="alpha">Сортировка: по алфавиту</option>
+                </select>
             </div>
 
-            <!-- Client Cards -->
-            <div class="clients-section">
-                <h3 class="section-title">📋 Клиенты</h3>
-                <div id="clients-list" class="clients-list">
-                    <div class="no-data">Загрузка данных...</div>
-                </div>
+            <!-- Фильтры -->
+            <div class="admin-filters">
+                <button class="admin-filter-btn active" data-admin-filter="all">Все</button>
+                <button class="admin-filter-btn" data-admin-filter="attention">⚠️ Нужно внимание</button>
+                <button class="admin-filter-btn" data-admin-filter="active">✅ Активные</button>
+                <button class="admin-filter-btn" data-admin-filter="inactive">⚪ Неактивные</button>
             </div>
+
+            <!-- Список клиентов: карточки на мобиле, таблица на десктопе -->
+            <div id="admin-clients-list" class="admin-clients-list">
+                <div class="no-data">Загрузка клиентов...</div>
+            </div>
+            <table class="admin-clients-table" id="admin-clients-table">
+                <thead>
+                    <tr>
+                        <th>Статус</th>
+                        <th>Имя</th>
+                        <th>Неделя</th>
+                        <th>Последняя трен.</th>
+                        <th>За 7 дней</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-clients-tbody"></tbody>
+            </table>
+
+            <!-- Старый дашборд по еде — сворачивающийся блок -->
+            <details class="admin-food-details">
+                <summary>🍽️ Дашборд по питанию</summary>
+                <div class="admin-food-body">
+                    <div class="dashboard-summary">
+                        <div class="summary-card">
+                            <div class="summary-icon">👥</div>
+                            <div class="summary-value" id="dash-total-clients">-</div>
+                            <div class="summary-label">Клиентов</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">⚠️</div>
+                            <div class="summary-value" id="dash-need-attention">-</div>
+                            <div class="summary-label">Требуют внимания</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">🍽️</div>
+                            <div class="summary-value" id="dash-avg-food-score">-</div>
+                            <div class="summary-label">Ср. оценка питания</div>
+                        </div>
+                    </div>
+                    <div class="filter-bar">
+                        <button class="filter-btn active" data-filter="all">Все</button>
+                        <button class="filter-btn" data-filter="problem">⚠️ Проблемные</button>
+                        <button class="filter-btn" data-filter="active">✅ Активные</button>
+                    </div>
+                    <div class="clients-section">
+                        <h3 class="section-title">📋 Клиенты (питание)</h3>
+                        <div id="clients-list" class="clients-list">
+                            <div class="no-data">Загрузка данных...</div>
+                        </div>
+                    </div>
+                </div>
+            </details>
         </div>
     </div>
 

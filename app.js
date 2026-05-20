@@ -573,7 +573,7 @@ function initializeTabs() {
             document.getElementById(tabName + '-tab').classList.add('active');
             if (tabName === 'progress') loadProgressData();
             if (tabName === 'measurements') loadMeasurementsData();
-            if (tabName === 'admin') loadDashboardData();
+            if (tabName === 'admin') { loadAdminClients(); loadDashboardData(); }
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         });
     });
@@ -919,6 +919,7 @@ function initAdminTab() {
         document.getElementById('admin-tab-btn').classList.remove('hidden');
         document.getElementById('tabs-container').classList.add('tabs-4');
         initFilters();
+        initAdminClientsControls();
     }
 }
 
@@ -1089,6 +1090,206 @@ function drawSparkline(canvas, data) {
         else ctx.lineTo(x, y);
     });
     ctx.stroke();
+}
+
+// ========== ADMIN: КЛИЕНТЫ ПО ТРЕНИРОВКАМ ==========
+
+var adminClients = [];
+var adminFilter = 'all';
+var adminSort = 'status';
+var adminSearch = '';
+
+// Соответствие статуса бэка → иконка + подпись + ранг для сортировки (меньше = выше)
+var ADMIN_STATUS_INFO = {
+    red:      { icon: '🔴', label: 'Провалы',       rank: 1, klass: 'admin-st-red' },
+    orange:   { icon: '🟠', label: 'Пропуск 7+ дн', rank: 2, klass: 'admin-st-orange' },
+    yellow:   { icon: '🟡', label: 'Пропустил',    rank: 3, klass: 'admin-st-yellow' },
+    green:    { icon: '🟢', label: 'В норме',      rank: 4, klass: 'admin-st-green' },
+    inactive: { icon: '⚪', label: 'Неактивный',   rank: 5, klass: 'admin-st-inactive' }
+};
+
+function formatDaysAgo(days) {
+    if (days == null) return 'не было';
+    if (days === 0) return 'сегодня';
+    if (days === 1) return 'вчера';
+    if (days < 5) return days + ' дн назад';
+    if (days < 21) return days + ' дн назад';
+    var weeks = Math.floor(days / 7);
+    return weeks + ' нед назад';
+}
+
+async function loadAdminClients() {
+    var list = document.getElementById('admin-clients-list');
+    if (list) list.innerHTML = '<div class="no-data">Загрузка клиентов...</div>';
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getAdminClients';
+        var response = await fetch(url);
+        var data = await response.json();
+        if (data.error) {
+            if (list) list.innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
+            return;
+        }
+        adminClients = data.clients || [];
+        renderAdminSummary();
+        renderAdminClients();
+    } catch (error) {
+        console.error('Admin clients load error:', error);
+        if (list) list.innerHTML = '<div class="no-data">Ошибка загрузки</div>';
+    }
+}
+
+function renderAdminSummary() {
+    var total = adminClients.length;
+    var attention = adminClients.filter(function(c) {
+        return c.status === 'red' || c.status === 'orange' || c.status === 'yellow';
+    }).length;
+    var activeWeek = adminClients.filter(function(c) {
+        return c.lastWorkoutDaysAgo != null && c.lastWorkoutDaysAgo < 7;
+    }).length;
+    document.getElementById('admin-total').textContent = total;
+    document.getElementById('admin-attention').textContent = attention;
+    document.getElementById('admin-active-week').textContent = activeWeek;
+
+    // Бейдж на вкладке
+    var badge = document.getElementById('admin-badge');
+    if (badge) {
+        if (attention > 0) { badge.textContent = attention; badge.classList.remove('hidden'); }
+        else badge.classList.add('hidden');
+    }
+
+    // Дата
+    var dateEl = document.getElementById('dashboard-date');
+    if (dateEl) {
+        dateEl.textContent = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+}
+
+function initAdminClientsControls() {
+    // Поиск
+    var search = document.getElementById('admin-search');
+    if (search) {
+        search.addEventListener('input', function() {
+            adminSearch = (search.value || '').toLowerCase().trim();
+            renderAdminClients();
+        });
+    }
+    // Сортировка
+    var sortEl = document.getElementById('admin-sort');
+    if (sortEl) {
+        sortEl.addEventListener('change', function() {
+            adminSort = sortEl.value;
+            renderAdminClients();
+        });
+    }
+    // Фильтры
+    document.querySelectorAll('.admin-filter-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.admin-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            adminFilter = btn.dataset.adminFilter;
+            renderAdminClients();
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        });
+    });
+}
+
+function getFilteredAdminClients() {
+    var arr = adminClients.slice();
+    // Фильтр
+    if (adminFilter === 'attention') {
+        arr = arr.filter(function(c) { return c.status === 'red' || c.status === 'orange' || c.status === 'yellow'; });
+    } else if (adminFilter === 'active') {
+        arr = arr.filter(function(c) { return c.status === 'green'; });
+    } else if (adminFilter === 'inactive') {
+        arr = arr.filter(function(c) { return c.status === 'inactive'; });
+    }
+    // Поиск
+    if (adminSearch) {
+        arr = arr.filter(function(c) { return (c.name || '').toLowerCase().indexOf(adminSearch) >= 0; });
+    }
+    // Сортировка
+    if (adminSort === 'status') {
+        arr.sort(function(a, b) {
+            var ra = (ADMIN_STATUS_INFO[a.status] || {}).rank || 99;
+            var rb = (ADMIN_STATUS_INFO[b.status] || {}).rank || 99;
+            if (ra !== rb) return ra - rb;
+            return (a.name || '').localeCompare(b.name || '', 'ru');
+        });
+    } else if (adminSort === 'date') {
+        arr.sort(function(a, b) {
+            var da = a.lastWorkoutDaysAgo == null ? 99999 : a.lastWorkoutDaysAgo;
+            var db = b.lastWorkoutDaysAgo == null ? 99999 : b.lastWorkoutDaysAgo;
+            return da - db;
+        });
+    } else if (adminSort === 'alpha') {
+        arr.sort(function(a, b) { return (a.name || '').localeCompare(b.name || '', 'ru'); });
+    }
+    return arr;
+}
+
+function renderAdminClients() {
+    var list = document.getElementById('admin-clients-list');
+    var tbody = document.getElementById('admin-clients-tbody');
+    var arr = getFilteredAdminClients();
+
+    if (arr.length === 0) {
+        if (list) list.innerHTML = '<div class="no-data">Нет клиентов в этой категории</div>';
+        if (tbody) tbody.innerHTML = '';
+        return;
+    }
+
+    // ── Мобильные карточки ──
+    if (list) {
+        list.innerHTML = arr.map(function(c) {
+            var info = ADMIN_STATUS_INFO[c.status] || ADMIN_STATUS_INFO.inactive;
+            var failBadge = c.failuresLastWorkout >= 2
+                ? '<span class="admin-card-badge admin-badge-red">⚠️ Провалы в последней</span>' : '';
+            return '<div class="admin-client-card ' + info.klass + '" data-chat="' + (c.chatId || '') + '">' +
+                '<div class="admin-card-top">' +
+                    '<div class="admin-card-status">' + info.icon + '</div>' +
+                    '<div class="admin-card-name">' + (c.name || 'Клиент') + '</div>' +
+                    '<div class="admin-card-status-label">' + info.label + '</div>' +
+                '</div>' +
+                '<div class="admin-card-meta">' +
+                    '<div class="admin-card-meta-item">' +
+                        '<span class="admin-card-meta-label">📅 Неделя</span>' +
+                        '<span class="admin-card-meta-value">' + (c.weekTitle || '—') + '</span>' +
+                    '</div>' +
+                    '<div class="admin-card-meta-item">' +
+                        '<span class="admin-card-meta-label">🏋️ Последняя</span>' +
+                        '<span class="admin-card-meta-value">' + formatDaysAgo(c.lastWorkoutDaysAgo) + '</span>' +
+                    '</div>' +
+                    '<div class="admin-card-meta-item">' +
+                        '<span class="admin-card-meta-label">📊 За 7 дней</span>' +
+                        '<span class="admin-card-meta-value">' + (c.workouts7Days || 0) + ' трен.</span>' +
+                    '</div>' +
+                '</div>' +
+                failBadge +
+                '<div class="admin-card-actions">' +
+                    '<button class="admin-card-btn admin-card-btn-primary" disabled title="Откроется в Фазе 2">👁 Открыть</button>' +
+                    '<button class="admin-card-btn" onclick="messageClient(\'' + (c.chatId || '') + '\', \'' + (c.name || '').replace(/'/g, "\\'") + '\')">✉️ Написать</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // ── Десктоп: таблица ──
+    if (tbody) {
+        tbody.innerHTML = arr.map(function(c) {
+            var info = ADMIN_STATUS_INFO[c.status] || ADMIN_STATUS_INFO.inactive;
+            return '<tr class="' + info.klass + '">' +
+                '<td><span class="admin-row-status">' + info.icon + '</span><span class="admin-row-status-label">' + info.label + '</span></td>' +
+                '<td class="admin-row-name">' + (c.name || 'Клиент') + '</td>' +
+                '<td>' + (c.weekTitle || '—') + '</td>' +
+                '<td>' + formatDaysAgo(c.lastWorkoutDaysAgo) + '</td>' +
+                '<td>' + (c.workouts7Days || 0) + '</td>' +
+                '<td class="admin-row-actions">' +
+                    '<button class="admin-row-btn" disabled title="Откроется в Фазе 2">👁</button>' +
+                    '<button class="admin-row-btn" onclick="messageClient(\'' + (c.chatId || '') + '\', \'' + (c.name || '').replace(/'/g, "\\'") + '\')">✉️</button>' +
+                '</td>' +
+            '</tr>';
+        }).join('');
+    }
 }
 
 // ========== MEASUREMENTS TAB ==========

@@ -958,6 +958,393 @@ body {
     opacity: 0.9;
 }
 
+/* ========== ADMIN: КЛИЕНТЫ ПО ТРЕНИРОВКАМ ========== */
+
+.admin-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 12px 8px;
+    background: white;
+}
+
+.admin-summary-card {
+    background: linear-gradient(135deg, #f5f5f5, #ffffff);
+    border-radius: 12px;
+    padding: 16px 8px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    animation: fadeInUp 0.5s ease backwards;
+    border-left: 4px solid transparent;
+}
+
+.admin-summary-card.admin-summary-warning {
+    border-left-color: #FFA726;
+    background: linear-gradient(135deg, #fff8e1, #ffffff);
+}
+
+.admin-summary-card.admin-summary-ok {
+    border-left-color: #43A047;
+    background: linear-gradient(135deg, #f1f8e9, #ffffff);
+}
+
+.admin-summary-icon {
+    font-size: 26px;
+    margin-bottom: 4px;
+}
+
+.admin-summary-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 2px;
+}
+
+.admin-summary-label {
+    font-size: 10px;
+    color: #666;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Поиск + сортировка */
+.admin-controls {
+    display: flex;
+    gap: 8px;
+    padding: 0 8px 8px;
+    background: white;
+}
+
+.admin-search {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #e0e0e0;
+    font-size: 14px;
+    background: #fafafa;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.admin-search:focus {
+    border-color: #1a1a2e;
+    background: white;
+}
+
+.admin-sort {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #e0e0e0;
+    font-size: 13px;
+    background: #fafafa;
+    color: #333;
+    cursor: pointer;
+    outline: none;
+    max-width: 50%;
+}
+
+/* Фильтры */
+.admin-filters {
+    display: flex;
+    gap: 6px;
+    padding: 0 8px 10px;
+    background: white;
+    overflow-x: auto;
+}
+
+.admin-filter-btn {
+    background: #f5f5f5;
+    border: 2px solid transparent;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.admin-filter-btn.active {
+    background: #1a1a2e;
+    color: white;
+    border-color: #1a1a2e;
+}
+
+.admin-filter-btn:active {
+    transform: scale(0.95);
+}
+
+/* Список клиентов: мобильные карточки */
+.admin-clients-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px 8px 80px;
+    background: #f7f7fa;
+}
+
+.admin-client-card {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid #ccc;
+    animation: fadeInUp 0.3s ease backwards;
+    transition: transform 0.15s ease;
+}
+
+.admin-client-card:active {
+    transform: scale(0.985);
+}
+
+.admin-client-card.admin-st-green    { border-left-color: #43A047; background: linear-gradient(135deg, #ffffff, #f1f8e9); }
+.admin-client-card.admin-st-yellow   { border-left-color: #FFA726; background: linear-gradient(135deg, #ffffff, #fff8e1); }
+.admin-client-card.admin-st-orange   { border-left-color: #FB8C00; background: linear-gradient(135deg, #ffffff, #fff3e0); }
+.admin-client-card.admin-st-red      { border-left-color: #E53935; background: linear-gradient(135deg, #ffffff, #ffebee); }
+.admin-client-card.admin-st-inactive { border-left-color: #BDBDBD; background: linear-gradient(135deg, #ffffff, #f5f5f5); opacity: 0.85; }
+
+.admin-card-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.admin-card-status {
+    font-size: 20px;
+}
+
+.admin-card-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    flex: 1;
+}
+
+.admin-card-status-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #555;
+    background: rgba(0,0,0,0.06);
+    padding: 3px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.admin-card-meta {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.admin-card-meta-item {
+    background: rgba(255,255,255,0.6);
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.admin-card-meta-label {
+    font-size: 10px;
+    color: #999;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.admin-card-meta-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.admin-card-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.admin-badge-red {
+    background: #FFEBEE;
+    color: #C62828;
+}
+
+.admin-card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.admin-card-btn {
+    flex: 1;
+    background: #f5f5f5;
+    border: none;
+    padding: 9px 10px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 12px;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.admin-card-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.admin-card-btn:not(:disabled):active {
+    transform: scale(0.97);
+}
+
+.admin-card-btn-primary {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: white;
+}
+
+/* Десктоп: таблица — скрыта на мобиле */
+.admin-clients-table {
+    display: none;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.admin-clients-table th {
+    background: #1a1a2e;
+    color: white;
+    text-align: left;
+    padding: 12px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.admin-clients-table td {
+    padding: 12px 14px;
+    font-size: 14px;
+    border-top: 1px solid #f0f0f0;
+    vertical-align: middle;
+}
+
+.admin-clients-table tr.admin-st-green    td:first-child { border-left: 4px solid #43A047; }
+.admin-clients-table tr.admin-st-yellow   td:first-child { border-left: 4px solid #FFA726; }
+.admin-clients-table tr.admin-st-orange   td:first-child { border-left: 4px solid #FB8C00; }
+.admin-clients-table tr.admin-st-red      td:first-child { border-left: 4px solid #E53935; }
+.admin-clients-table tr.admin-st-inactive td:first-child { border-left: 4px solid #BDBDBD; }
+
+.admin-row-status {
+    font-size: 16px;
+    margin-right: 6px;
+}
+
+.admin-row-status-label {
+    font-size: 12px;
+    color: #666;
+    font-weight: 600;
+}
+
+.admin-row-name {
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.admin-row-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.admin-row-btn {
+    background: #f5f5f5;
+    border: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.admin-row-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.admin-row-btn:not(:disabled):hover { background: #e0e0e0; }
+
+/* Свёрнутый блок «Питание клиентов» */
+.admin-food-details {
+    margin: 12px 8px 80px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    overflow: hidden;
+}
+
+.admin-food-details > summary {
+    padding: 14px 16px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #1a1a2e;
+    cursor: pointer;
+    background: linear-gradient(135deg, #f5f5f5, #ffffff);
+    list-style: none;
+    user-select: none;
+}
+
+.admin-food-details > summary::-webkit-details-marker { display: none; }
+.admin-food-details > summary::before {
+    content: '▸ ';
+    display: inline-block;
+    transition: transform 0.2s ease;
+    margin-right: 4px;
+}
+
+.admin-food-details[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.admin-food-body {
+    border-top: 1px solid #eee;
+}
+
+/* На десктопе показываем таблицу, скрываем карточки */
+@media (min-width: 900px) {
+    .admin-clients-list { display: none; }
+    .admin-clients-table {
+        display: table;
+        margin: 8px 16px 24px;
+        width: calc(100% - 32px);
+    }
+    .admin-summary {
+        grid-template-columns: repeat(3, 1fr);
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    .admin-controls {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    .admin-filters {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    .admin-food-details {
+        max-width: 900px;
+        margin: 24px auto 80px;
+    }
+}
+
 /* ========== MEASUREMENTS TAB ========== */
 
 .measurements-latest {
