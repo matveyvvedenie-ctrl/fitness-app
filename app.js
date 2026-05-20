@@ -920,6 +920,7 @@ function initAdminTab() {
         document.getElementById('tabs-container').classList.add('tabs-4');
         initFilters();
         initAdminClientsControls();
+        initClientCardTabs();
     }
 }
 
@@ -1139,16 +1140,21 @@ async function loadAdminClients() {
 }
 
 function renderAdminSummary() {
-    var total = adminClients.length;
-    var attention = adminClients.filter(function(c) {
+    // Архивных в сводку не считаем
+    var active = adminClients.filter(function(c) { return c.archived !== true; });
+    var archivedCount = adminClients.length - active.length;
+    var total = active.length;
+    var attention = active.filter(function(c) {
         return c.status === 'red' || c.status === 'orange' || c.status === 'yellow';
     }).length;
-    var activeWeek = adminClients.filter(function(c) {
+    var activeWeek = active.filter(function(c) {
         return c.lastWorkoutDaysAgo != null && c.lastWorkoutDaysAgo < 7;
     }).length;
     document.getElementById('admin-total').textContent = total;
     document.getElementById('admin-attention').textContent = attention;
     document.getElementById('admin-active-week').textContent = activeWeek;
+    var archCount = document.getElementById('admin-archive-count');
+    if (archCount) archCount.textContent = archivedCount > 0 ? '(' + archivedCount + ')' : '';
 
     // Бейдж на вкладке
     var badge = document.getElementById('admin-badge');
@@ -1195,13 +1201,18 @@ function initAdminClientsControls() {
 
 function getFilteredAdminClients() {
     var arr = adminClients.slice();
-    // Фильтр
-    if (adminFilter === 'attention') {
-        arr = arr.filter(function(c) { return c.status === 'red' || c.status === 'orange' || c.status === 'yellow'; });
-    } else if (adminFilter === 'active') {
-        arr = arr.filter(function(c) { return c.status === 'green'; });
-    } else if (adminFilter === 'inactive') {
-        arr = arr.filter(function(c) { return c.status === 'inactive'; });
+    // Архив — отдельная "папка". Во всех остальных фильтрах архивных скрываем.
+    if (adminFilter === 'archive') {
+        arr = arr.filter(function(c) { return c.archived === true; });
+    } else {
+        arr = arr.filter(function(c) { return c.archived !== true; });
+        if (adminFilter === 'attention') {
+            arr = arr.filter(function(c) { return c.status === 'red' || c.status === 'orange' || c.status === 'yellow'; });
+        } else if (adminFilter === 'active') {
+            arr = arr.filter(function(c) { return c.status === 'green'; });
+        } else if (adminFilter === 'inactive') {
+            arr = arr.filter(function(c) { return c.status === 'inactive'; });
+        }
     }
     // Поиск
     if (adminSearch) {
@@ -1242,9 +1253,16 @@ function renderAdminClients() {
     if (list) {
         list.innerHTML = arr.map(function(c) {
             var info = ADMIN_STATUS_INFO[c.status] || ADMIN_STATUS_INFO.inactive;
-            var failBadge = c.failuresLastWorkout >= 2
+            var safeName = (c.name || '').replace(/'/g, "\\'");
+            var isArchived = c.archived === true;
+            var failBadge = (!isArchived && c.failuresLastWorkout >= 2)
                 ? '<span class="admin-card-badge admin-badge-red">⚠️ Провалы в последней</span>' : '';
-            return '<div class="admin-client-card ' + info.klass + '" data-chat="' + (c.chatId || '') + '">' +
+            var archivedBadge = isArchived
+                ? '<span class="admin-card-badge admin-badge-archived">📦 В архиве</span>' : '';
+            var archiveBtn = isArchived
+                ? '<button class="admin-card-btn admin-card-btn-restore" onclick="toggleArchiveClient(\'' + c.chatId + '\', false)">↩️ Вернуть</button>'
+                : '<button class="admin-card-btn admin-card-btn-archive" onclick="toggleArchiveClient(\'' + c.chatId + '\', true)">📦 В архив</button>';
+            return '<div class="admin-client-card ' + info.klass + (isArchived ? ' admin-card-archived' : '') + '" data-chat="' + (c.chatId || '') + '">' +
                 '<div class="admin-card-top">' +
                     '<div class="admin-card-status">' + info.icon + '</div>' +
                     '<div class="admin-card-name">' + (c.name || 'Клиент') + '</div>' +
@@ -1264,10 +1282,12 @@ function renderAdminClients() {
                         '<span class="admin-card-meta-value">' + (c.workouts7Days || 0) + ' трен.</span>' +
                     '</div>' +
                 '</div>' +
+                archivedBadge +
                 failBadge +
                 '<div class="admin-card-actions">' +
-                    '<button class="admin-card-btn admin-card-btn-primary" disabled title="Откроется в Фазе 2">👁 Открыть</button>' +
-                    '<button class="admin-card-btn" onclick="messageClient(\'' + (c.chatId || '') + '\', \'' + (c.name || '').replace(/'/g, "\\'") + '\')">✉️ Написать</button>' +
+                    '<button class="admin-card-btn admin-card-btn-primary" onclick="openClientCard(\'' + c.chatId + '\')">👁 Открыть</button>' +
+                    '<button class="admin-card-btn" onclick="messageClient(\'' + c.chatId + '\', \'' + safeName + '\')">✉️ Написать</button>' +
+                    archiveBtn +
                 '</div>' +
             '</div>';
         }).join('');
@@ -1277,19 +1297,191 @@ function renderAdminClients() {
     if (tbody) {
         tbody.innerHTML = arr.map(function(c) {
             var info = ADMIN_STATUS_INFO[c.status] || ADMIN_STATUS_INFO.inactive;
-            return '<tr class="' + info.klass + '">' +
+            var safeName = (c.name || '').replace(/'/g, "\\'");
+            var isArchived = c.archived === true;
+            var archiveAction = isArchived
+                ? '<button class="admin-row-btn" title="Вернуть из архива" onclick="toggleArchiveClient(\'' + c.chatId + '\', false)">↩️</button>'
+                : '<button class="admin-row-btn" title="В архив" onclick="toggleArchiveClient(\'' + c.chatId + '\', true)">📦</button>';
+            return '<tr class="' + info.klass + (isArchived ? ' admin-row-archived' : '') + '">' +
                 '<td><span class="admin-row-status">' + info.icon + '</span><span class="admin-row-status-label">' + info.label + '</span></td>' +
-                '<td class="admin-row-name">' + (c.name || 'Клиент') + '</td>' +
+                '<td class="admin-row-name">' + (c.name || 'Клиент') + (isArchived ? ' <span class="admin-row-archive-tag">📦</span>' : '') + '</td>' +
                 '<td>' + (c.weekTitle || '—') + '</td>' +
                 '<td>' + formatDaysAgo(c.lastWorkoutDaysAgo) + '</td>' +
                 '<td>' + (c.workouts7Days || 0) + '</td>' +
                 '<td class="admin-row-actions">' +
-                    '<button class="admin-row-btn" disabled title="Откроется в Фазе 2">👁</button>' +
-                    '<button class="admin-row-btn" onclick="messageClient(\'' + (c.chatId || '') + '\', \'' + (c.name || '').replace(/'/g, "\\'") + '\')">✉️</button>' +
+                    '<button class="admin-row-btn" title="Открыть" onclick="openClientCard(\'' + c.chatId + '\')">👁</button>' +
+                    '<button class="admin-row-btn" title="Написать" onclick="messageClient(\'' + c.chatId + '\', \'' + safeName + '\')">✉️</button>' +
+                    archiveAction +
                 '</td>' +
             '</tr>';
         }).join('');
     }
+}
+
+// ========== АРХИВ КЛИЕНТОВ ==========
+
+async function toggleArchiveClient(chatId, archived) {
+    var client = adminClients.find(function(c) { return c.chatId === chatId; });
+    var name = client ? client.name : 'клиента';
+    var action = archived ? ('Убрать ' + name + ' в архив?') : ('Вернуть ' + name + ' из архива?');
+    var confirmed = await new Promise(function(resolve) {
+        if (tg && tg.showConfirm) tg.showConfirm(action, function(ok) { resolve(ok); });
+        else resolve(confirm(action));
+    });
+    if (!confirmed) return;
+
+    try {
+        var url = APPS_SCRIPT_URL + '?action=setClientArchived&targetChatId=' + encodeURIComponent(chatId) + '&archived=' + (archived ? 'true' : 'false');
+        var response = await fetch(url);
+        var data = await response.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        // Обновляем локально, чтобы не делать полный re-fetch
+        if (client) client.archived = archived;
+        renderAdminSummary();
+        renderAdminClients();
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    } catch (error) {
+        console.error('Archive toggle error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+    }
+}
+
+// ========== КАРТОЧКА КЛИЕНТА (Фаза 2A: просмотр программы) ==========
+
+var currentClientCard = null;
+
+function openClientCard(chatId) {
+    var client = adminClients.find(function(c) { return c.chatId === chatId; });
+    if (!client) return;
+    currentClientCard = client;
+
+    document.getElementById('cc-name').textContent = client.name || 'Клиент';
+    document.getElementById('cc-meta').textContent =
+        (client.weekTitle || 'Программа') +
+        ' · последняя: ' + formatDaysAgo(client.lastWorkoutDaysAgo);
+
+    // Кнопка архива в шапке
+    var archBtn = document.getElementById('cc-archive-btn');
+    if (archBtn) {
+        archBtn.textContent = client.archived ? '↩️' : '📦';
+        archBtn.title = client.archived ? 'Вернуть из архива' : 'В архив';
+    }
+
+    // Открыть экран
+    var screen = document.getElementById('client-card-screen');
+    screen.classList.remove('hidden');
+    document.body.classList.add('no-scroll');
+
+    // Сбросить на вкладку "Программа"
+    switchClientCardTab('program');
+    loadClientProgram(client.sheetName);
+}
+
+function closeClientCard() {
+    var screen = document.getElementById('client-card-screen');
+    screen.classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+    currentClientCard = null;
+}
+
+function switchClientCardTab(tabName) {
+    document.querySelectorAll('.cc-tab-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.ccTab === tabName);
+    });
+    document.querySelectorAll('.cc-tab-content').forEach(function(content) {
+        content.classList.remove('active');
+    });
+    document.getElementById('cc-' + tabName + '-tab').classList.add('active');
+}
+
+function initClientCardTabs() {
+    document.querySelectorAll('.cc-tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            switchClientCardTab(btn.dataset.ccTab);
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        });
+    });
+}
+
+function toggleArchiveFromCard() {
+    if (!currentClientCard) return;
+    var newState = !currentClientCard.archived;
+    toggleArchiveClient(currentClientCard.chatId, newState).then(function() {
+        // После архивирования закрываем карточку (клиент исчез из основного списка)
+        if (newState) closeClientCard();
+        else {
+            // Обновим кнопку
+            var archBtn = document.getElementById('cc-archive-btn');
+            if (archBtn) {
+                archBtn.textContent = currentClientCard.archived ? '↩️' : '📦';
+                archBtn.title = currentClientCard.archived ? 'Вернуть из архива' : 'В архив';
+            }
+        }
+    });
+}
+
+async function loadClientProgram(sheetName) {
+    var container = document.getElementById('cc-program-container');
+    container.innerHTML = '<div class="no-data">Загрузка программы...</div>';
+    try {
+        var url = APPS_SCRIPT_URL + '?action=readClientProgram&sheetName=' + encodeURIComponent(sheetName);
+        var response = await fetch(url);
+        var data = await response.json();
+        if (data.error) {
+            container.innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
+            return;
+        }
+        renderClientProgram(data);
+    } catch (error) {
+        console.error('Load client program error:', error);
+        container.innerHTML = '<div class="no-data">Ошибка загрузки программы</div>';
+    }
+}
+
+function renderClientProgram(data) {
+    var container = document.getElementById('cc-program-container');
+    var days = data.days || [];
+    if (days.length === 0) {
+        container.innerHTML = '<div class="no-data">📋 В программе пока нет упражнений</div>';
+        return;
+    }
+
+    container.innerHTML = days.map(function(day, dayIdx) {
+        var exercisesHtml = (day.exercises || []).map(function(ex, exIdx) {
+            var weightPlan = (ex.weightPlan !== '' && ex.weightPlan != null) ? ex.weightPlan : '—';
+            var reps = (ex.reps !== '' && ex.reps != null) ? ex.reps : '—';
+            var sets = (ex.sets !== '' && ex.sets != null) ? ex.sets : '—';
+            var rpe = (ex.rpe !== '' && ex.rpe != null) ? ex.rpe : '—';
+            var done = (ex.weightFact !== '' && ex.weightFact != null && ex.weightFact !== 0)
+                || (ex.repsFact !== '' && ex.repsFact != null && ex.repsFact !== 0);
+            var factHtml = done
+                ? '<div class="cc-ex-fact">✅ Факт: ' + (ex.weightFact || '—') + ' кг × ' + (ex.repsFact || '—') + '</div>'
+                : '';
+            var noteHtml = (ex.note && ex.note.toString().trim())
+                ? '<div class="cc-ex-note">📝 ' + ex.note + '</div>' : '';
+            return '<div class="cc-exercise">' +
+                '<div class="cc-ex-num">' + (exIdx + 1) + '</div>' +
+                '<div class="cc-ex-info">' +
+                    '<div class="cc-ex-name">' + (ex.exercise || '') + '</div>' +
+                    '<div class="cc-ex-params">' +
+                        '<span class="cc-ex-param">⚖️ ' + weightPlan + ' кг</span>' +
+                        '<span class="cc-ex-param">🔄 ' + reps + ' повт</span>' +
+                        '<span class="cc-ex-param">📦 ' + sets + ' подх</span>' +
+                        '<span class="cc-ex-param">🔥 RPE ' + rpe + '</span>' +
+                    '</div>' +
+                    factHtml +
+                    noteHtml +
+                '</div>' +
+            '</div>';
+        }).join('');
+        return '<div class="cc-day-block">' +
+            '<div class="cc-day-title">📅 ' + (day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
+            (exercisesHtml || '<div class="no-data">Нет упражнений</div>') +
+        '</div>';
+    }).join('');
 }
 
 // ========== MEASUREMENTS TAB ==========

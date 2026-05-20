@@ -248,6 +248,7 @@
                 <button class="admin-filter-btn" data-admin-filter="attention">⚠️ Нужно внимание</button>
                 <button class="admin-filter-btn" data-admin-filter="active">✅ Активные</button>
                 <button class="admin-filter-btn" data-admin-filter="inactive">⚪ Неактивные</button>
+                <button class="admin-filter-btn" data-admin-filter="archive">📦 Архив <span class="admin-filter-count" id="admin-archive-count"></span></button>
             </div>
 
             <!-- Список клиентов: карточки на мобиле, таблица на десктопе -->
@@ -302,6 +303,49 @@
                     </div>
                 </div>
             </details>
+        </div>
+    </div>
+
+    <!-- Карточка клиента (открывается поверх всего, только для тренера) -->
+    <div id="client-card-screen" class="client-card-screen hidden">
+        <div class="cc-header">
+            <button class="cc-back-btn" onclick="closeClientCard()">←</button>
+            <div class="cc-header-text">
+                <div class="cc-header-name" id="cc-name">—</div>
+                <div class="cc-header-meta" id="cc-meta">—</div>
+            </div>
+            <button class="cc-archive-btn" id="cc-archive-btn" onclick="toggleArchiveFromCard()" title="В архив">📦</button>
+        </div>
+
+        <!-- Вкладки внутри карточки -->
+        <div class="cc-tabs">
+            <button class="cc-tab-btn active" data-cc-tab="program">Программа</button>
+            <button class="cc-tab-btn" data-cc-tab="history">История</button>
+            <button class="cc-tab-btn" data-cc-tab="stats">Статистика</button>
+            <button class="cc-tab-btn" data-cc-tab="notes">Заметки</button>
+        </div>
+
+        <!-- Вкладка: Программа -->
+        <div id="cc-program-tab" class="cc-tab-content active">
+            <div class="cc-readonly-banner">👁 Просмотр — редактирование в следующей фазе</div>
+            <div id="cc-program-container" class="cc-program-container">
+                <div class="no-data">Загрузка программы...</div>
+            </div>
+        </div>
+
+        <!-- Вкладка: История (заглушка) -->
+        <div id="cc-history-tab" class="cc-tab-content">
+            <div class="no-data">📅 История тренировок появится в следующей фазе</div>
+        </div>
+
+        <!-- Вкладка: Статистика (заглушка) -->
+        <div id="cc-stats-tab" class="cc-tab-content">
+            <div class="no-data">📊 Графики и статистика появятся в следующей фазе</div>
+        </div>
+
+        <!-- Вкладка: Заметки (заглушка) -->
+        <div id="cc-notes-tab" class="cc-tab-content">
+            <div class="no-data">📝 Заметки тренера появятся в следующей фазе</div>
         </div>
     </div>
 

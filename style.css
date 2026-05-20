@@ -1211,6 +1211,44 @@ body {
     color: white;
 }
 
+.admin-card-btn-archive {
+    background: #FFF3E0;
+    color: #BF360C;
+}
+
+.admin-card-btn-restore {
+    background: #E8F5E9;
+    color: #1B5E20;
+}
+
+.admin-card-archived {
+    opacity: 0.75;
+}
+
+.admin-badge-archived {
+    background: #ECEFF1;
+    color: #455A64;
+}
+
+.admin-filter-count {
+    font-size: 11px;
+    color: #999;
+    margin-left: 2px;
+}
+
+.admin-filter-btn.active .admin-filter-count {
+    color: rgba(255,255,255,0.7);
+}
+
+.admin-row-archived {
+    opacity: 0.7;
+}
+
+.admin-row-archive-tag {
+    font-size: 12px;
+    margin-left: 6px;
+}
+
 /* Десктоп: таблица — скрыта на мобиле */
 .admin-clients-table {
     display: none;
@@ -1343,6 +1381,232 @@ body {
         max-width: 900px;
         margin: 24px auto 80px;
     }
+}
+
+/* ========== КАРТОЧКА КЛИЕНТА (тренер) ========== */
+
+.no-scroll { overflow: hidden; }
+
+.client-card-screen {
+    position: fixed;
+    inset: 0;
+    background: #f5f5f7;
+    z-index: 1000;
+    overflow-y: auto;
+    animation: ccSlideIn 0.22s ease;
+}
+
+@keyframes ccSlideIn {
+    from { transform: translateX(20px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+
+.cc-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: white;
+    padding: 16px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+}
+
+.cc-back-btn {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    font-size: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+
+.cc-back-btn:active { background: rgba(255,255,255,0.25); }
+
+.cc-header-text { flex: 1; min-width: 0; }
+
+.cc-header-name {
+    font-size: 17px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cc-header-meta {
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    margin-top: 2px;
+}
+
+.cc-archive-btn {
+    background: rgba(255,255,255,0.12);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    font-size: 17px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+
+.cc-archive-btn:active { background: rgba(255,255,255,0.28); }
+
+.cc-tabs {
+    display: flex;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    overflow-x: auto;
+    position: sticky;
+    top: 68px;
+    z-index: 9;
+}
+
+.cc-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 14px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #777;
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 3px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.cc-tab-btn.active {
+    color: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+}
+
+.cc-tab-content {
+    display: none;
+    padding: 12px 10px 80px;
+}
+
+.cc-tab-content.active { display: block; }
+
+.cc-readonly-banner {
+    background: #fffde7;
+    color: #6d4c00;
+    border-left: 4px solid #FBC02D;
+    padding: 10px 14px;
+    font-size: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.cc-program-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.cc-day-block {
+    background: white;
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.cc-day-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1a1a2e;
+    padding: 6px 8px 10px;
+    border-bottom: 1px solid #f0f0f0;
+    margin-bottom: 8px;
+}
+
+.cc-exercise {
+    display: flex;
+    gap: 10px;
+    padding: 10px 8px;
+    border-bottom: 1px solid #f7f7f7;
+    align-items: flex-start;
+}
+
+.cc-exercise:last-child { border-bottom: none; }
+
+.cc-ex-num {
+    background: #1a1a2e;
+    color: white;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.cc-ex-info { flex: 1; min-width: 0; }
+
+.cc-ex-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+}
+
+.cc-ex-params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    font-size: 12px;
+    color: #555;
+}
+
+.cc-ex-param {
+    background: #f5f5f7;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.cc-ex-fact {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #2E7D32;
+    font-weight: 600;
+}
+
+.cc-ex-note {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #6d4c00;
+    background: #fffde7;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border-left: 3px solid #FBC02D;
+}
+
+/* На десктопе карточка клиента — по центру, ограничена по ширине */
+@media (min-width: 900px) {
+    .client-card-screen {
+        background: linear-gradient(180deg, #1a1a2e 0%, #1a1a2e 200px, #f5f5f7 200px);
+    }
+    .cc-header,
+    .cc-tabs,
+    .cc-tab-content {
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .cc-tabs { top: 76px; }
 }
 
 /* ========== MEASUREMENTS TAB ========== */
