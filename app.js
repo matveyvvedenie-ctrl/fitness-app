@@ -11,6 +11,11 @@ try {
     tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
+    // Запрещаем свайп вниз закрывать мини-приложение (если поддерживается версией Telegram)
+    if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
+    if (typeof tg.requestFullscreen === 'function') {
+        try { tg.requestFullscreen(); } catch (_) {}
+    }
 } catch (e) {
     console.error('Telegram WebApp not loaded:', e);
     tg = {
@@ -1528,6 +1533,15 @@ function renderClientProgram(data) {
         return;
     }
 
+    // Также запоминаем "день" для каждого упражнения (для фильтра библиотеки по группе мышц)
+    days.forEach(function(day) {
+        (day.exercises || []).forEach(function(ex) {
+            if (ex.rowIndex && currentProgramExercisesByRow[ex.rowIndex]) {
+                currentProgramExercisesByRow[ex.rowIndex].__dayName = day.day || '';
+            }
+        });
+    });
+
     container.innerHTML = days.map(function(day, dayIdx) {
         var groups = groupExercises(day.exercises || []);
         var groupsHtml = groups.map(function(group) {
@@ -1590,10 +1604,17 @@ function openExerciseEditor(rowIndex) {
     }
 
     document.getElementById('ex-editor-modal').classList.remove('hidden');
+
+    // Готовим библиотеку и сбрасываем фильтр на "Этот день"
+    libraryFilterMuscle = 'day';
+    librarySearchText = '';
+    closeExerciseLibrary();
+    loadExerciseLibrary(); // фоном — потом откроется быстро по фокусу
 }
 
 function closeExerciseEditor() {
     document.getElementById('ex-editor-modal').classList.add('hidden');
+    closeExerciseLibrary();
     currentEditingRow = null;
 }
 
@@ -1687,6 +1708,153 @@ function initExerciseEditor() {
     var delBtn = document.getElementById('ex-edit-delete-btn');
     if (saveBtn) saveBtn.addEventListener('click', saveExerciseEdit);
     if (delBtn) delBtn.addEventListener('click', deleteExerciseEdit);
+
+    // Поле "Название": фокус → открыть библиотеку, ввод → отфильтровать
+    var nameInput = document.getElementById('ex-edit-name');
+    if (nameInput) {
+        nameInput.addEventListener('focus', function() {
+            openExerciseLibrary();
+        });
+        nameInput.addEventListener('input', function() {
+            librarySearchText = (nameInput.value || '').toLowerCase().trim();
+            renderLibraryList();
+        });
+    }
+}
+
+// ========== БИБЛИОТЕКА УПРАЖНЕНИЙ (Фаза 2B+) ==========
+
+var exerciseLibrary = [];
+var exerciseLibraryLoaded = false;
+var libraryFilterMuscle = 'day';  // 'day' | 'all' | <название мышцы>
+var librarySearchText = '';
+
+// Известные группы мышц для парсинга имён дней и фильтра
+var KNOWN_MUSCLES = ['грудь', 'спина', 'плечи', 'бицепс', 'трицепс', 'ноги', 'квадрицепс', 'бицепс бедра', 'ягодицы', 'пресс', 'икры', 'предплечья'];
+
+async function loadExerciseLibrary() {
+    if (exerciseLibraryLoaded) return;
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getExerciseLibrary';
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (data && !data.error) {
+            exerciseLibrary = data.exercises || [];
+            exerciseLibraryLoaded = true;
+        }
+    } catch (e) {
+        console.error('Library load error:', e);
+    }
+}
+
+// Достаёт мышцы из названия дня тренировки (например "Пн Спина-Грудь-Плечи")
+function getMusclesFromDay(dayName) {
+    var name = (dayName || '').toLowerCase();
+    return KNOWN_MUSCLES.filter(function(m) { return name.indexOf(m) >= 0; });
+}
+
+// Совпадает ли упражнение с заданным набором групп мышц (хотя бы одной)
+function exerciseMatchesMuscles(ex, muscles) {
+    if (!muscles || muscles.length === 0) return true;
+    var g = (ex.group || '').toLowerCase();
+    var n = (ex.name || '').toLowerCase();
+    return muscles.some(function(m) {
+        return g.indexOf(m) >= 0 || n.indexOf(m) >= 0;
+    });
+}
+
+async function openExerciseLibrary() {
+    var panel = document.getElementById('ex-library-panel');
+    if (!panel) return;
+    panel.classList.remove('hidden');
+    librarySearchText = (document.getElementById('ex-edit-name').value || '').toLowerCase().trim();
+    if (!exerciseLibraryLoaded) {
+        document.getElementById('ex-library-list').innerHTML = '<div class="ex-library-loading">Загрузка библиотеки...</div>';
+        await loadExerciseLibrary();
+    }
+    renderLibraryTabs();
+    renderLibraryList();
+}
+
+function closeExerciseLibrary() {
+    var panel = document.getElementById('ex-library-panel');
+    if (panel) panel.classList.add('hidden');
+}
+
+function renderLibraryTabs() {
+    var tabsEl = document.getElementById('ex-library-tabs');
+    if (!tabsEl) return;
+    var ex = currentEditingRow ? currentProgramExercisesByRow[currentEditingRow] : null;
+    var dayName = ex ? (ex.__dayName || '') : '';
+    var muscles = getMusclesFromDay(dayName);
+
+    var tabs = [];
+    if (muscles.length > 0) {
+        tabs.push({ key: 'day', label: 'Этот день' });
+    } else {
+        // Если в названии дня не нашли мышц — фолбэк на "Все" по умолчанию
+        libraryFilterMuscle = 'all';
+    }
+    tabs.push({ key: 'all', label: 'Все' });
+    muscles.forEach(function(m) {
+        tabs.push({ key: m, label: m.charAt(0).toUpperCase() + m.slice(1) });
+    });
+
+    tabsEl.innerHTML = tabs.map(function(t) {
+        var active = t.key === libraryFilterMuscle ? ' active' : '';
+        return '<button type="button" class="ex-lib-tab' + active + '" data-muscle="' + t.key + '">' + t.label + '</button>';
+    }).join('');
+
+    tabsEl.querySelectorAll('.ex-lib-tab').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            tabsEl.querySelectorAll('.ex-lib-tab').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            libraryFilterMuscle = btn.dataset.muscle;
+            renderLibraryList();
+        });
+    });
+}
+
+function renderLibraryList() {
+    var listEl = document.getElementById('ex-library-list');
+    if (!listEl) return;
+    var ex = currentEditingRow ? currentProgramExercisesByRow[currentEditingRow] : null;
+    var dayName = ex ? (ex.__dayName || '') : '';
+    var dayMuscles = getMusclesFromDay(dayName);
+
+    var filtered = exerciseLibrary.filter(function(item) {
+        // По мышцам
+        if (libraryFilterMuscle === 'all') { /* без фильтра */ }
+        else if (libraryFilterMuscle === 'day') {
+            if (!exerciseMatchesMuscles(item, dayMuscles)) return false;
+        } else {
+            if (!exerciseMatchesMuscles(item, [libraryFilterMuscle])) return false;
+        }
+        // По строке поиска
+        if (librarySearchText && item.name.toLowerCase().indexOf(librarySearchText) < 0) return false;
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="ex-library-empty">Ничего не найдено</div>';
+        return;
+    }
+
+    listEl.innerHTML = filtered.slice(0, 80).map(function(item) {
+        var safe = (item.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        var groupHtml = item.group ? '<div class="ex-lib-item-group">' + item.group + '</div>' : '';
+        return '<button type="button" class="ex-lib-item" onclick="selectExerciseFromLibrary(\'' + safe + '\')">' +
+            '<div class="ex-lib-item-name">' + item.name + '</div>' +
+            groupHtml +
+        '</button>';
+    }).join('');
+}
+
+function selectExerciseFromLibrary(name) {
+    var input = document.getElementById('ex-edit-name');
+    if (input) input.value = name;
+    closeExerciseLibrary();
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 }
 
 // ========== MEASUREMENTS TAB ==========

@@ -360,7 +360,13 @@
             <div class="ex-editor-body">
                 <div class="ex-editor-field">
                     <label class="ex-editor-label">Название упражнения</label>
-                    <input type="text" class="ex-editor-input" id="ex-edit-name" placeholder="Например: Жим штанги лёжа">
+                    <input type="text" class="ex-editor-input" id="ex-edit-name" placeholder="Например: Жим штанги лёжа" autocomplete="off">
+                    <div class="ex-library-panel hidden" id="ex-library-panel">
+                        <div class="ex-library-tabs" id="ex-library-tabs"></div>
+                        <div class="ex-library-list" id="ex-library-list">
+                            <div class="ex-library-loading">Загрузка библиотеки...</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="ex-editor-row">
                     <div class="ex-editor-field">
