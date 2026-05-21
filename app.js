@@ -921,6 +921,7 @@ function initAdminTab() {
         initFilters();
         initAdminClientsControls();
         initClientCardTabs();
+        initExerciseEditor();
     }
 }
 
@@ -1472,6 +1473,12 @@ function groupExercises(exercises) {
     return groups;
 }
 
+// Кэш всех упражнений текущей программы (для лёгкого поиска по rowIndex)
+var currentProgramExercisesByRow = {};
+
+// Экранируем кавычки для безопасной вставки в onclick=""
+function escAttr(s) { return (s == null ? '' : s.toString()).replace(/"/g, '&quot;').replace(/'/g, "\\'"); }
+
 // Рендер одного упражнения внутри блока (без обёртки cc-exercise — для суперсета используется cc-exercise-inner)
 function renderExerciseRow(ex, label) {
     var weightPlan = (ex.weightPlan !== '' && ex.weightPlan != null) ? ex.weightPlan : '—';
@@ -1487,8 +1494,14 @@ function renderExerciseRow(ex, label) {
         ? '<div class="cc-ex-note">' + ex.note + '</div>' : '';
     var labelHtml = label
         ? '<span class="cc-ex-suplabel">' + label + '</span>' : '';
+    var editBtn = ex.rowIndex
+        ? '<button class="cc-ex-edit-btn" onclick="openExerciseEditor(' + ex.rowIndex + ')" title="Редактировать">✏️</button>'
+        : '';
     return '<div class="cc-ex-row">' +
-        '<div class="cc-ex-name">' + labelHtml + cleanExerciseName(ex.exercise) + '</div>' +
+        '<div class="cc-ex-name-row">' +
+            '<div class="cc-ex-name">' + labelHtml + cleanExerciseName(ex.exercise) + '</div>' +
+            editBtn +
+        '</div>' +
         '<div class="cc-ex-grid">' +
             '<div class="cc-ex-cell"><div class="cc-cell-label">Вес</div><div class="cc-cell-value">' + weightPlan + ' кг</div></div>' +
             '<div class="cc-ex-cell"><div class="cc-cell-label">Повт.</div><div class="cc-cell-value">' + reps + '</div></div>' +
@@ -1503,6 +1516,13 @@ function renderExerciseRow(ex, label) {
 function renderClientProgram(data) {
     var container = document.getElementById('cc-program-container');
     var days = data.days || [];
+    // Заполняем кэш rowIndex → упражнение, чтобы редактор мог быстро взять данные
+    currentProgramExercisesByRow = {};
+    days.forEach(function(day) {
+        (day.exercises || []).forEach(function(ex) {
+            if (ex.rowIndex) currentProgramExercisesByRow[ex.rowIndex] = ex;
+        });
+    });
     if (days.length === 0) {
         container.innerHTML = '<div class="no-data">В программе пока нет упражнений</div>';
         return;
@@ -1538,6 +1558,135 @@ function renderClientProgram(data) {
             (groupsHtml || '<div class="no-data">Нет упражнений</div>') +
         '</div>';
     }).join('');
+}
+
+// ========== РЕДАКТОР УПРАЖНЕНИЯ (Фаза 2B) ==========
+
+var currentEditingRow = null;
+
+function openExerciseEditor(rowIndex) {
+    var ex = currentProgramExercisesByRow[rowIndex];
+    if (!ex || !currentClientCard) return;
+    currentEditingRow = rowIndex;
+
+    document.getElementById('ex-editor-title').textContent = cleanExerciseName(ex.exercise) || 'Упражнение';
+    document.getElementById('ex-edit-name').value = cleanExerciseName(ex.exercise) || '';
+    document.getElementById('ex-edit-weight').value = ex.weightPlan != null ? ex.weightPlan : '';
+    document.getElementById('ex-edit-reps').value = ex.reps != null ? ex.reps : '';
+    document.getElementById('ex-edit-sets').value = ex.sets != null ? ex.sets : '';
+    document.getElementById('ex-edit-rpe').value = ex.rpe != null ? ex.rpe : '';
+    document.getElementById('ex-edit-note').value = ex.note != null ? ex.note : '';
+
+    // Подсказка про последний факт
+    var hint = document.getElementById('ex-edit-history-hint');
+    var done = (ex.weightFact !== '' && ex.weightFact != null && ex.weightFact !== 0)
+        || (ex.repsFact !== '' && ex.repsFact != null && ex.repsFact !== 0);
+    if (done) {
+        hint.textContent = 'Последний факт клиента: ' + (ex.weightFact || '—') + ' кг × ' + (ex.repsFact || '—');
+        hint.classList.remove('hidden');
+    } else {
+        hint.textContent = '';
+        hint.classList.add('hidden');
+    }
+
+    document.getElementById('ex-editor-modal').classList.remove('hidden');
+}
+
+function closeExerciseEditor() {
+    document.getElementById('ex-editor-modal').classList.add('hidden');
+    currentEditingRow = null;
+}
+
+async function saveExerciseEdit() {
+    if (!currentEditingRow || !currentClientCard) return;
+    var saveBtn = document.getElementById('ex-edit-save-btn');
+    var origText = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳ Сохранение...';
+    try {
+        var params = {
+            action: 'updateClientExercise',
+            sheetName: currentClientCard.sheetName,
+            rowIndex: currentEditingRow,
+            exercise: document.getElementById('ex-edit-name').value.trim(),
+            weightPlan: document.getElementById('ex-edit-weight').value.trim(),
+            reps: document.getElementById('ex-edit-reps').value.trim(),
+            sets: document.getElementById('ex-edit-sets').value.trim(),
+            rpe: document.getElementById('ex-edit-rpe').value.trim(),
+            note: document.getElementById('ex-edit-note').value.trim()
+        };
+        var query = Object.keys(params).map(function(k) {
+            return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+        }).join('&');
+        var response = await fetch(APPS_SCRIPT_URL + '?' + query);
+        var data = await response.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка сохранения: ' + (data.error || 'не удалось'));
+            saveBtn.disabled = false;
+            saveBtn.textContent = origText;
+            return;
+        }
+        saveBtn.textContent = '✅ Сохранено';
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        // Перезагрузить программу клиента и закрыть модалку
+        await loadClientProgram(currentClientCard.sheetName);
+        setTimeout(function() {
+            closeExerciseEditor();
+            saveBtn.disabled = false;
+            saveBtn.textContent = origText;
+        }, 400);
+    } catch (error) {
+        console.error('Save exercise error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+        saveBtn.disabled = false;
+        saveBtn.textContent = origText;
+    }
+}
+
+async function deleteExerciseEdit() {
+    if (!currentEditingRow || !currentClientCard) return;
+    var ex = currentProgramExercisesByRow[currentEditingRow];
+    var name = ex ? cleanExerciseName(ex.exercise) : 'упражнение';
+    var confirmed = await new Promise(function(resolve) {
+        if (tg && tg.showConfirm) tg.showConfirm('Удалить «' + name + '» из программы?', function(ok) { resolve(ok); });
+        else resolve(confirm('Удалить «' + name + '» из программы?'));
+    });
+    if (!confirmed) return;
+
+    var delBtn = document.getElementById('ex-edit-delete-btn');
+    var origText = delBtn.textContent;
+    delBtn.disabled = true;
+    delBtn.textContent = '⏳ Удаление...';
+    try {
+        var url = APPS_SCRIPT_URL + '?action=deleteClientExercise' +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&rowIndex=' + currentEditingRow;
+        var response = await fetch(url);
+        var data = await response.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            delBtn.disabled = false;
+            delBtn.textContent = origText;
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadClientProgram(currentClientCard.sheetName);
+        closeExerciseEditor();
+        delBtn.disabled = false;
+        delBtn.textContent = origText;
+    } catch (error) {
+        console.error('Delete exercise error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+        delBtn.disabled = false;
+        delBtn.textContent = origText;
+    }
+}
+
+function initExerciseEditor() {
+    var saveBtn = document.getElementById('ex-edit-save-btn');
+    var delBtn = document.getElementById('ex-edit-delete-btn');
+    if (saveBtn) saveBtn.addEventListener('click', saveExerciseEdit);
+    if (delBtn) delBtn.addEventListener('click', deleteExerciseEdit);
 }
 
 // ========== MEASUREMENTS TAB ==========

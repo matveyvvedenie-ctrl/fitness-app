@@ -1669,6 +1669,203 @@ body {
     margin: 12px 0;
 }
 
+/* Шапка строки с названием + кнопка ✏️ справа */
+.cc-ex-name-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.cc-ex-name-row .cc-ex-name {
+    margin-bottom: 0;
+    flex: 1;
+}
+
+.cc-ex-edit-btn {
+    background: #f5f5f7;
+    border: 1px solid #ececf0;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+    line-height: 1;
+}
+
+.cc-ex-edit-btn:hover { background: #ececf0; }
+.cc-ex-edit-btn:active { transform: scale(0.94); }
+
+/* ===== МОДАЛКА РЕДАКТИРОВАНИЯ УПРАЖНЕНИЯ ===== */
+
+.ex-editor-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    animation: ccSlideIn 0.18s ease;
+}
+
+.ex-editor-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(2px);
+}
+
+.ex-editor-content {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    background: white;
+    border-radius: 18px 18px 0 0;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.18);
+    animation: editorSlideUp 0.22s ease;
+}
+
+@keyframes editorSlideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+}
+
+.ex-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 14px 18px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.ex-editor-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a2e;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ex-editor-close {
+    background: transparent;
+    border: none;
+    font-size: 22px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+
+.ex-editor-close:hover { background: #f5f5f7; color: #555; }
+
+.ex-editor-body {
+    padding: 16px 18px 8px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ex-editor-field { margin-bottom: 12px; }
+
+.ex-editor-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 0;
+}
+
+.ex-editor-row .ex-editor-field { margin-bottom: 12px; }
+
+.ex-editor-label {
+    display: block;
+    font-size: 11px;
+    color: #888;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
+}
+
+.ex-editor-input,
+.ex-editor-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #e0e0e0;
+    background: #fafafa;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+    outline: none;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.ex-editor-textarea { resize: vertical; min-height: 56px; font-weight: 500; }
+
+.ex-editor-input:focus,
+.ex-editor-textarea:focus {
+    background: white;
+    border-color: #1a1a2e;
+}
+
+.ex-editor-history-hint {
+    font-size: 12px;
+    color: #2E7D32;
+    background: #e8f5e9;
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin: 4px 0 12px;
+    font-weight: 600;
+}
+
+.ex-editor-history-hint.hidden { display: none; }
+
+.ex-editor-actions {
+    display: flex;
+    gap: 8px;
+    padding: 12px 18px 18px;
+    border-top: 1px solid #f0f0f0;
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
+}
+
+.ex-editor-btn {
+    flex: 1;
+    padding: 13px 12px;
+    border-radius: 12px;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.ex-editor-btn:active { transform: scale(0.97); }
+.ex-editor-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.ex-editor-btn-delete {
+    background: #FFEBEE;
+    color: #C62828;
+}
+
+.ex-editor-btn-save {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: white;
+    flex: 1.5;
+}
+
 /* На десктопе карточка клиента — по центру, ограничена по ширине */
 @media (min-width: 900px) {
     .client-card-screen {
@@ -1682,6 +1879,8 @@ body {
         margin-right: auto;
     }
     .cc-tabs { top: 76px; }
+    .ex-editor-modal { align-items: center; }
+    .ex-editor-content { border-radius: 18px; }
 }
 
 /* ========== MEASUREMENTS TAB ========== */

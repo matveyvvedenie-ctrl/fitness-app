@@ -349,6 +349,52 @@
         </div>
     </div>
 
+    <!-- Модалка редактирования упражнения (тренер) -->
+    <div id="ex-editor-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeExerciseEditor()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title" id="ex-editor-title">Упражнение</div>
+                <button class="ex-editor-close" onclick="closeExerciseEditor()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Название упражнения</label>
+                    <input type="text" class="ex-editor-input" id="ex-edit-name" placeholder="Например: Жим штанги лёжа">
+                </div>
+                <div class="ex-editor-row">
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Вес</label>
+                        <input type="text" class="ex-editor-input" id="ex-edit-weight" placeholder="60 или 60-70">
+                    </div>
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Повторы</label>
+                        <input type="text" class="ex-editor-input" id="ex-edit-reps" placeholder="8 или 8-10">
+                    </div>
+                </div>
+                <div class="ex-editor-row">
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Подходы</label>
+                        <input type="number" inputmode="numeric" class="ex-editor-input" id="ex-edit-sets" placeholder="4">
+                    </div>
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Target RPE</label>
+                        <input type="number" inputmode="decimal" step="0.5" min="1" max="10" class="ex-editor-input" id="ex-edit-rpe" placeholder="8">
+                    </div>
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Заметка тренера</label>
+                    <textarea class="ex-editor-textarea" id="ex-edit-note" rows="2" placeholder="Например: следить за прогибом в спине"></textarea>
+                </div>
+                <div class="ex-editor-history-hint" id="ex-edit-history-hint"></div>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-delete" id="ex-edit-delete-btn">🗑 Удалить</button>
+                <button class="ex-editor-btn ex-editor-btn-save" id="ex-edit-save-btn">💾 Сохранить</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модалка самочувствия (показывается при входе в тренировку) -->
     <div id="wellness-modal" class="rpe-modal hidden">
         <div class="rpe-modal-backdrop" onclick="skipWellness()"></div>
