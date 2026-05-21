@@ -473,34 +473,47 @@ body {
     cursor: not-allowed;
 }
 
-/* Tabs */
+/* Tabs — закреплены ВНИЗУ экрана как мобильная навигация */
 .tabs {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     background: white;
-    border-bottom: 2px solid #e0e0e0;
+    border-top: 1px solid #e0e0e0;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+    z-index: 50;
+    padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .tab-btn {
     background: white;
     border: none;
-    padding: 16px;
-    font-size: 15px;
+    padding: 10px 6px 8px;
+    font-size: 12px;
     font-weight: 600;
     color: #999;
     cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.3s ease;
+    border-top: 3px solid transparent;
+    transition: all 0.2s ease;
+    line-height: 1.2;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
 
 .tab-btn.active {
     color: #E53935;
-    border-bottom-color: #E53935;
-    background: linear-gradient(to bottom, #fff, #ffebee);
+    border-top-color: #E53935;
+    background: linear-gradient(to top, #fff, #ffebee);
 }
 
 .tab-btn:active {
-    transform: scale(0.98);
+    transform: scale(0.96);
 }
 
 /* Tab Content */
@@ -678,8 +691,8 @@ body {
 }
 
 .tabs.tabs-4 .tab-btn {
-    font-size: 12px;
-    padding: 14px 4px;
+    font-size: 11px;
+    padding: 8px 2px;
 }
 
 /* ========== ADMIN DASHBOARD ========== */
