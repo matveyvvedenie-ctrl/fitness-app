@@ -16,6 +16,30 @@ try {
     if (typeof tg.requestFullscreen === 'function') {
         try { tg.requestFullscreen(); } catch (_) {}
     }
+    // Отступ сверху, чтобы контент не залезал под Telegram-шапку (Закрыть/▼/⋯).
+    // Bot API 8.0+: tg.contentSafeAreaInset.top даёт точное значение. Старые версии — fallback 56px.
+    function applyTelegramTopInset() {
+        var top = 0;
+        try {
+            if (tg.isFullscreen === true) {
+                top = (tg.contentSafeAreaInset && tg.contentSafeAreaInset.top) || 0;
+            } else if (tg.contentSafeAreaInset && typeof tg.contentSafeAreaInset.top === 'number') {
+                top = tg.contentSafeAreaInset.top;
+            } else {
+                top = 56; // запас под Telegram-шапку на iPhone
+            }
+        } catch (_) { top = 56; }
+        document.documentElement.style.setProperty('--tg-top-pad', top + 'px');
+    }
+    applyTelegramTopInset();
+    // Обновляем при изменении viewport / fullscreen
+    try {
+        if (typeof tg.onEvent === 'function') {
+            tg.onEvent('viewportChanged', applyTelegramTopInset);
+            tg.onEvent('contentSafeAreaChanged', applyTelegramTopInset);
+            tg.onEvent('fullscreenChanged', applyTelegramTopInset);
+        }
+    } catch (_) {}
 } catch (e) {
     console.error('Telegram WebApp not loaded:', e);
     tg = {
@@ -922,7 +946,7 @@ function initAdminTab() {
     var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '';
     if (chatId === TRAINER_CHAT_ID) {
         document.getElementById('admin-tab-btn').classList.remove('hidden');
-        document.getElementById('tabs-container').classList.add('tabs-4');
+        document.getElementById('tabs-container').classList.add('tabs-5');
         initFilters();
         initAdminClientsControls();
         initClientCardTabs();
