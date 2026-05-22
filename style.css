@@ -1730,6 +1730,12 @@ body {
     flex: 1;
 }
 
+.cc-ex-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
 .cc-ex-edit-btn {
     background: #f5f5f7;
     border: 1px solid #ececf0;

@@ -1520,13 +1520,16 @@ function renderExerciseRow(ex, label) {
         ? '<div class="cc-ex-note">' + ex.note + '</div>' : '';
     var labelHtml = label
         ? '<span class="cc-ex-suplabel">' + label + '</span>' : '';
-    var editBtn = ex.rowIndex
-        ? '<button class="cc-ex-edit-btn" onclick="openExerciseEditor(' + ex.rowIndex + ')" title="Редактировать">✏️</button>'
+    var actionsBtns = ex.rowIndex
+        ? '<div class="cc-ex-actions">' +
+            '<button class="cc-ex-edit-btn" onclick="openReplaceFromCard(' + ex.rowIndex + ')" title="Заменить упражнение">🔄</button>' +
+            '<button class="cc-ex-edit-btn" onclick="openExerciseEditor(' + ex.rowIndex + ')" title="Редактировать">✏️</button>' +
+          '</div>'
         : '';
     return '<div class="cc-ex-row">' +
         '<div class="cc-ex-name-row">' +
             '<div class="cc-ex-name">' + labelHtml + cleanExerciseName(ex.exercise) + '</div>' +
-            editBtn +
+            actionsBtns +
         '</div>' +
         '<div class="cc-ex-grid">' +
             '<div class="cc-ex-cell"><div class="cc-cell-label">Вес</div><div class="cc-cell-value">' + weightPlan + ' кг</div></div>' +
@@ -1600,7 +1603,7 @@ function renderClientProgram(data) {
 // ========== РЕДАКТОР УПРАЖНЕНИЯ (Фаза 2B + 2C) ==========
 
 var currentEditingRow = null;
-var currentEditingMode = 'edit'; // 'edit' | 'add'
+var currentEditingMode = 'edit'; // 'edit' | 'add' | 'replace'
 var currentAddDay = '';          // используется в режиме 'add'
 
 function openExerciseEditor(rowIndex) {
@@ -1643,6 +1646,51 @@ function openExerciseEditor(rowIndex) {
     librarySearchText = '';
     closeExerciseLibrary();
     loadExerciseLibrary(); // фоном — потом откроется быстро по фокусу
+}
+
+// Открыть модалку в режиме «Заменить» — сразу открыта библиотека,
+// выбор упражнения автоматически сохраняет в листе клиента
+function openReplaceFromCard(rowIndex) {
+    var ex = currentProgramExercisesByRow[rowIndex];
+    if (!ex || !currentClientCard) return;
+    currentEditingRow = rowIndex;
+    currentEditingMode = 'replace';
+    currentAddDay = ex.__dayName || '';
+
+    document.getElementById('ex-editor-title').textContent = '🔄 Заменить: ' + cleanExerciseName(ex.exercise);
+    document.getElementById('ex-edit-name').value = ''; // очищаем чтобы фильтр библиотеки не сужался
+    document.getElementById('ex-edit-weight').value = ex.weightPlan != null ? ex.weightPlan : '';
+    document.getElementById('ex-edit-reps').value = ex.reps != null ? ex.reps : '';
+    document.getElementById('ex-edit-sets').value = ex.sets != null ? ex.sets : '';
+    document.getElementById('ex-edit-rpe').value = ex.rpe != null ? ex.rpe : '';
+    document.getElementById('ex-edit-note').value = ex.note != null ? ex.note : '';
+
+    // Скрыть «Удалить», поменять кнопку сохранения
+    var delBtn = document.getElementById('ex-edit-delete-btn');
+    if (delBtn) delBtn.classList.add('hidden');
+    var saveBtn = document.getElementById('ex-edit-save-btn');
+    if (saveBtn) saveBtn.textContent = '💾 Сохранить с теми же весами';
+
+    // Подсказка про прошлый факт
+    var hint = document.getElementById('ex-edit-history-hint');
+    var done = (ex.weightFact !== '' && ex.weightFact != null && ex.weightFact !== 0)
+        || (ex.repsFact !== '' && ex.repsFact != null && ex.repsFact !== 0);
+    if (done) {
+        hint.textContent = 'Последний факт клиента: ' + (ex.weightFact || '—') + ' кг × ' + (ex.repsFact || '—');
+        hint.classList.remove('hidden');
+    } else {
+        hint.textContent = '';
+        hint.classList.add('hidden');
+    }
+
+    document.getElementById('ex-editor-modal').classList.remove('hidden');
+
+    // Сразу разворачиваем библиотеку с фильтром «Этот день»
+    libraryFilterMuscle = 'day';
+    librarySearchText = '';
+    loadExerciseLibrary().then(function() {
+        openExerciseLibrary();
+    });
 }
 
 // Открыть модалку для ДОБАВЛЕНИЯ нового упражнения в указанный день
@@ -1702,8 +1750,8 @@ async function saveExerciseEdit() {
     saveBtn.textContent = '⏳ Сохранение...';
 
     var nameVal = document.getElementById('ex-edit-name').value.trim();
-    if (currentEditingMode === 'add' && !nameVal) {
-        tg.showAlert('Укажи название упражнения');
+    if (!nameVal) {
+        tg.showAlert(currentEditingMode === 'replace' ? 'Выбери упражнение из библиотеки' : 'Укажи название упражнения');
         saveBtn.disabled = false;
         saveBtn.textContent = origText;
         return;
@@ -1972,6 +2020,11 @@ function selectExerciseFromLibrary(name) {
     if (input) input.value = name;
     closeExerciseLibrary();
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+    // В режиме «Заменить» — сразу автосохраняем выбранное упражнение
+    if (currentEditingMode === 'replace') {
+        saveExerciseEdit();
+    }
 }
 
 // ========== MEASUREMENTS TAB ==========
