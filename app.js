@@ -11,11 +11,8 @@ try {
     tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
-    // Запрещаем свайп вниз закрывать мини-приложение (если поддерживается версией Telegram)
-    if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
-    if (typeof tg.requestFullscreen === 'function') {
-        try { tg.requestFullscreen(); } catch (_) {}
-    }
+    // НЕ блокируем вертикальный свайп — пользователь должен иметь возможность свернуть мини-апп жестом.
+    // (раньше вызывали tg.disableVerticalSwipes() и tg.requestFullscreen() — это мешало)
     // Отступ сверху, чтобы контент не залезал под Telegram-шапку (Закрыть/▼/⋯).
     // Bot API 8.0+: tg.contentSafeAreaInset.top даёт точное значение. Старые версии — fallback 56px.
     function applyTelegramTopInset() {
@@ -1591,21 +1588,27 @@ function renderClientProgram(data) {
             '</div>';
         }).join('');
 
+        var safeDay = (day.day || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return '<div class="cc-day-block">' +
             '<div class="cc-day-title">' + (day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
             (groupsHtml || '<div class="no-data">Нет упражнений</div>') +
+            '<button class="cc-add-ex-btn" onclick="openAddExerciseModal(\'' + safeDay + '\')">+ Добавить упражнение</button>' +
         '</div>';
     }).join('');
 }
 
-// ========== РЕДАКТОР УПРАЖНЕНИЯ (Фаза 2B) ==========
+// ========== РЕДАКТОР УПРАЖНЕНИЯ (Фаза 2B + 2C) ==========
 
 var currentEditingRow = null;
+var currentEditingMode = 'edit'; // 'edit' | 'add'
+var currentAddDay = '';          // используется в режиме 'add'
 
 function openExerciseEditor(rowIndex) {
     var ex = currentProgramExercisesByRow[rowIndex];
     if (!ex || !currentClientCard) return;
     currentEditingRow = rowIndex;
+    currentEditingMode = 'edit';
+    currentAddDay = '';
 
     document.getElementById('ex-editor-title').textContent = cleanExerciseName(ex.exercise) || 'Упражнение';
     document.getElementById('ex-edit-name').value = cleanExerciseName(ex.exercise) || '';
@@ -1614,6 +1617,12 @@ function openExerciseEditor(rowIndex) {
     document.getElementById('ex-edit-sets').value = ex.sets != null ? ex.sets : '';
     document.getElementById('ex-edit-rpe').value = ex.rpe != null ? ex.rpe : '';
     document.getElementById('ex-edit-note').value = ex.note != null ? ex.note : '';
+
+    // Кнопка «Удалить» — только в режиме редактирования
+    var delBtn = document.getElementById('ex-edit-delete-btn');
+    if (delBtn) delBtn.classList.remove('hidden');
+    var saveBtn = document.getElementById('ex-edit-save-btn');
+    if (saveBtn) saveBtn.textContent = '💾 Сохранить';
 
     // Подсказка про последний факт
     var hint = document.getElementById('ex-edit-history-hint');
@@ -1636,6 +1645,49 @@ function openExerciseEditor(rowIndex) {
     loadExerciseLibrary(); // фоном — потом откроется быстро по фокусу
 }
 
+// Открыть модалку для ДОБАВЛЕНИЯ нового упражнения в указанный день
+function openAddExerciseModal(dayName) {
+    if (!currentClientCard) return;
+    currentEditingRow = null;
+    currentEditingMode = 'add';
+    currentAddDay = dayName || '';
+
+    document.getElementById('ex-editor-title').textContent = '+ Новое упражнение' + (dayName ? ' · ' + dayName : '');
+    document.getElementById('ex-edit-name').value = '';
+    document.getElementById('ex-edit-weight').value = '';
+    document.getElementById('ex-edit-reps').value = '';
+    document.getElementById('ex-edit-sets').value = '4';
+    document.getElementById('ex-edit-rpe').value = '8';
+    document.getElementById('ex-edit-note').value = '';
+
+    // Скрываем кнопку «Удалить» в режиме добавления
+    var delBtn = document.getElementById('ex-edit-delete-btn');
+    if (delBtn) delBtn.classList.add('hidden');
+    var saveBtn = document.getElementById('ex-edit-save-btn');
+    if (saveBtn) saveBtn.textContent = '➕ Добавить';
+
+    // Скрываем подсказку про факт (для нового упражнения её нет)
+    var hint = document.getElementById('ex-edit-history-hint');
+    hint.textContent = '';
+    hint.classList.add('hidden');
+
+    document.getElementById('ex-editor-modal').classList.remove('hidden');
+
+    // Готовим библиотеку и фильтр "Этот день" — но для добавления у нас __dayName ещё нет в currentProgramExercisesByRow
+    // Создадим фейковый ex для рендера табов мышц
+    libraryFilterMuscle = 'day';
+    librarySearchText = '';
+    // Подсунем дань через специальный поинт: храним последнее значение в currentAddDay,
+    // а renderLibraryTabs будет смотреть либо currentEditingRow, либо currentAddDay.
+    closeExerciseLibrary();
+    loadExerciseLibrary();
+    // Сразу откроем библиотеку — в режиме добавления это удобно
+    setTimeout(function() {
+        var nameInput = document.getElementById('ex-edit-name');
+        if (nameInput) nameInput.focus();
+    }, 200);
+}
+
 function closeExerciseEditor() {
     document.getElementById('ex-editor-modal').classList.add('hidden');
     closeExerciseLibrary();
@@ -1643,23 +1695,53 @@ function closeExerciseEditor() {
 }
 
 async function saveExerciseEdit() {
-    if (!currentEditingRow || !currentClientCard) return;
+    if (!currentClientCard) return;
     var saveBtn = document.getElementById('ex-edit-save-btn');
     var origText = saveBtn.textContent;
     saveBtn.disabled = true;
     saveBtn.textContent = '⏳ Сохранение...';
-    try {
-        var params = {
-            action: 'updateClientExercise',
+
+    var nameVal = document.getElementById('ex-edit-name').value.trim();
+    if (currentEditingMode === 'add' && !nameVal) {
+        tg.showAlert('Укажи название упражнения');
+        saveBtn.disabled = false;
+        saveBtn.textContent = origText;
+        return;
+    }
+
+    var params;
+    if (currentEditingMode === 'add') {
+        params = {
+            action: 'addClientExercise',
             sheetName: currentClientCard.sheetName,
-            rowIndex: currentEditingRow,
-            exercise: document.getElementById('ex-edit-name').value.trim(),
+            dayName: currentAddDay,
+            exercise: nameVal,
             weightPlan: document.getElementById('ex-edit-weight').value.trim(),
             reps: document.getElementById('ex-edit-reps').value.trim(),
             sets: document.getElementById('ex-edit-sets').value.trim(),
             rpe: document.getElementById('ex-edit-rpe').value.trim(),
             note: document.getElementById('ex-edit-note').value.trim()
         };
+    } else {
+        if (!currentEditingRow) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = origText;
+            return;
+        }
+        params = {
+            action: 'updateClientExercise',
+            sheetName: currentClientCard.sheetName,
+            rowIndex: currentEditingRow,
+            exercise: nameVal,
+            weightPlan: document.getElementById('ex-edit-weight').value.trim(),
+            reps: document.getElementById('ex-edit-reps').value.trim(),
+            sets: document.getElementById('ex-edit-sets').value.trim(),
+            rpe: document.getElementById('ex-edit-rpe').value.trim(),
+            note: document.getElementById('ex-edit-note').value.trim()
+        };
+    }
+
+    try {
         var query = Object.keys(params).map(function(k) {
             return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
         }).join('&');
@@ -1671,9 +1753,8 @@ async function saveExerciseEdit() {
             saveBtn.textContent = origText;
             return;
         }
-        saveBtn.textContent = '✅ Сохранено';
+        saveBtn.textContent = currentEditingMode === 'add' ? '✅ Добавлено' : '✅ Сохранено';
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        // Перезагрузить программу клиента и закрыть модалку
         await loadClientProgram(currentClientCard.sheetName);
         setTimeout(function() {
             closeExerciseEditor();
@@ -1812,11 +1893,17 @@ function closeExerciseLibrary() {
     if (panel) panel.classList.add('hidden');
 }
 
+// Текущий «день» для фильтра библиотеки — берём из редактируемого упражнения или из режима добавления.
+function getCurrentDayForLibrary() {
+    if (currentEditingMode === 'add') return currentAddDay || '';
+    var ex = currentEditingRow ? currentProgramExercisesByRow[currentEditingRow] : null;
+    return ex ? (ex.__dayName || '') : '';
+}
+
 function renderLibraryTabs() {
     var tabsEl = document.getElementById('ex-library-tabs');
     if (!tabsEl) return;
-    var ex = currentEditingRow ? currentProgramExercisesByRow[currentEditingRow] : null;
-    var dayName = ex ? (ex.__dayName || '') : '';
+    var dayName = getCurrentDayForLibrary();
     var muscles = getMusclesFromDay(dayName);
 
     var tabs = [];
@@ -1849,8 +1936,7 @@ function renderLibraryTabs() {
 function renderLibraryList() {
     var listEl = document.getElementById('ex-library-list');
     if (!listEl) return;
-    var ex = currentEditingRow ? currentProgramExercisesByRow[currentEditingRow] : null;
-    var dayName = ex ? (ex.__dayName || '') : '';
+    var dayName = getCurrentDayForLibrary();
     var dayMuscles = getMusclesFromDay(dayName);
 
     var filtered = exerciseLibrary.filter(function(item) {
