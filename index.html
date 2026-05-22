@@ -327,7 +327,17 @@
 
         <!-- Вкладка: Программа -->
         <div id="cc-program-tab" class="cc-tab-content active">
-            <div class="cc-readonly-banner">👁 Просмотр — редактирование в следующей фазе</div>
+            <!-- Кнопки действий с программой -->
+            <div class="cc-program-actions">
+                <button class="cc-action-btn cc-action-week" onclick="duplicateWeekFlow()">
+                    <span class="cc-action-icon">📅</span>
+                    <span class="cc-action-text">Новая неделя</span>
+                </button>
+                <button class="cc-action-btn cc-action-notify" onclick="notifyClientFlow()">
+                    <span class="cc-action-icon">📤</span>
+                    <span class="cc-action-text">Отправить клиенту</span>
+                </button>
+            </div>
             <div id="cc-program-container" class="cc-program-container">
                 <div class="no-data">Загрузка программы...</div>
             </div>

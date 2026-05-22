@@ -1539,6 +1539,84 @@ function renderExerciseRow(ex, label) {
     '</div>';
 }
 
+// ========== ДЕЙСТВИЯ С ПРОГРАММОЙ КЛИЕНТА (Фаза 2F) ==========
+
+// Дублировать неделю — спрашиваем «с автоподбором весов или нет»
+async function duplicateWeekFlow() {
+    if (!currentClientCard) return;
+    var name = currentClientCard.name || 'клиента';
+
+    // Шаг 1: спросить включить ли автоподбор
+    var autoProgress = await new Promise(function(resolve) {
+        var msg = 'Подобрать веса на новую неделю автоматически по фактам прошлой?\n\n' +
+                  '«Да» — если клиент тянул план, веса немного поднимутся. Если не тянул — снизятся до факта.\n' +
+                  '«Нет» — план останется тем же, тренируется с теми же весами.';
+        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
+        else resolve(confirm(msg));
+    });
+
+    // Шаг 2: подтверждение действия
+    var confirmText = autoProgress
+        ? 'Создать новую неделю для ' + name + ' с автоподбором весов?\nФакты прошлой недели будут стёрты.'
+        : 'Создать новую неделю для ' + name + ' с теми же весами?\nФакты прошлой недели будут стёрты.';
+    var confirmed = await new Promise(function(resolve) {
+        if (tg && tg.showConfirm) tg.showConfirm(confirmText, function(ok) { resolve(ok); });
+        else resolve(confirm(confirmText));
+    });
+    if (!confirmed) return;
+
+    try {
+        var url = APPS_SCRIPT_URL + '?action=duplicateClientWeek' +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&autoProgress=' + (autoProgress ? 'true' : 'false');
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        // Обновим weekTitle в шапке карточки
+        if (data.newTitle) {
+            currentClientCard.weekTitle = data.newTitle;
+            document.getElementById('cc-meta').textContent = data.newTitle;
+        }
+        await loadClientProgram(currentClientCard.sheetName);
+        tg.showAlert('✅ Новая неделя создана: ' + (data.newTitle || ''));
+    } catch (error) {
+        console.error('Duplicate week error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+    }
+}
+
+// Отправить клиенту уведомление о том, что программа обновлена
+async function notifyClientFlow() {
+    if (!currentClientCard || !currentClientCard.chatId) return;
+    var name = currentClientCard.name || 'клиенту';
+    var confirmed = await new Promise(function(resolve) {
+        var msg = 'Отправить ' + name + ' уведомление о том, что программа обновлена?';
+        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
+        else resolve(confirm(msg));
+    });
+    if (!confirmed) return;
+
+    try {
+        var url = APPS_SCRIPT_URL + '?action=notifyClient' +
+            '&targetChatId=' + encodeURIComponent(currentClientCard.chatId);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось отправить'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        tg.showAlert('✅ Уведомление отправлено');
+    } catch (error) {
+        console.error('Notify error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+    }
+}
+
 function renderClientProgram(data) {
     var container = document.getElementById('cc-program-container');
     var days = data.days || [];
