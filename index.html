@@ -359,9 +359,108 @@
             <div class="no-data">📊 Графики и статистика появятся в следующей фазе</div>
         </div>
 
-        <!-- Вкладка: Заметки (заглушка) -->
+        <!-- Вкладка: Заметки тренера + Анкета клиента -->
         <div id="cc-notes-tab" class="cc-tab-content">
-            <div class="no-data">📝 Заметки тренера появятся в следующей фазе</div>
+
+            <!-- Форма новой заметки -->
+            <div class="notes-new-card">
+                <div class="notes-card-title">📝 Новая заметка</div>
+                <textarea id="notes-new-text" class="notes-textarea" rows="3" placeholder="Например: жалуется на правое плечо при жиме — исключить штангу"></textarea>
+                <div class="notes-new-controls">
+                    <label class="notes-checkbox-label">
+                        <input type="checkbox" id="notes-new-important">
+                        <span>⚠️ Обратить внимание</span>
+                    </label>
+                    <button class="notes-save-btn" onclick="saveNewNote()">💾 Сохранить</button>
+                </div>
+            </div>
+
+            <!-- Лента заметок -->
+            <div class="notes-list-section">
+                <div class="notes-card-title">📋 История заметок</div>
+                <div id="notes-list" class="notes-list">
+                    <div class="no-data">Загрузка заметок...</div>
+                </div>
+            </div>
+
+            <!-- Анкета клиента (свёрнута по умолчанию) -->
+            <details class="notes-profile-card">
+                <summary class="notes-profile-summary">
+                    <span>👤 Анкета клиента</span>
+                </summary>
+                <div class="notes-profile-body" id="notes-profile-body">
+                    <div class="notes-profile-grid">
+                        <div class="prof-field">
+                            <label>Пол</label>
+                            <div class="prof-radio-group">
+                                <label class="prof-radio"><input type="radio" name="prof-gender" value="male"><span>М</span></label>
+                                <label class="prof-radio"><input type="radio" name="prof-gender" value="female"><span>Ж</span></label>
+                            </div>
+                        </div>
+                        <div class="prof-field">
+                            <label>Возраст</label>
+                            <input type="number" inputmode="numeric" id="prof-age" class="prof-input" placeholder="25">
+                        </div>
+                        <div class="prof-field">
+                            <label>Рост, см</label>
+                            <input type="number" inputmode="numeric" id="prof-height" class="prof-input" placeholder="178">
+                        </div>
+                        <div class="prof-field">
+                            <label>Вес, кг</label>
+                            <input type="number" inputmode="decimal" step="0.1" id="prof-weight" class="prof-input" placeholder="80">
+                        </div>
+                        <div class="prof-field prof-field-full">
+                            <label>Цель</label>
+                            <select id="prof-goal" class="prof-input">
+                                <option value="">—</option>
+                                <option value="loss">Похудение</option>
+                                <option value="mass">Набор массы</option>
+                                <option value="tone">Тонус / поддержание</option>
+                                <option value="strength">Сила</option>
+                            </select>
+                        </div>
+                        <div class="prof-field">
+                            <label>Уровень</label>
+                            <select id="prof-level" class="prof-input">
+                                <option value="">—</option>
+                                <option value="beginner">Новичок</option>
+                                <option value="intermediate">Средний</option>
+                                <option value="advanced">Продвинутый</option>
+                            </select>
+                        </div>
+                        <div class="prof-field">
+                            <label>Тренировок в неделю</label>
+                            <select id="prof-frequency" class="prof-input">
+                                <option value="">—</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                        <div class="prof-field prof-field-full">
+                            <label>Ограничения</label>
+                            <div class="prof-checks">
+                                <label class="prof-chk"><input type="checkbox" value="knee" class="prof-limit-cb"><span>Колено</span></label>
+                                <label class="prof-chk"><input type="checkbox" value="back" class="prof-limit-cb"><span>Поясница</span></label>
+                                <label class="prof-chk"><input type="checkbox" value="shoulder" class="prof-limit-cb"><span>Плечо</span></label>
+                                <label class="prof-chk"><input type="checkbox" value="wrist" class="prof-limit-cb"><span>Запястье</span></label>
+                            </div>
+                            <input type="text" id="prof-limit-other" class="prof-input" placeholder="Другое (свободный текст)">
+                        </div>
+                        <div class="prof-field prof-field-full">
+                            <label>Инвентарь</label>
+                            <select id="prof-inventory" class="prof-input">
+                                <option value="">—</option>
+                                <option value="gym">Зал</option>
+                                <option value="home_dumbbells">Дом с гантелями</option>
+                                <option value="home_none">Дом без инвентаря</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="notes-save-btn" onclick="saveClientProfile()">💾 Сохранить анкету</button>
+                </div>
+            </details>
         </div>
     </div>
 

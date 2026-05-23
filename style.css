@@ -2105,6 +2105,265 @@ body {
     }
 }
 
+/* ===== ВКЛАДКА «ЗАМЕТКИ» В КАРТОЧКЕ КЛИЕНТА ===== */
+
+.notes-new-card, .notes-list-section {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 12px;
+}
+
+.notes-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 10px;
+}
+
+.notes-textarea {
+    width: 100%;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 14px;
+    background: #fafafa;
+    outline: none;
+    resize: vertical;
+    min-height: 70px;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+}
+
+.notes-textarea:focus {
+    border-color: #1a1a2e;
+    background: white;
+}
+
+.notes-new-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.notes-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #555;
+    cursor: pointer;
+    user-select: none;
+}
+
+.notes-checkbox-label input { width: 16px; height: 16px; cursor: pointer; }
+
+.notes-save-btn {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.notes-save-btn:active { transform: scale(0.97); }
+
+.notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.notes-item {
+    background: #fafafa;
+    border-radius: 10px;
+    padding: 10px 12px;
+    border-left: 4px solid #1a1a2e;
+}
+
+.notes-item-important {
+    background: linear-gradient(135deg, #FFF8E1, #FFFDE7);
+    border-left-color: #FFC107;
+}
+
+.notes-item-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    color: #888;
+}
+
+.notes-item-date { font-weight: 600; }
+.notes-flag {
+    background: #FFC107;
+    color: white;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.notes-item-del {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.5;
+    transition: opacity 0.15s ease;
+}
+
+.notes-item-del:hover { opacity: 1; }
+
+.notes-item-text {
+    font-size: 13px;
+    color: #1a1a1a;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Анкета (свёрнутая details) */
+.notes-profile-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    overflow: hidden;
+}
+
+.notes-profile-summary {
+    padding: 14px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #1a1a2e;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    background: linear-gradient(135deg, #f5f5f5, #ffffff);
+}
+
+.notes-profile-summary::-webkit-details-marker { display: none; }
+
+.notes-profile-summary::before {
+    content: '▸ ';
+    display: inline-block;
+    transition: transform 0.2s ease;
+    margin-right: 4px;
+}
+
+.notes-profile-card[open] .notes-profile-summary::before {
+    transform: rotate(90deg);
+}
+
+.notes-profile-body {
+    padding: 14px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.notes-profile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.prof-field { display: flex; flex-direction: column; gap: 4px; }
+.prof-field-full { grid-column: 1 / -1; }
+
+.prof-field label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.prof-input {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fafafa;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+    outline: none;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.prof-input:focus { background: white; border-color: #1a1a2e; }
+
+.prof-radio-group { display: flex; gap: 6px; }
+.prof-radio {
+    flex: 1;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 9px 0;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 700;
+    font-size: 14px;
+    color: #1a1a2e;
+    transition: all 0.15s ease;
+}
+
+.prof-radio input { display: none; }
+
+.prof-radio:has(input:checked) {
+    background: #1a1a2e;
+    color: white;
+    border-color: #1a1a2e;
+}
+
+.prof-checks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.prof-chk {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 7px 10px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+    color: #1a1a1a;
+    transition: all 0.15s ease;
+}
+
+.prof-chk:has(input:checked) {
+    background: #fff8e1;
+    border-color: #FFC107;
+}
+
+.prof-chk input { width: 14px; height: 14px; cursor: pointer; }
+
+/* Бейдж важной заметки на карточке клиента */
+.admin-badge-important {
+    background: #FFF8E1;
+    color: #BF360C;
+    border: 1px solid #FFC107;
+}
+
 /* ===== ВКЛАДКА «ИСТОРИЯ» В КАРТОЧКЕ КЛИЕНТА ===== */
 
 .cc-history-container {

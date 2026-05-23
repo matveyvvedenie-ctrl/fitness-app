@@ -1306,6 +1306,8 @@ function renderAdminClients() {
                 ? '<span class="admin-card-badge admin-badge-red">⚠️ Провалы в последней</span>' : '';
             var archivedBadge = isArchived
                 ? '<span class="admin-card-badge admin-badge-archived">📦 В архиве</span>' : '';
+            var importantBadge = c.hasImportantNote
+                ? '<span class="admin-card-badge admin-badge-important">⚠️ Есть заметка</span>' : '';
             var archiveBtn = isArchived
                 ? '<button class="admin-card-btn admin-card-btn-restore" onclick="toggleArchiveClient(\'' + c.chatId + '\', false)">↩️ Вернуть</button>'
                 : '<button class="admin-card-btn admin-card-btn-archive" onclick="toggleArchiveClient(\'' + c.chatId + '\', true)">📦 В архив</button>';
@@ -1330,6 +1332,7 @@ function renderAdminClients() {
                     '</div>' +
                 '</div>' +
                 archivedBadge +
+                importantBadge +
                 failBadge +
                 '<div class="admin-card-actions">' +
                     '<button class="admin-card-btn admin-card-btn-primary" onclick="openClientCard(\'' + c.chatId + '\')">👁 Открыть</button>' +
@@ -1422,8 +1425,10 @@ function openClientCard(chatId) {
     screen.classList.remove('hidden');
     document.body.classList.add('no-scroll');
 
-    // При смене клиента сбрасываем кэш истории
+    // При смене клиента сбрасываем все кэши вкладок
     resetClientHistoryCache();
+    notesLoadedFor = '';
+    profileLoadedFor = '';
 
     // Сбросить на вкладку "Программа"
     switchClientCardTab('program');
@@ -1449,6 +1454,10 @@ function switchClientCardTab(tabName) {
     // Лениво загружаем содержимое вкладки при первом открытии
     if (tabName === 'history' && currentClientCard) {
         loadClientHistory(currentClientCard.name);
+    }
+    if (tabName === 'notes' && currentClientCard) {
+        loadClientNotes(currentClientCard.name);
+        loadClientProfile(currentClientCard.chatId);
     }
 }
 
@@ -1956,6 +1965,200 @@ function renderClientHistory(history) {
 // При смене клиента — сбрасываем кэш истории
 function resetClientHistoryCache() {
     clientHistoryLoadedFor = '';
+}
+
+// ========== ВКЛАДКА «ЗАМЕТКИ» (Фаза 4) ==========
+
+var notesLoadedFor = '';
+var profileLoadedFor = '';
+
+async function loadClientNotes(clientName) {
+    if (!clientName) return;
+    var list = document.getElementById('notes-list');
+    if (!list) return;
+    if (notesLoadedFor === clientName) return; // уже загружено
+    list.innerHTML = '<div class="no-data">Загрузка заметок...</div>';
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getClientNotes&clientName=' + encodeURIComponent(clientName);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (data.error) {
+            list.innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
+            return;
+        }
+        notesLoadedFor = clientName;
+        renderNotesList(data.notes || []);
+    } catch (e) {
+        list.innerHTML = '<div class="no-data">Ошибка загрузки</div>';
+    }
+}
+
+function renderNotesList(notes) {
+    var list = document.getElementById('notes-list');
+    if (!list) return;
+    if (!notes || notes.length === 0) {
+        list.innerHTML = '<div class="no-data">Пока нет заметок</div>';
+        return;
+    }
+    list.innerHTML = notes.map(function(n) {
+        var flag = n.important ? '<span class="notes-flag">⚠️</span>' : '';
+        var safeName = (currentClientCard ? currentClientCard.name : '').replace(/'/g, "\\'");
+        var text = (n.text || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+        return '<div class="notes-item' + (n.important ? ' notes-item-important' : '') + '">' +
+            '<div class="notes-item-head">' +
+                '<span class="notes-item-date">📅 ' + n.date + '</span>' +
+                flag +
+                '<button class="notes-item-del" onclick="deleteClientNoteFlow(' + n.ts + ')" title="Удалить">🗑</button>' +
+            '</div>' +
+            '<div class="notes-item-text">' + text + '</div>' +
+        '</div>';
+    }).join('');
+}
+
+async function saveNewNote() {
+    if (!currentClientCard) return;
+    var textEl = document.getElementById('notes-new-text');
+    var impEl = document.getElementById('notes-new-important');
+    var text = (textEl.value || '').trim();
+    if (!text) {
+        tg.showAlert('Напиши текст заметки');
+        return;
+    }
+    try {
+        var url = APPS_SCRIPT_URL + '?action=addClientNote' +
+            '&clientName=' + encodeURIComponent(currentClientCard.name) +
+            '&text=' + encodeURIComponent(text) +
+            '&important=' + (impEl.checked ? 'true' : 'false');
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        textEl.value = '';
+        impEl.checked = false;
+        notesLoadedFor = ''; // сброс кэша, перезагрузим
+        await loadClientNotes(currentClientCard.name);
+    } catch (e) {
+        console.error('Save note error:', e);
+        tg.showAlert('Ошибка соединения ❌');
+    }
+}
+
+async function deleteClientNoteFlow(ts) {
+    if (!currentClientCard || !ts) return;
+    var confirmed = await new Promise(function(resolve) {
+        var msg = 'Удалить заметку?';
+        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
+        else resolve(confirm(msg));
+    });
+    if (!confirmed) return;
+    try {
+        var url = APPS_SCRIPT_URL + '?action=deleteClientNote' +
+            '&clientName=' + encodeURIComponent(currentClientCard.name) +
+            '&ts=' + ts;
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        notesLoadedFor = '';
+        await loadClientNotes(currentClientCard.name);
+    } catch (e) {
+        tg.showAlert('Ошибка соединения ❌');
+    }
+}
+
+// ── Анкета клиента ──
+
+async function loadClientProfile(chatId) {
+    if (!chatId) return;
+    if (profileLoadedFor === chatId) return;
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getClientProfile&targetChatId=' + encodeURIComponent(chatId);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (data.error) return;
+        profileLoadedFor = chatId;
+        fillProfileForm(data);
+    } catch (e) { console.error('Load profile error:', e); }
+}
+
+function fillProfileForm(p) {
+    // Пол
+    document.querySelectorAll('input[name="prof-gender"]').forEach(function(el) {
+        el.checked = (el.value === p.gender);
+    });
+    document.getElementById('prof-age').value = p.age || '';
+    document.getElementById('prof-height').value = p.height || '';
+    document.getElementById('prof-weight').value = p.weight || '';
+    document.getElementById('prof-goal').value = p.goal || '';
+    document.getElementById('prof-level').value = p.level || '';
+    document.getElementById('prof-frequency').value = p.frequency || '';
+    document.getElementById('prof-inventory').value = p.inventory || '';
+
+    // Ограничения: CSV в hidden, чекбоксы для стандартных + free-text «Другое»
+    var lim = (p.limitations || '').toString();
+    var known = ['knee', 'back', 'shoulder', 'wrist'];
+    var arr = lim.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    var other = [];
+    document.querySelectorAll('.prof-limit-cb').forEach(function(cb) {
+        cb.checked = arr.indexOf(cb.value) >= 0;
+    });
+    arr.forEach(function(v) { if (known.indexOf(v) < 0) other.push(v); });
+    document.getElementById('prof-limit-other').value = other.join(', ');
+}
+
+function collectProfileForm() {
+    var gender = '';
+    var g = document.querySelector('input[name="prof-gender"]:checked');
+    if (g) gender = g.value;
+
+    var limits = [];
+    document.querySelectorAll('.prof-limit-cb').forEach(function(cb) {
+        if (cb.checked) limits.push(cb.value);
+    });
+    var other = (document.getElementById('prof-limit-other').value || '').trim();
+    if (other) other.split(',').forEach(function(s) {
+        var v = s.trim();
+        if (v) limits.push(v);
+    });
+
+    return {
+        gender: gender,
+        age: document.getElementById('prof-age').value.trim(),
+        height: document.getElementById('prof-height').value.trim(),
+        weight: document.getElementById('prof-weight').value.trim(),
+        goal: document.getElementById('prof-goal').value,
+        level: document.getElementById('prof-level').value,
+        frequency: document.getElementById('prof-frequency').value,
+        limitations: limits.join(','),
+        inventory: document.getElementById('prof-inventory').value
+    };
+}
+
+async function saveClientProfile() {
+    if (!currentClientCard) return;
+    var fields = collectProfileForm();
+    var qs = 'action=updateClientProfile&targetChatId=' + encodeURIComponent(currentClientCard.chatId);
+    Object.keys(fields).forEach(function(k) {
+        qs += '&' + k + '=' + encodeURIComponent(fields[k]);
+    });
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?' + qs);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        tg.showAlert('✅ Анкета сохранена');
+    } catch (e) {
+        tg.showAlert('Ошибка соединения ❌');
+    }
 }
 
 // ========== ИСТОРИЯ ПО КОНКРЕТНОМУ УПРАЖНЕНИЮ ==========
