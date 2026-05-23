@@ -1897,23 +1897,42 @@ function renderClientHistory(history) {
 
         // Рендер упражнений
         var exHtml = (day.exercises || []).map(function(ex) {
+            // Защита: ISO-дата иногда попадает в reps/weightPlan
+            var repsClean = ex.reps;
+            if (typeof repsClean === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(repsClean)) repsClean = '';
+            var weightPlanClean = ex.weightPlan;
+            if (typeof weightPlanClean === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(weightPlanClean)) weightPlanClean = '';
+
             var fact = '';
             if (ex.weightFact !== '' && ex.weightFact != null) {
                 fact = ex.weightFact + ' кг';
                 if (ex.repsFact !== '' && ex.repsFact != null) fact += ' × ' + ex.repsFact;
             }
-            var rpe = (ex.rpe !== '' && ex.rpe != null) ? ' · RPE ' + ex.rpe : '';
+
+            // Бейдж с фидбэком (Легко/Норм/Тяжело/Не вытянул) — приходит с бэка
+            var feedbackHtml = '';
+            if (ex.feedback && ex.feedback.label) {
+                feedbackHtml = '<span class="hh-ex-feedback hh-fb-' + ex.feedback.code + '">' +
+                    ex.feedback.emoji + ' ' + ex.feedback.label +
+                '</span>';
+            }
+
+            var rpeText = (ex.rpe !== '' && ex.rpe != null) ? ' · RPE ' + ex.rpe : '';
+
             var commentHtml = (ex.comment && ex.comment.toString().trim())
                 ? '<div class="hh-ex-comment">💬 ' + ex.comment + '</div>' : '';
+
             var planText = '';
-            if (ex.weightPlan) {
-                planText = '<span class="hh-ex-plan">план: ' + ex.weightPlan + ' × ' + (ex.reps || '—') + '</span>';
+            if (weightPlanClean) {
+                var repsPart = repsClean ? ' × ' + repsClean : '';
+                planText = '<span class="hh-ex-plan">план: ' + weightPlanClean + repsPart + '</span>';
             }
             return '<div class="hh-ex">' +
                 '<div class="hh-ex-name">' + cleanExerciseName(ex.exercise) + '</div>' +
-                '<div class="hh-ex-fact">' +
+                '<div class="hh-ex-fact-row">' +
                     (fact ? '<span class="hh-ex-fact-value">' + fact + '</span>' : '<span class="hh-ex-skipped">не выполнено</span>') +
-                    rpe +
+                    '<span class="hh-ex-rpe">' + rpeText + '</span>' +
+                    feedbackHtml +
                 '</div>' +
                 planText +
                 commentHtml +
