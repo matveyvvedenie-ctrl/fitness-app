@@ -493,6 +493,65 @@
         </div>
     </div>
 
+    <!-- Модалка выбора типа добавления (одиночное / суперсет / трисет) -->
+    <div id="ex-add-type-modal" class="ex-add-type-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeAddTypeDialog()"></div>
+        <div class="ex-add-type-content">
+            <div class="ex-add-type-header">
+                <div class="ex-add-type-title">Что добавить?</div>
+                <div class="ex-add-type-subtitle" id="ex-add-type-subtitle"></div>
+            </div>
+            <button class="ex-add-type-option" data-type="single">
+                <div class="ex-add-type-icon">🏋️</div>
+                <div class="ex-add-type-text">
+                    <div class="ex-add-type-name">Упражнение</div>
+                    <div class="ex-add-type-desc">Одно движение</div>
+                </div>
+            </button>
+            <button class="ex-add-type-option" data-type="superset">
+                <div class="ex-add-type-icon">🔗</div>
+                <div class="ex-add-type-text">
+                    <div class="ex-add-type-name">Суперсет</div>
+                    <div class="ex-add-type-desc">Два упражнения подряд без отдыха</div>
+                </div>
+            </button>
+            <button class="ex-add-type-option" data-type="triset">
+                <div class="ex-add-type-icon">🔗</div>
+                <div class="ex-add-type-text">
+                    <div class="ex-add-type-name">Трисет</div>
+                    <div class="ex-add-type-desc">Три упражнения подряд без отдыха</div>
+                </div>
+            </button>
+            <button class="ex-add-type-cancel" onclick="closeAddTypeDialog()">Отмена</button>
+        </div>
+    </div>
+
+    <!-- Модалка действий с днём тренировки -->
+    <div id="day-actions-modal" class="ex-add-type-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeDayActionsDialog()"></div>
+        <div class="ex-add-type-content">
+            <div class="ex-add-type-header">
+                <div class="ex-add-type-title">Действия с днём</div>
+                <div class="ex-add-type-subtitle" id="day-actions-name">—</div>
+            </div>
+            <button class="ex-add-type-option" onclick="renameCurrentDay()">
+                <div class="ex-add-type-icon">✏️</div>
+                <div class="ex-add-type-text">
+                    <div class="ex-add-type-name">Переименовать</div>
+                    <div class="ex-add-type-desc">Поменять название тренировки</div>
+                </div>
+            </button>
+            <button class="ex-add-type-option ex-add-type-danger" onclick="deleteCurrentDay()">
+                <div class="ex-add-type-icon">🗑</div>
+                <div class="ex-add-type-text">
+                    <div class="ex-add-type-name">Удалить день</div>
+                    <div class="ex-add-type-desc">Заголовок и все упражнения внутри</div>
+                </div>
+            </button>
+            <button class="ex-add-type-cancel" onclick="closeDayActionsDialog()">Отмена</button>
+        </div>
+    </div>
+
     <!-- Модалка добавления блока упражнений (суперсет/трисет) -->
     <div id="ex-block-modal" class="ex-editor-modal hidden">
         <div class="ex-editor-backdrop" onclick="closeBlockModal()"></div>

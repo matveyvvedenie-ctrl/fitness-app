@@ -1618,9 +1618,61 @@ body {
     font-weight: 700;
     color: #1a1a2e;
     padding: 6px 8px 10px;
+    flex: 1;
+}
+
+.cc-day-title-row {
+    display: flex;
+    align-items: center;
     border-bottom: 1px solid #f0f0f0;
     margin-bottom: 8px;
 }
+
+.cc-day-menu-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 22px;
+    line-height: 1;
+    padding: 0 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+
+.cc-day-menu-btn:hover { background: #f5f5f7; color: #1a1a2e; }
+.cc-day-menu-btn:active { transform: scale(0.92); }
+
+/* Кнопка «+ Добавить день тренировки» под всеми днями */
+.cc-add-day-btn {
+    width: 100%;
+    margin-top: 16px;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 2px 8px rgba(26,26,46,0.18);
+}
+
+.cc-add-day-btn:hover { opacity: 0.93; }
+.cc-add-day-btn:active { transform: scale(0.98); }
+
+/* Опасная опция в диалоге действий с днём (Удалить) */
+.ex-add-type-option.ex-add-type-danger {
+    background: #ffebee;
+}
+.ex-add-type-option.ex-add-type-danger:hover,
+.ex-add-type-option.ex-add-type-danger:active {
+    background: #ffcdd2;
+    border-color: #C62828;
+}
+.ex-add-type-option.ex-add-type-danger .ex-add-type-name { color: #C62828; }
 
 .cc-exercise {
     display: flex;
@@ -1876,6 +1928,118 @@ body {
 
 .cc-ex-edit-btn:hover { background: #ececf0; }
 .cc-ex-edit-btn:active { transform: scale(0.94); }
+
+/* ===== ДИАЛОГ ВЫБОРА ТИПА ДОБАВЛЕНИЯ ===== */
+
+.ex-add-type-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(2px);
+}
+
+.ex-add-type-content {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    background: white;
+    border-radius: 18px 18px 0 0;
+    padding: 18px 16px max(18px, env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.22);
+    animation: editorSlideUp 0.22s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ex-add-type-header {
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.ex-add-type-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #1a1a2e;
+}
+
+.ex-add-type-subtitle {
+    font-size: 13px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.ex-add-type-option {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: #f5f5f7;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+    width: 100%;
+}
+
+.ex-add-type-option:hover,
+.ex-add-type-option:active {
+    background: #ebebf0;
+    border-color: #1a1a2e;
+    transform: scale(0.985);
+}
+
+.ex-add-type-icon {
+    font-size: 30px;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    background: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.ex-add-type-text { flex: 1; }
+
+.ex-add-type-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 2px;
+}
+
+.ex-add-type-desc {
+    font-size: 12px;
+    color: #777;
+    line-height: 1.3;
+}
+
+.ex-add-type-cancel {
+    margin-top: 6px;
+    background: transparent;
+    border: none;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #999;
+    cursor: pointer;
+    border-radius: 10px;
+}
+
+.ex-add-type-cancel:hover { background: #f5f5f7; color: #555; }
+
+@media (min-width: 900px) {
+    .ex-add-type-modal { align-items: center; }
+    .ex-add-type-content { border-radius: 18px; }
+}
 
 /* ===== МОДАЛКА РЕДАКТИРОВАНИЯ УПРАЖНЕНИЯ ===== */
 

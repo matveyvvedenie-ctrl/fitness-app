@@ -966,6 +966,7 @@ function initAdminTab() {
         initAdminClientsControls();
         initClientCardTabs();
         initExerciseEditor();
+        initAddTypeDialog();
         initBlockModal();
     }
 }
@@ -1710,13 +1711,19 @@ function renderClientProgram(data) {
 
         var safeDay = (day.day || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return '<div class="cc-day-block">' +
-            '<div class="cc-day-title">' + (day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
+            '<div class="cc-day-title-row">' +
+                '<div class="cc-day-title">' + (day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
+                '<button class="cc-day-menu-btn" onclick="showDayActionsDialog(\'' + safeDay + '\')" title="Действия с днём">⋯</button>' +
+            '</div>' +
             '<div class="cc-day-exercises" data-day-name="' + safeDay + '">' +
                 (groupsHtml || '<div class="no-data">Нет упражнений</div>') +
             '</div>' +
             '<button class="cc-add-ex-btn" onclick="showAddTypeDialog(\'' + safeDay + '\')">+ Добавить упражнение</button>' +
         '</div>';
     }).join('');
+
+    // После списка дней — кнопка «+ Добавить день»
+    container.innerHTML += '<button class="cc-add-day-btn" onclick="showAddDayDialog()">+ Добавить день тренировки</button>';
 
     // Инициализируем drag-and-drop для каждого дня (только внутри одного дня — перенос между днями отключён)
     initDayDragDrop();
@@ -2242,34 +2249,132 @@ function selectExerciseFromLibrary(name) {
 var currentBlockType = 'superset';
 var currentBlockDay = '';
 
-// При нажатии «+ Добавить упражнение» — диалог выбора типа
+// Кастомный диалог выбора типа добавления — стилизованный, единообразный на всех платформах
+var pendingAddDay = '';
+
 function showAddTypeDialog(dayName) {
     if (!currentClientCard) return;
-    // Telegram showPopup (если доступен) — нативный диалог с кнопками
-    if (tg && typeof tg.showPopup === 'function') {
-        try {
-            tg.showPopup({
-                title: 'Что добавить?',
-                message: dayName ? ('В день: ' + dayName) : '',
-                buttons: [
-                    { id: 'single',   type: 'default', text: '🏋️ Упражнение' },
-                    { id: 'superset', type: 'default', text: '🔗 Суперсет (2)' },
-                    { id: 'triset',   type: 'default', text: '🔗 Трисет (3)' },
-                    { type: 'cancel' }
-                ]
-            }, function(id) {
-                if (id === 'single')   openAddExerciseModal(dayName);
-                else if (id === 'superset') openBlockModal(dayName, 'superset');
-                else if (id === 'triset')   openBlockModal(dayName, 'triset');
-            });
+    pendingAddDay = dayName || '';
+    var subtitle = document.getElementById('ex-add-type-subtitle');
+    if (subtitle) subtitle.textContent = dayName ? ('в день: ' + dayName) : '';
+    document.getElementById('ex-add-type-modal').classList.remove('hidden');
+}
+
+function closeAddTypeDialog() {
+    document.getElementById('ex-add-type-modal').classList.add('hidden');
+}
+
+function initAddTypeDialog() {
+    document.querySelectorAll('.ex-add-type-option').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var type = btn.dataset.type;
+            closeAddTypeDialog();
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            if (type === 'single')        openAddExerciseModal(pendingAddDay);
+            else if (type === 'superset') openBlockModal(pendingAddDay, 'superset');
+            else if (type === 'triset')   openBlockModal(pendingAddDay, 'triset');
+        });
+    });
+}
+
+// ========== УПРАВЛЕНИЕ ДНЯМИ ТРЕНИРОВКИ (Фаза C) ==========
+
+// Диалог действий с днём — переименовать или удалить
+function showDayActionsDialog(dayName) {
+    if (!currentClientCard || !dayName) return;
+    document.getElementById('day-actions-name').textContent = dayName;
+    document.getElementById('day-actions-modal').dataset.dayName = dayName;
+    document.getElementById('day-actions-modal').classList.remove('hidden');
+}
+
+function closeDayActionsDialog() {
+    document.getElementById('day-actions-modal').classList.add('hidden');
+}
+
+async function renameCurrentDay() {
+    var modal = document.getElementById('day-actions-modal');
+    var oldName = modal.dataset.dayName;
+    closeDayActionsDialog();
+    if (!oldName || !currentClientCard) return;
+
+    var newName = await new Promise(function(resolve) {
+        if (tg && typeof tg.showPopup === 'function' && false) {
+            // showPopup не умеет принимать ввод текста — используем JS prompt
+        }
+        resolve(prompt('Новое название дня:', oldName));
+    });
+    if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+
+    try {
+        var url = APPS_SCRIPT_URL + '?action=renameClientDay' +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&oldDayName=' + encodeURIComponent(oldName) +
+            '&newDayName=' + encodeURIComponent(newName.trim());
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
             return;
-        } catch (_) { /* fallback ниже */ }
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadClientProgram(currentClientCard.sheetName);
+    } catch (error) {
+        console.error('Rename day error:', error);
+        tg.showAlert('Ошибка соединения ❌');
     }
-    // Fallback на простой prompt
-    var choice = prompt('Что добавить?\n1 — Упражнение\n2 — Суперсет (2)\n3 — Трисет (3)', '1');
-    if (choice === '1') openAddExerciseModal(dayName);
-    else if (choice === '2') openBlockModal(dayName, 'superset');
-    else if (choice === '3') openBlockModal(dayName, 'triset');
+}
+
+async function deleteCurrentDay() {
+    var modal = document.getElementById('day-actions-modal');
+    var dayName = modal.dataset.dayName;
+    closeDayActionsDialog();
+    if (!dayName || !currentClientCard) return;
+
+    var confirmed = await new Promise(function(resolve) {
+        var msg = 'Удалить день «' + dayName + '» вместе со всеми упражнениями внутри?';
+        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
+        else resolve(confirm(msg));
+    });
+    if (!confirmed) return;
+
+    try {
+        var url = APPS_SCRIPT_URL + '?action=deleteClientDay' +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&dayName=' + encodeURIComponent(dayName);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadClientProgram(currentClientCard.sheetName);
+    } catch (error) {
+        console.error('Delete day error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+    }
+}
+
+async function showAddDayDialog() {
+    if (!currentClientCard) return;
+    var dayName = prompt('Название нового дня (например: «Пт Грудь-Трицепс»):');
+    if (!dayName || !dayName.trim()) return;
+    try {
+        var url = APPS_SCRIPT_URL + '?action=addClientDay' +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&dayName=' + encodeURIComponent(dayName.trim());
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadClientProgram(currentClientCard.sheetName);
+    } catch (error) {
+        console.error('Add day error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+    }
 }
 
 function openBlockModal(dayName, type) {
