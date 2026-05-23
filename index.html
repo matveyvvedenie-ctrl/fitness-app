@@ -346,6 +346,9 @@
 
         <!-- Вкладка: История тренировок -->
         <div id="cc-history-tab" class="cc-tab-content">
+            <button class="cc-history-by-exercise-btn" onclick="openExerciseStats()">
+                📊 История по упражнению
+            </button>
             <div id="cc-history-container" class="cc-history-container">
                 <div class="no-data">Загрузка истории...</div>
             </div>
@@ -525,6 +528,33 @@
                 </div>
             </button>
             <button class="ex-add-type-cancel" onclick="closeAddTypeDialog()">Отмена</button>
+        </div>
+    </div>
+
+    <!-- Модалка истории по конкретному упражнению (график + таблица + PR) -->
+    <div id="ex-stat-modal" class="ex-stat-modal hidden">
+        <div class="ex-stat-header">
+            <button class="cc-back-btn" onclick="closeExerciseStats()">←</button>
+            <div class="ex-stat-header-text">
+                <div class="ex-stat-header-title">📊 История упражнения</div>
+                <div class="ex-stat-header-sub" id="ex-stat-client-name">—</div>
+            </div>
+        </div>
+        <div class="ex-stat-body">
+            <div class="ex-stat-select-wrap">
+                <label class="ex-editor-label">Выберите упражнение</label>
+                <select id="ex-stat-select" class="ex-editor-input"></select>
+            </div>
+            <div class="ex-stat-pr" id="ex-stat-pr">
+                🏆 Личный рекорд: —
+            </div>
+            <div class="ex-stat-chart-wrap">
+                <canvas id="ex-stat-chart"></canvas>
+            </div>
+            <div class="ex-stat-table-section">
+                <div class="ex-stat-table-title">📋 Все попытки</div>
+                <div id="ex-stat-table" class="ex-stat-table"></div>
+            </div>
         </div>
     </div>
 

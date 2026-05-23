@@ -1958,6 +1958,234 @@ function resetClientHistoryCache() {
     clientHistoryLoadedFor = '';
 }
 
+// ========== ИСТОРИЯ ПО КОНКРЕТНОМУ УПРАЖНЕНИЮ ==========
+
+var exStatChart = null;
+var exStatSelectedName = '';
+
+// Собирает уникальный список упражнений из текущей истории клиента (по очищенным именам)
+function _getUniqueExercisesFromHistory(history) {
+    var seen = {};
+    var list = [];
+    (history || []).forEach(function(day) {
+        (day.exercises || []).forEach(function(ex) {
+            var name = cleanExerciseName(ex.exercise);
+            if (!name) return;
+            if (seen[name]) return;
+            seen[name] = true;
+            list.push(name);
+        });
+    });
+    list.sort(function(a, b) { return a.localeCompare(b, 'ru'); });
+    return list;
+}
+
+// Собирает массив попыток (только с фактом) для конкретного упражнения, отсортированных по дате (по возрастанию для графика)
+function _collectExerciseAttempts(history, exerciseName) {
+    var target = cleanExerciseName(exerciseName);
+    var attempts = [];
+    (history || []).forEach(function(day) {
+        (day.exercises || []).forEach(function(ex) {
+            if (cleanExerciseName(ex.exercise) !== target) return;
+            var wFact = parseFloat(ex.weightFact);
+            var rFact = parseFloat(ex.repsFact);
+            // Без факта неинтересно (план не делал)
+            if (isNaN(wFact) && isNaN(rFact)) return;
+            attempts.push({
+                date: day.date,
+                dateObj: day.dateObj,
+                weightFact: isNaN(wFact) ? null : wFact,
+                repsFact: isNaN(rFact) ? null : rFact,
+                rpe: ex.rpe || '',
+                feedback: ex.feedback || null,
+                comment: ex.comment || '',
+                weightPlan: ex.weightPlan || '',
+                reps: ex.reps || ''
+            });
+        });
+    });
+    attempts.sort(function(a, b) { return a.dateObj - b.dateObj; });
+    return attempts;
+}
+
+function openExerciseStats() {
+    if (!currentClientCard) return;
+    var history = clientHistoryCache[currentClientCard.name] || [];
+    if (history.length === 0) {
+        tg.showAlert('Сначала открой вкладку «История» — нужно загрузить данные');
+        return;
+    }
+
+    document.getElementById('ex-stat-client-name').textContent = currentClientCard.name;
+    document.body.classList.add('no-scroll');
+    document.getElementById('ex-stat-modal').classList.remove('hidden');
+
+    var list = _getUniqueExercisesFromHistory(history);
+    var sel = document.getElementById('ex-stat-select');
+    sel.innerHTML = list.map(function(name) {
+        return '<option value="' + name.replace(/"/g, '&quot;') + '">' + name + '</option>';
+    }).join('');
+
+    // Выбираем первое (или ранее выбранное, если осталось в списке)
+    if (exStatSelectedName && list.indexOf(exStatSelectedName) >= 0) {
+        sel.value = exStatSelectedName;
+    } else if (list.length > 0) {
+        sel.value = list[0];
+        exStatSelectedName = list[0];
+    }
+
+    // Навешиваем обработчик один раз
+    if (!sel.dataset.bound) {
+        sel.addEventListener('change', function() {
+            exStatSelectedName = sel.value;
+            renderExerciseStats(currentClientCard.name, sel.value);
+        });
+        sel.dataset.bound = '1';
+    }
+
+    if (exStatSelectedName) renderExerciseStats(currentClientCard.name, exStatSelectedName);
+}
+
+function closeExerciseStats() {
+    document.getElementById('ex-stat-modal').classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+    if (exStatChart) {
+        try { exStatChart.destroy(); } catch (_) {}
+        exStatChart = null;
+    }
+}
+
+function renderExerciseStats(clientName, exerciseName) {
+    var history = clientHistoryCache[clientName] || [];
+    var attempts = _collectExerciseAttempts(history, exerciseName);
+
+    // ── Личный рекорд ──
+    var prEl = document.getElementById('ex-stat-pr');
+    if (attempts.length === 0) {
+        prEl.innerHTML = '🏆 Личный рекорд: <span class="ex-stat-empty">нет данных</span>';
+    } else {
+        var pr = attempts.reduce(function(acc, a) {
+            if (acc == null) return a;
+            if ((a.weightFact || 0) > (acc.weightFact || 0)) return a;
+            // При равном весе — больше повторов лучше
+            if ((a.weightFact || 0) === (acc.weightFact || 0) && (a.repsFact || 0) > (acc.repsFact || 0)) return a;
+            return acc;
+        }, null);
+        var repsTxt = pr.repsFact ? ' × ' + pr.repsFact : '';
+        prEl.innerHTML = '🏆 Личный рекорд: <strong>' + (pr.weightFact != null ? pr.weightFact + ' кг' : '—') + repsTxt + '</strong> <span class="ex-stat-pr-date">(' + pr.date + ')</span>';
+    }
+
+    // ── График ──
+    var canvas = document.getElementById('ex-stat-chart');
+    if (exStatChart) {
+        try { exStatChart.destroy(); } catch (_) {}
+        exStatChart = null;
+    }
+    if (attempts.length === 0) {
+        canvas.style.display = 'none';
+    } else {
+        canvas.style.display = '';
+        var ctx = canvas.getContext('2d');
+        var labels = attempts.map(function(a) {
+            // Короткая дата dd.MM
+            var p = (a.date || '').split('.');
+            return p.length >= 2 ? p[0] + '.' + p[1] : a.date;
+        });
+        var weights = attempts.map(function(a) { return a.weightFact; });
+
+        // Цвета точек по фидбэку
+        var pointColors = attempts.map(function(a) {
+            if (a.feedback && a.feedback.code) {
+                if (a.feedback.code === 'easy')   return '#43A047';
+                if (a.feedback.code === 'normal') return '#1565C0';
+                if (a.feedback.code === 'hard')   return '#E65100';
+                if (a.feedback.code === 'failed') return '#C62828';
+            }
+            return '#1a1a2e';
+        });
+
+        exStatChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Вес, кг',
+                    data: weights,
+                    borderColor: '#1a1a2e',
+                    backgroundColor: 'rgba(26,26,46,0.08)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 6,
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1a1a2e',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        padding: 10,
+                        cornerRadius: 8,
+                        displayColors: false,
+                        callbacks: {
+                            label: function(ctx2) {
+                                var i = ctx2.dataIndex;
+                                var a = attempts[i];
+                                var parts = [];
+                                if (a.weightFact != null) parts.push(a.weightFact + ' кг');
+                                if (a.repsFact != null) parts.push(a.repsFact + ' повт');
+                                if (a.rpe) parts.push('RPE ' + a.rpe);
+                                if (a.feedback) parts.push(a.feedback.emoji + ' ' + a.feedback.label);
+                                return parts.join(' · ');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: { callback: function(v) { return v + ' кг'; } },
+                        grid: { color: '#f0f0f0' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // ── Таблица ──
+    var table = document.getElementById('ex-stat-table');
+    if (attempts.length === 0) {
+        table.innerHTML = '<div class="no-data">Нет фактических попыток</div>';
+        return;
+    }
+    // В таблице — по убыванию даты (свежие сверху)
+    var rev = attempts.slice().reverse();
+    table.innerHTML = rev.map(function(a) {
+        var fb = a.feedback
+            ? '<span class="hh-ex-feedback hh-fb-' + a.feedback.code + '">' + a.feedback.emoji + ' ' + a.feedback.label + '</span>'
+            : '';
+        var repsTxt = a.repsFact != null ? ' × ' + a.repsFact : '';
+        var rpeTxt = a.rpe ? ' · RPE ' + a.rpe : '';
+        return '<div class="ex-stat-row">' +
+            '<div class="ex-stat-row-date">' + a.date + '</div>' +
+            '<div class="ex-stat-row-value">' +
+                '<strong>' + (a.weightFact != null ? a.weightFact + ' кг' : '—') + repsTxt + '</strong>' +
+                '<span class="ex-stat-row-rpe">' + rpeTxt + '</span>' +
+            '</div>' +
+            fb +
+        '</div>';
+    }).join('');
+}
+
 // ========== РЕДАКТОР УПРАЖНЕНИЯ (Фаза 2B + 2C) ==========
 
 var currentEditingRow = null;

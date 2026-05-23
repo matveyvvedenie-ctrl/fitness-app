@@ -1929,6 +1929,182 @@ body {
 .cc-ex-edit-btn:hover { background: #ececf0; }
 .cc-ex-edit-btn:active { transform: scale(0.94); }
 
+/* ===== ЭКРАН «ИСТОРИЯ ПО УПРАЖНЕНИЮ» ===== */
+
+.cc-history-by-exercise-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #1565C0, #0D47A1);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: all 0.15s ease;
+    box-shadow: 0 2px 8px rgba(13,71,161,0.18);
+}
+
+.cc-history-by-exercise-btn:hover { opacity: 0.93; }
+.cc-history-by-exercise-btn:active { transform: scale(0.98); }
+
+.ex-stat-modal {
+    position: fixed;
+    top: var(--tg-top-pad, 0);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #f5f5f7;
+    z-index: 1100;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    animation: ccSlideIn 0.22s ease;
+}
+
+.ex-stat-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: white;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+}
+
+.ex-stat-header-text { flex: 1; min-width: 0; }
+
+.ex-stat-header-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.ex-stat-header-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    margin-top: 2px;
+}
+
+.ex-stat-body {
+    flex: 1;
+    padding: 14px 12px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.ex-stat-select-wrap {
+    background: white;
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.ex-stat-select-wrap select {
+    width: 100%;
+    margin-top: 4px;
+}
+
+.ex-stat-pr {
+    background: linear-gradient(135deg, #FFF8E1, #FFFDE7);
+    border-left: 4px solid #FFC107;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #5D4037;
+    font-weight: 600;
+}
+
+.ex-stat-pr strong {
+    color: #BF360C;
+    font-size: 16px;
+}
+
+.ex-stat-pr-date {
+    font-size: 12px;
+    color: #999;
+    font-weight: 500;
+    margin-left: 6px;
+}
+
+.ex-stat-empty {
+    color: #999;
+    font-style: italic;
+    font-weight: 500;
+}
+
+.ex-stat-chart-wrap {
+    background: white;
+    border-radius: 12px;
+    padding: 12px 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    height: 240px;
+    position: relative;
+}
+
+.ex-stat-table-section {
+    background: white;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.ex-stat-table-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 8px;
+}
+
+.ex-stat-table {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ex-stat-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #fafafa;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.ex-stat-row-date {
+    color: #666;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ex-stat-row-value {
+    color: #1a1a2e;
+}
+
+.ex-stat-row-rpe {
+    color: #888;
+    font-weight: 500;
+    margin-left: 4px;
+}
+
+@media (min-width: 900px) {
+    .ex-stat-body {
+        max-width: 800px;
+        margin: 0 auto;
+        width: 100%;
+    }
+    .ex-stat-header {
+        padding-left: calc((100vw - 800px)/2 + 14px);
+        padding-right: calc((100vw - 800px)/2 + 14px);
+    }
+}
+
 /* ===== ВКЛАДКА «ИСТОРИЯ» В КАРТОЧКЕ КЛИЕНТА ===== */
 
 .cc-history-container {
