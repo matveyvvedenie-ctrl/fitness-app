@@ -1541,34 +1541,24 @@ function renderExerciseRow(ex, label) {
 
 // ========== ДЕЙСТВИЯ С ПРОГРАММОЙ КЛИЕНТА (Фаза 2F) ==========
 
-// Дублировать неделю — спрашиваем «с автоподбором весов или нет»
+// Дублировать неделю — план остаётся, факты стираются, заголовок инкрементируется
+// (автоподбор весов временно отключён, подключим в следующей итерации через ИИ)
 async function duplicateWeekFlow() {
     if (!currentClientCard) return;
     var name = currentClientCard.name || 'клиента';
 
-    // Шаг 1: спросить включить ли автоподбор
-    var autoProgress = await new Promise(function(resolve) {
-        var msg = 'Подобрать веса на новую неделю автоматически по фактам прошлой?\n\n' +
-                  '«Да» — если клиент тянул план, веса немного поднимутся. Если не тянул — снизятся до факта.\n' +
-                  '«Нет» — план останется тем же, тренируется с теми же весами.';
+    var confirmed = await new Promise(function(resolve) {
+        var msg = 'Создать новую неделю для ' + name + '?\n' +
+                  'План упражнений остаётся тем же, факты прошлой недели будут стёрты.';
         if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
         else resolve(confirm(msg));
-    });
-
-    // Шаг 2: подтверждение действия
-    var confirmText = autoProgress
-        ? 'Создать новую неделю для ' + name + ' с автоподбором весов?\nФакты прошлой недели будут стёрты.'
-        : 'Создать новую неделю для ' + name + ' с теми же весами?\nФакты прошлой недели будут стёрты.';
-    var confirmed = await new Promise(function(resolve) {
-        if (tg && tg.showConfirm) tg.showConfirm(confirmText, function(ok) { resolve(ok); });
-        else resolve(confirm(confirmText));
     });
     if (!confirmed) return;
 
     try {
         var url = APPS_SCRIPT_URL + '?action=duplicateClientWeek' +
             '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
-            '&autoProgress=' + (autoProgress ? 'true' : 'false');
+            '&autoProgress=false';
         var resp = await fetch(url);
         var data = await resp.json();
         if (!data.success) {
@@ -1576,7 +1566,6 @@ async function duplicateWeekFlow() {
             return;
         }
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        // Обновим weekTitle в шапке карточки
         if (data.newTitle) {
             currentClientCard.weekTitle = data.newTitle;
             document.getElementById('cc-meta').textContent = data.newTitle;
