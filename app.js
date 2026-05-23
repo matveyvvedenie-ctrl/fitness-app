@@ -273,14 +273,32 @@ function renderAllDaysIfNeeded() {
     if (typeof renderWorkout === 'function') renderWorkout();
 }
 
-// Применить мультипликатор к плановому весу для отображения
+// Разобрать вес: понимает «80», «80.5», «80-90», «80,5 - 90» → {min, max}
+function _parseWeightRange(s) {
+    if (s == null) return null;
+    var str = s.toString().replace(',', '.').trim();
+    var nums = str.match(/[0-9]+(?:\.[0-9]+)?/g);
+    if (!nums || nums.length === 0) return null;
+    var min = parseFloat(nums[0]);
+    var max = nums.length > 1 ? parseFloat(nums[nums.length - 1]) : min;
+    if (isNaN(min)) return null;
+    if (isNaN(max)) max = min;
+    return { min: min, max: max };
+}
+
+// Применить самочувствие к плановому весу для отображения клиенту.
+// Логика:
+//   «Бодрый» (mult=1.0)     → план без изменений (как написал тренер, например «80-90»)
+//   «Устал» / «Приболел» / «ПМС» (mult<1) → нижняя граница × mult (со скидкой), округление до 0.5кг
+// Если weightPlan — одиночное число, используем его как min=max.
 function getDisplayWeight(weightPlan) {
-    var base = parseFloat(weightPlan);
-    if (isNaN(base) || base <= 0) return weightPlan;
     var mult = getWellnessMultiplier();
-    if (mult >= 1) return base;
-    // Округление к 0.5 кг
-    return Math.round(base * mult * 2) / 2;
+    // Бодрый — ничего не трогаем, отдаём план как есть
+    if (mult >= 1) return weightPlan;
+    var range = _parseWeightRange(weightPlan);
+    if (!range) return weightPlan; // нечисловое значение — оставляем как есть
+    // Со снижением — нижняя граница диапазона × мультипликатор, округление до 0.5кг
+    return Math.round(range.min * mult * 2) / 2;
 }
 
 // ─── RPE-фидбэк (после каждого упражнения, опционально) ───────────────
@@ -948,6 +966,7 @@ function initAdminTab() {
         initAdminClientsControls();
         initClientCardTabs();
         initExerciseEditor();
+        initBlockModal();
     }
 }
 
@@ -1468,25 +1487,38 @@ async function loadClientProgram(sheetName) {
     }
 }
 
-// Префикс «СЕТ:» в названии означает первый элемент суперсета (следующее упражнение — пара).
+// Префикс «СЕТ:» — суперсет (2 упражнения подряд).
+// Префикс «ТРИСЕТ:» — трисет (3 упражнения подряд).
 function isSupersetStart(ex) {
     var name = (ex && ex.exercise ? ex.exercise : '').toString().trim();
     return /^сет\s*:/i.test(name);
 }
 
+function isTrisetStart(ex) {
+    var name = (ex && ex.exercise ? ex.exercise : '').toString().trim();
+    return /^трисет\s*:/i.test(name);
+}
+
 function cleanExerciseName(name) {
-    return (name || '').toString().replace(/^\s*сет\s*:\s*/i, '').trim();
+    return (name || '').toString()
+        .replace(/^\s*трисет\s*:\s*/i, '')
+        .replace(/^\s*сет\s*:\s*/i, '')
+        .trim();
 }
 
 // Превращает плоский список упражнений в массив групп:
-// { type: 'single' | 'superset', exercises: [...], number: <номер для отображения> }
+// { type: 'single' | 'superset' | 'triset', exercises: [...], number: <номер для отображения> }
 function groupExercises(exercises) {
     var groups = [];
     var displayNum = 0;
     var i = 0;
     while (i < exercises.length) {
         var ex = exercises[i];
-        if (isSupersetStart(ex) && i + 1 < exercises.length) {
+        if (isTrisetStart(ex) && i + 2 < exercises.length) {
+            displayNum++;
+            groups.push({ type: 'triset', exercises: [exercises[i], exercises[i + 1], exercises[i + 2]], number: displayNum });
+            i += 3;
+        } else if (isSupersetStart(ex) && i + 1 < exercises.length) {
             displayNum++;
             groups.push({ type: 'superset', exercises: [exercises[i], exercises[i + 1]], number: displayNum });
             i += 2;
@@ -1633,10 +1665,26 @@ function renderClientProgram(data) {
     container.innerHTML = days.map(function(day, dayIdx) {
         var groups = groupExercises(day.exercises || []);
         var groupsHtml = groups.map(function(group) {
-            if (group.type === 'superset') {
-                // Для суперсета храним ОБА rowIndex через запятую — при drag перемещаются оба упражнения вместе
+            if (group.type === 'triset') {
                 var rowIdxs = group.exercises.map(function(ex) { return ex.rowIndex; }).filter(function(r) { return r; }).join(',');
-                return '<div class="cc-exercise cc-superset" data-row-indexes="' + rowIdxs + '">' +
+                return '<div class="cc-exercise cc-superset cc-triset" data-row-indexes="' + rowIdxs + '">' +
+                    '<div class="cc-drag-handle">⋮⋮</div>' +
+                    '<div class="cc-ex-num">' + group.number + '</div>' +
+                    '<div class="cc-ex-info">' +
+                        '<div class="cc-superset-header cc-triset-header">Трисет</div>' +
+                        '<div class="cc-superset-body">' +
+                            renderExerciseRow(group.exercises[0], 'A') +
+                            '<div class="cc-superset-divider"></div>' +
+                            renderExerciseRow(group.exercises[1], 'B') +
+                            '<div class="cc-superset-divider"></div>' +
+                            renderExerciseRow(group.exercises[2], 'C') +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }
+            if (group.type === 'superset') {
+                var rowIdxs2 = group.exercises.map(function(ex) { return ex.rowIndex; }).filter(function(r) { return r; }).join(',');
+                return '<div class="cc-exercise cc-superset" data-row-indexes="' + rowIdxs2 + '">' +
                     '<div class="cc-drag-handle">⋮⋮</div>' +
                     '<div class="cc-ex-num">' + group.number + '</div>' +
                     '<div class="cc-ex-info">' +
@@ -1666,7 +1714,7 @@ function renderClientProgram(data) {
             '<div class="cc-day-exercises" data-day-name="' + safeDay + '">' +
                 (groupsHtml || '<div class="no-data">Нет упражнений</div>') +
             '</div>' +
-            '<button class="cc-add-ex-btn" onclick="openAddExerciseModal(\'' + safeDay + '\')">+ Добавить упражнение</button>' +
+            '<button class="cc-add-ex-btn" onclick="showAddTypeDialog(\'' + safeDay + '\')">+ Добавить упражнение</button>' +
         '</div>';
     }).join('');
 
@@ -2116,6 +2164,163 @@ function selectExerciseFromLibrary(name) {
     if (input) input.value = name;
     closeExerciseLibrary();
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+}
+
+// ========== ДОБАВЛЕНИЕ БЛОКА (суперсет / трисет) ==========
+
+var currentBlockType = 'superset';
+var currentBlockDay = '';
+
+// При нажатии «+ Добавить упражнение» — диалог выбора типа
+function showAddTypeDialog(dayName) {
+    if (!currentClientCard) return;
+    // Telegram showPopup (если доступен) — нативный диалог с кнопками
+    if (tg && typeof tg.showPopup === 'function') {
+        try {
+            tg.showPopup({
+                title: 'Что добавить?',
+                message: dayName ? ('В день: ' + dayName) : '',
+                buttons: [
+                    { id: 'single',   type: 'default', text: '🏋️ Упражнение' },
+                    { id: 'superset', type: 'default', text: '🔗 Суперсет (2)' },
+                    { id: 'triset',   type: 'default', text: '🔗 Трисет (3)' },
+                    { type: 'cancel' }
+                ]
+            }, function(id) {
+                if (id === 'single')   openAddExerciseModal(dayName);
+                else if (id === 'superset') openBlockModal(dayName, 'superset');
+                else if (id === 'triset')   openBlockModal(dayName, 'triset');
+            });
+            return;
+        } catch (_) { /* fallback ниже */ }
+    }
+    // Fallback на простой prompt
+    var choice = prompt('Что добавить?\n1 — Упражнение\n2 — Суперсет (2)\n3 — Трисет (3)', '1');
+    if (choice === '1') openAddExerciseModal(dayName);
+    else if (choice === '2') openBlockModal(dayName, 'superset');
+    else if (choice === '3') openBlockModal(dayName, 'triset');
+}
+
+function openBlockModal(dayName, type) {
+    currentBlockType = type;
+    currentBlockDay = dayName || '';
+    var count = type === 'triset' ? 3 : 2;
+    var title = type === 'triset' ? '+ Новый трисет (3 упр.)' : '+ Новый суперсет (2 упр.)';
+    document.getElementById('ex-block-title').textContent = title + (dayName ? ' · ' + dayName : '');
+
+    // Рендерим N секций
+    var html = '';
+    for (var i = 0; i < count; i++) {
+        var label = String.fromCharCode(65 + i); // A, B, C
+        html +=
+            '<div class="ex-block-section" data-block-idx="' + i + '">' +
+                '<div class="ex-block-section-title">' + label + ' — упражнение ' + (i + 1) + '</div>' +
+                '<div class="ex-editor-field">' +
+                    '<label class="ex-editor-label">Название</label>' +
+                    '<input type="text" class="ex-editor-input ex-block-name" data-idx="' + i + '" placeholder="Например: Жим штанги лёжа">' +
+                '</div>' +
+                '<div class="ex-editor-row">' +
+                    '<div class="ex-editor-field">' +
+                        '<label class="ex-editor-label">Вес</label>' +
+                        '<input type="text" class="ex-editor-input ex-block-weight" data-idx="' + i + '" placeholder="60 или 60-70">' +
+                    '</div>' +
+                    '<div class="ex-editor-field">' +
+                        '<label class="ex-editor-label">Повторы</label>' +
+                        '<input type="text" class="ex-editor-input ex-block-reps" data-idx="' + i + '" placeholder="8 или 8-10">' +
+                    '</div>' +
+                '</div>' +
+                '<div class="ex-editor-row">' +
+                    '<div class="ex-editor-field">' +
+                        '<label class="ex-editor-label">Подходы</label>' +
+                        '<input type="number" inputmode="numeric" class="ex-editor-input ex-block-sets" data-idx="' + i + '" placeholder="4" value="4">' +
+                    '</div>' +
+                    '<div class="ex-editor-field">' +
+                        '<label class="ex-editor-label">Target RPE</label>' +
+                        '<input type="number" inputmode="decimal" step="0.5" min="1" max="10" class="ex-editor-input ex-block-rpe" data-idx="' + i + '" placeholder="8" value="8">' +
+                    '</div>' +
+                '</div>' +
+                '<div class="ex-editor-field">' +
+                    '<label class="ex-editor-label">Заметка тренера</label>' +
+                    '<textarea class="ex-editor-textarea ex-block-note" data-idx="' + i + '" rows="1" placeholder="(опционально)"></textarea>' +
+                '</div>' +
+            '</div>';
+    }
+    document.getElementById('ex-block-body').innerHTML = html;
+    document.getElementById('ex-block-modal').classList.remove('hidden');
+}
+
+function closeBlockModal() {
+    document.getElementById('ex-block-modal').classList.add('hidden');
+}
+
+async function saveBlock() {
+    if (!currentClientCard) return;
+    var saveBtn = document.getElementById('ex-block-save-btn');
+    var origText = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳ Добавление...';
+
+    // Собираем все секции
+    var sections = document.querySelectorAll('#ex-block-body .ex-block-section');
+    var exercises = [];
+    for (var i = 0; i < sections.length; i++) {
+        var s = sections[i];
+        var name = s.querySelector('.ex-block-name').value.trim();
+        if (!name) {
+            tg.showAlert('Заполни название упражнения ' + String.fromCharCode(65 + i));
+            saveBtn.disabled = false;
+            saveBtn.textContent = origText;
+            return;
+        }
+        // Префикс «СЕТ:» / «ТРИСЕТ:» только у первого
+        if (i === 0) {
+            var prefix = currentBlockType === 'triset' ? 'ТРИСЕТ: ' : 'СЕТ: ';
+            name = prefix + name;
+        }
+        exercises.push({
+            exercise: name,
+            weightPlan: s.querySelector('.ex-block-weight').value.trim(),
+            reps: s.querySelector('.ex-block-reps').value.trim(),
+            sets: s.querySelector('.ex-block-sets').value.trim(),
+            rpe: s.querySelector('.ex-block-rpe').value.trim(),
+            note: s.querySelector('.ex-block-note').value.trim()
+        });
+    }
+
+    try {
+        var url = APPS_SCRIPT_URL +
+            '?action=addClientExercises&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&dayName=' + encodeURIComponent(currentBlockDay);
+        var resp = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify({ exercises: exercises })
+        });
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            saveBtn.disabled = false;
+            saveBtn.textContent = origText;
+            return;
+        }
+        saveBtn.textContent = '✅ Добавлено';
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadClientProgram(currentClientCard.sheetName);
+        setTimeout(function() {
+            closeBlockModal();
+            saveBtn.disabled = false;
+            saveBtn.textContent = origText;
+        }, 400);
+    } catch (error) {
+        console.error('Save block error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+        saveBtn.disabled = false;
+        saveBtn.textContent = origText;
+    }
+}
+
+function initBlockModal() {
+    var saveBtn = document.getElementById('ex-block-save-btn');
+    if (saveBtn) saveBtn.addEventListener('click', saveBlock);
 }
 
 // ========== MEASUREMENTS TAB ==========
