@@ -1794,6 +1794,8 @@ async function handleDayReorder(container) {
 var currentEditingRow = null;
 var currentEditingMode = 'edit'; // 'edit' | 'add'
 var currentAddDay = '';          // используется в режиме 'add'
+var currentSetType = 'single';   // 'single' | 'superset' | 'triset' (только в режиме add)
+var activeNameInputId = 'ex-edit-name'; // какое поле «Название» сейчас активно для библиотеки
 
 function openExerciseEditor(rowIndex) {
     var ex = currentProgramExercisesByRow[rowIndex];
@@ -1801,6 +1803,13 @@ function openExerciseEditor(rowIndex) {
     currentEditingRow = rowIndex;
     currentEditingMode = 'edit';
     currentAddDay = '';
+    currentSetType = 'single';
+
+    // Скрываем переключатель типа и блоки B/C при редактировании одного упражнения
+    document.getElementById('ex-type-switch').classList.add('hidden');
+    document.getElementById('ex-block-B').classList.add('hidden');
+    document.getElementById('ex-block-C').classList.add('hidden');
+    document.getElementById('ex-block-A-title').classList.add('hidden');
 
     document.getElementById('ex-editor-title').textContent = cleanExerciseName(ex.exercise) || 'Упражнение';
     document.getElementById('ex-edit-name').value = cleanExerciseName(ex.exercise) || '';
@@ -1837,14 +1846,25 @@ function openExerciseEditor(rowIndex) {
     loadExerciseLibrary(); // фоном — потом откроется быстро по фокусу
 }
 
-// Открыть модалку для ДОБАВЛЕНИЯ нового упражнения в указанный день
+// Открыть модалку для ДОБАВЛЕНИЯ нового упражнения / суперсета / трисета в указанный день
 function openAddExerciseModal(dayName) {
     if (!currentClientCard) return;
     currentEditingRow = null;
     currentEditingMode = 'add';
     currentAddDay = dayName || '';
+    currentSetType = 'single';
 
     document.getElementById('ex-editor-title').textContent = '+ Новое упражнение' + (dayName ? ' · ' + dayName : '');
+
+    // Скрываем переключатель типа и блоки B/C — для одиночного режима они не нужны
+    // (для суперсета/трисета используется отдельная модалка #ex-block-modal через showAddTypeDialog)
+    var typeSwitch = document.getElementById('ex-type-switch'); if (typeSwitch) typeSwitch.classList.add('hidden');
+    var bB = document.getElementById('ex-block-B'); if (bB) bB.classList.add('hidden');
+    var bC = document.getElementById('ex-block-C'); if (bC) bC.classList.add('hidden');
+    var tA = document.getElementById('ex-block-A-title'); if (tA) tA.classList.add('hidden');
+    currentSetType = 'single';
+
+    // Очищаем поля (блок A — единственный в одиночном режиме)
     document.getElementById('ex-edit-name').value = '';
     document.getElementById('ex-edit-weight').value = '';
     document.getElementById('ex-edit-reps').value = '';
@@ -1852,32 +1872,66 @@ function openAddExerciseModal(dayName) {
     document.getElementById('ex-edit-rpe').value = '8';
     document.getElementById('ex-edit-note').value = '';
 
-    // Скрываем кнопку «Удалить» в режиме добавления
+    // Скрываем кнопку «Удалить» и подсказку фактов
     var delBtn = document.getElementById('ex-edit-delete-btn');
     if (delBtn) delBtn.classList.add('hidden');
     var saveBtn = document.getElementById('ex-edit-save-btn');
     if (saveBtn) saveBtn.textContent = '➕ Добавить';
-
-    // Скрываем подсказку про факт (для нового упражнения её нет)
     var hint = document.getElementById('ex-edit-history-hint');
     hint.textContent = '';
     hint.classList.add('hidden');
 
     document.getElementById('ex-editor-modal').classList.remove('hidden');
 
-    // Готовим библиотеку и фильтр "Этот день" — но для добавления у нас __dayName ещё нет в currentProgramExercisesByRow
-    // Создадим фейковый ex для рендера табов мышц
+    // Готовим библиотеку
     libraryFilterMuscle = 'day';
     librarySearchText = '';
-    // Подсунем дань через специальный поинт: храним последнее значение в currentAddDay,
-    // а renderLibraryTabs будет смотреть либо currentEditingRow, либо currentAddDay.
+    activeNameInputId = 'ex-edit-name';
     closeExerciseLibrary();
     loadExerciseLibrary();
-    // Сразу откроем библиотеку — в режиме добавления это удобно
     setTimeout(function() {
         var nameInput = document.getElementById('ex-edit-name');
         if (nameInput) nameInput.focus();
     }, 200);
+}
+
+// Переключение типа набора: single / superset / triset
+function setSetType(type) {
+    currentSetType = type;
+    var blockB = document.getElementById('ex-block-B');
+    var blockC = document.getElementById('ex-block-C');
+    var titleA = document.getElementById('ex-block-A-title');
+
+    if (type === 'single') {
+        blockB.classList.add('hidden');
+        blockC.classList.add('hidden');
+        titleA.classList.add('hidden');
+    } else if (type === 'superset') {
+        blockB.classList.remove('hidden');
+        blockC.classList.add('hidden');
+        titleA.classList.remove('hidden');
+    } else if (type === 'triset') {
+        blockB.classList.remove('hidden');
+        blockC.classList.remove('hidden');
+        titleA.classList.remove('hidden');
+    }
+
+    // Обновим визуально активную кнопку переключателя
+    document.querySelectorAll('.ex-type-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.setType === type);
+    });
+
+    // Закроем библиотеку если была открыта (контекст полей сменился)
+    closeExerciseLibrary();
+}
+
+function initSetTypeSwitch() {
+    document.querySelectorAll('.ex-type-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            setSetType(btn.dataset.setType);
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        });
+    });
 }
 
 function closeExerciseEditor() {
@@ -2006,17 +2060,21 @@ function initExerciseEditor() {
     if (saveBtn) saveBtn.addEventListener('click', saveExerciseEdit);
     if (delBtn) delBtn.addEventListener('click', deleteExerciseEdit);
 
-    // Поле "Название": фокус → открыть библиотеку, ввод → отфильтровать
-    var nameInput = document.getElementById('ex-edit-name');
-    if (nameInput) {
-        nameInput.addEventListener('focus', function() {
+    initSetTypeSwitch();
+
+    // Поля «Название» (A, B, C): фокус → открыть библиотеку, ввод → фильтр
+    document.querySelectorAll('.ex-name-field').forEach(function(input) {
+        input.addEventListener('focus', function() {
+            activeNameInputId = input.id;
             openExerciseLibrary();
         });
-        nameInput.addEventListener('input', function() {
-            librarySearchText = (nameInput.value || '').toLowerCase().trim();
+        input.addEventListener('input', function() {
+            // Активным считается тот, в кого вводят
+            activeNameInputId = input.id;
+            librarySearchText = (input.value || '').toLowerCase().trim();
             renderLibraryList();
         });
-    }
+    });
 }
 
 // ========== БИБЛИОТЕКА УПРАЖНЕНИЙ (Фаза 2B+) ==========
@@ -2069,9 +2127,22 @@ async function openExerciseLibrary() {
     var panel = document.getElementById('ex-library-panel');
     if (!panel) return;
     panel.classList.remove('hidden');
-    // НЕ берём текущее имя как поисковую строку — это мешает фильтрам по мышцам.
-    // Поиск активируется только когда пользователь сам что-то ВВОДИТ в инпут.
     librarySearchText = '';
+
+    // Показываем для какого блока сейчас выбираем (только если виден переключатель — режим add с супер/трисетом)
+    var ctx = document.getElementById('ex-library-context');
+    if (ctx) {
+        if (currentSetType !== 'single') {
+            var activeInput = document.getElementById(activeNameInputId);
+            var blockLabel = activeInput ? activeInput.dataset.block : '';
+            var label = blockLabel === 'A' ? 'А — первое' : (blockLabel === 'B' ? 'Б — второе' : 'В — третье');
+            ctx.textContent = 'Выбираешь для: ' + label;
+            ctx.classList.remove('hidden');
+        } else {
+            ctx.classList.add('hidden');
+        }
+    }
+
     if (!exerciseLibraryLoaded) {
         document.getElementById('ex-library-list').innerHTML = '<div class="ex-library-loading">Загрузка библиотеки...</div>';
         await loadExerciseLibrary();
@@ -2160,7 +2231,7 @@ function renderLibraryList() {
 }
 
 function selectExerciseFromLibrary(name) {
-    var input = document.getElementById('ex-edit-name');
+    var input = document.getElementById(activeNameInputId) || document.getElementById('ex-edit-name');
     if (input) input.value = name;
     closeExerciseLibrary();
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
