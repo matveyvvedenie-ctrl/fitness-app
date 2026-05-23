@@ -1422,6 +1422,9 @@ function openClientCard(chatId) {
     screen.classList.remove('hidden');
     document.body.classList.add('no-scroll');
 
+    // При смене клиента сбрасываем кэш истории
+    resetClientHistoryCache();
+
     // Сбросить на вкладку "Программа"
     switchClientCardTab('program');
     loadClientProgram(client.sheetName);
@@ -1442,6 +1445,11 @@ function switchClientCardTab(tabName) {
         content.classList.remove('active');
     });
     document.getElementById('cc-' + tabName + '-tab').classList.add('active');
+
+    // Лениво загружаем содержимое вкладки при первом открытии
+    if (tabName === 'history' && currentClientCard) {
+        loadClientHistory(currentClientCard.name);
+    }
 }
 
 function initClientCardTabs() {
@@ -1794,6 +1802,141 @@ async function handleDayReorder(container) {
         tg.showAlert('Ошибка соединения ❌');
         await loadClientProgram(currentClientCard.sheetName);
     }
+}
+
+// ========== ВКЛАДКА «ИСТОРИЯ» (Фаза 3) ==========
+
+// Кэш истории по имени клиента (на случай переключения вкладок туда-сюда)
+var clientHistoryCache = {};
+var clientHistoryLoadedFor = '';
+
+async function loadClientHistory(clientName) {
+    if (!clientName) return;
+    var container = document.getElementById('cc-history-container');
+    if (!container) return;
+
+    // Если уже грузили для этого клиента — просто перерендерим из кэша
+    if (clientHistoryLoadedFor === clientName && clientHistoryCache[clientName]) {
+        renderClientHistory(clientHistoryCache[clientName]);
+        return;
+    }
+
+    container.innerHTML = '<div class="no-data">Загрузка истории...</div>';
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getClientHistory' +
+            '&clientName=' + encodeURIComponent(clientName) +
+            '&limit=60';
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (data.error) {
+            container.innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
+            return;
+        }
+        clientHistoryCache[clientName] = data.history || [];
+        clientHistoryLoadedFor = clientName;
+        renderClientHistory(data.history || []);
+    } catch (error) {
+        console.error('Load history error:', error);
+        container.innerHTML = '<div class="no-data">Ошибка загрузки истории</div>';
+    }
+}
+
+// Названия дней недели для даты
+var WEEKDAYS_RU = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+var MONTHS_RU = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+
+function formatHistoryDate(displayDateStr, dateObj) {
+    // displayDateStr — «dd.MM.yyyy»; добавим день недели и месяц словом
+    try {
+        var d = new Date(dateObj);
+        var dayNum = d.getDate();
+        var month = MONTHS_RU[d.getMonth()];
+        var weekday = WEEKDAYS_RU[d.getDay()];
+        return dayNum + ' ' + month + ', ' + weekday;
+    } catch (_) { return displayDateStr; }
+}
+
+// «Дней назад»
+function daysAgoLabel(dateObj) {
+    var now = new Date();
+    var today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    var d = new Date(dateObj);
+    var d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    var days = Math.round((today0 - d0) / (24 * 60 * 60 * 1000));
+    if (days === 0) return 'сегодня';
+    if (days === 1) return 'вчера';
+    if (days < 7) return days + ' дн назад';
+    var weeks = Math.floor(days / 7);
+    if (weeks < 5) return weeks + ' нед назад';
+    var months = Math.floor(days / 30);
+    return months + ' мес назад';
+}
+
+function renderClientHistory(history) {
+    var container = document.getElementById('cc-history-container');
+    if (!container) return;
+    if (!history || history.length === 0) {
+        container.innerHTML = '<div class="no-data">📅 У клиента пока нет завершённых тренировок</div>';
+        return;
+    }
+
+    container.innerHTML = history.map(function(day, idx) {
+        var dateLabel = formatHistoryDate(day.date, day.dateObj);
+        var agoLabel = daysAgoLabel(day.dateObj);
+        var isOpen = idx === 0; // самая свежая открыта по умолчанию
+
+        // Группа по неделям/дням внутри одной даты — берём первую неделю и название дня (если есть)
+        var weekInfo = '';
+        if (day.exercises && day.exercises.length) {
+            var firstEx = day.exercises[0];
+            var parts = [];
+            if (firstEx.week) parts.push(firstEx.week);
+            if (firstEx.day) parts.push(firstEx.day);
+            if (parts.length) weekInfo = '<div class="hh-week">' + parts.join(' · ') + '</div>';
+        }
+
+        // Рендер упражнений
+        var exHtml = (day.exercises || []).map(function(ex) {
+            var fact = '';
+            if (ex.weightFact !== '' && ex.weightFact != null) {
+                fact = ex.weightFact + ' кг';
+                if (ex.repsFact !== '' && ex.repsFact != null) fact += ' × ' + ex.repsFact;
+            }
+            var rpe = (ex.rpe !== '' && ex.rpe != null) ? ' · RPE ' + ex.rpe : '';
+            var commentHtml = (ex.comment && ex.comment.toString().trim())
+                ? '<div class="hh-ex-comment">💬 ' + ex.comment + '</div>' : '';
+            var planText = '';
+            if (ex.weightPlan) {
+                planText = '<span class="hh-ex-plan">план: ' + ex.weightPlan + ' × ' + (ex.reps || '—') + '</span>';
+            }
+            return '<div class="hh-ex">' +
+                '<div class="hh-ex-name">' + cleanExerciseName(ex.exercise) + '</div>' +
+                '<div class="hh-ex-fact">' +
+                    (fact ? '<span class="hh-ex-fact-value">' + fact + '</span>' : '<span class="hh-ex-skipped">не выполнено</span>') +
+                    rpe +
+                '</div>' +
+                planText +
+                commentHtml +
+            '</div>';
+        }).join('');
+
+        return '<details class="hh-day"' + (isOpen ? ' open' : '') + '>' +
+            '<summary class="hh-day-summary">' +
+                '<div class="hh-day-head">' +
+                    '<div class="hh-date">📅 ' + dateLabel + '</div>' +
+                    '<div class="hh-ago">' + agoLabel + '</div>' +
+                '</div>' +
+                weekInfo +
+                '<div class="hh-count">' + day.exercises.length + ' упр.</div>' +
+            '</summary>' +
+            '<div class="hh-day-body">' + exHtml + '</div>' +
+        '</details>';
+    }).join('');
+}
+
+// При смене клиента — сбрасываем кэш истории
+function resetClientHistoryCache() {
+    clientHistoryLoadedFor = '';
 }
 
 // ========== РЕДАКТОР УПРАЖНЕНИЯ (Фаза 2B + 2C) ==========
