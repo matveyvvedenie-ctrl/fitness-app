@@ -1630,6 +1630,46 @@ body {
     align-items: flex-start;
 }
 
+/* Ручка для перетаскивания */
+.cc-drag-handle {
+    color: #bbb;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: grab;
+    user-select: none;
+    padding: 8px 4px 4px;
+    flex-shrink: 0;
+    letter-spacing: -2px;
+    touch-action: none;
+}
+
+.cc-drag-handle:active {
+    cursor: grabbing;
+    color: #555;
+}
+
+/* Состояния SortableJS */
+.cc-sortable-chosen {
+    background: #f0f4ff !important;
+    box-shadow: 0 6px 20px rgba(26,26,46,0.18) !important;
+    z-index: 100;
+}
+
+.cc-sortable-ghost {
+    opacity: 0.35;
+    background: #e8eaf6 !important;
+}
+
+.cc-sortable-drag {
+    opacity: 0.95;
+}
+
+.cc-day-exercises {
+    /* контейнер для драга — отдельных стилей не требуется, кроме мин-высоты */
+    min-height: 10px;
+}
+
 .cc-exercise:last-child { border-bottom: none; }
 
 .cc-ex-num {

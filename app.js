@@ -1634,7 +1634,10 @@ function renderClientProgram(data) {
         var groups = groupExercises(day.exercises || []);
         var groupsHtml = groups.map(function(group) {
             if (group.type === 'superset') {
-                return '<div class="cc-exercise cc-superset">' +
+                // Для суперсета храним ОБА rowIndex через запятую — при drag перемещаются оба упражнения вместе
+                var rowIdxs = group.exercises.map(function(ex) { return ex.rowIndex; }).filter(function(r) { return r; }).join(',');
+                return '<div class="cc-exercise cc-superset" data-row-indexes="' + rowIdxs + '">' +
+                    '<div class="cc-drag-handle">⋮⋮</div>' +
                     '<div class="cc-ex-num">' + group.number + '</div>' +
                     '<div class="cc-ex-info">' +
                         '<div class="cc-superset-header">Суперсет</div>' +
@@ -1647,7 +1650,9 @@ function renderClientProgram(data) {
                 '</div>';
             }
             // single
-            return '<div class="cc-exercise">' +
+            var singleRowIdx = group.exercises[0].rowIndex || '';
+            return '<div class="cc-exercise" data-row-indexes="' + singleRowIdx + '">' +
+                '<div class="cc-drag-handle">⋮⋮</div>' +
                 '<div class="cc-ex-num">' + group.number + '</div>' +
                 '<div class="cc-ex-info">' +
                     renderExerciseRow(group.exercises[0], '') +
@@ -1658,10 +1663,82 @@ function renderClientProgram(data) {
         var safeDay = (day.day || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return '<div class="cc-day-block">' +
             '<div class="cc-day-title">' + (day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
-            (groupsHtml || '<div class="no-data">Нет упражнений</div>') +
+            '<div class="cc-day-exercises" data-day-name="' + safeDay + '">' +
+                (groupsHtml || '<div class="no-data">Нет упражнений</div>') +
+            '</div>' +
             '<button class="cc-add-ex-btn" onclick="openAddExerciseModal(\'' + safeDay + '\')">+ Добавить упражнение</button>' +
         '</div>';
     }).join('');
+
+    // Инициализируем drag-and-drop для каждого дня (только внутри одного дня — перенос между днями отключён)
+    initDayDragDrop();
+}
+
+// ========== ПЕРЕТАСКИВАНИЕ УПРАЖНЕНИЙ (Фаза 2E) ==========
+
+var sortableInstances = [];
+
+function initDayDragDrop() {
+    if (typeof Sortable === 'undefined') {
+        console.warn('SortableJS not loaded');
+        return;
+    }
+    // Удалим старые инстансы перед перерендером
+    sortableInstances.forEach(function(s) { try { s.destroy(); } catch (_) {} });
+    sortableInstances = [];
+
+    document.querySelectorAll('.cc-day-exercises').forEach(function(container, dayIdx) {
+        var s = Sortable.create(container, {
+            group: 'day-' + dayIdx, // разные группы — нельзя перетаскивать между днями
+            animation: 180,
+            handle: '.cc-drag-handle',
+            chosenClass: 'cc-sortable-chosen',
+            ghostClass: 'cc-sortable-ghost',
+            dragClass: 'cc-sortable-drag',
+            forceFallback: true, // надёжнее на iOS
+            fallbackTolerance: 5,
+            onEnd: function(evt) {
+                if (evt.oldIndex === evt.newIndex) return; // ничего не изменилось
+                handleDayReorder(container);
+            }
+        });
+        sortableInstances.push(s);
+    });
+}
+
+async function handleDayReorder(container) {
+    if (!currentClientCard) return;
+
+    // Собираем новый порядок rowIndex'ов (для суперсетов — оба row подряд)
+    var rowIndexes = [];
+    container.querySelectorAll('[data-row-indexes]').forEach(function(el) {
+        var ids = (el.dataset.rowIndexes || '').split(',').map(function(s) { return parseInt(s.trim(), 10); }).filter(function(n) { return !isNaN(n); });
+        ids.forEach(function(n) { rowIndexes.push(n); });
+    });
+
+    if (rowIndexes.length === 0) return;
+
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+
+    try {
+        var url = APPS_SCRIPT_URL + '?action=reorderDayExercises' +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&order=' + encodeURIComponent(rowIndexes.join(','));
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Не удалось переставить: ' + (data.error || ''));
+            // Восстановим из бэка чтобы UI не врал
+            await loadClientProgram(currentClientCard.sheetName);
+            return;
+        }
+        // Перезагрузим — пересчитаются номера и rowIndex'ы
+        await loadClientProgram(currentClientCard.sheetName);
+    } catch (error) {
+        console.error('Reorder error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+        await loadClientProgram(currentClientCard.sheetName);
+    }
 }
 
 // ========== РЕДАКТОР УПРАЖНЕНИЯ (Фаза 2B + 2C) ==========
