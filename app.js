@@ -1429,6 +1429,7 @@ function openClientCard(chatId) {
     resetClientHistoryCache();
     notesLoadedFor = '';
     profileLoadedFor = '';
+    statsLoadedFor = '';
 
     // Сбросить на вкладку "Программа"
     switchClientCardTab('program');
@@ -1458,6 +1459,9 @@ function switchClientCardTab(tabName) {
     if (tabName === 'notes' && currentClientCard) {
         loadClientNotes(currentClientCard.name);
         loadClientProfile(currentClientCard.chatId);
+    }
+    if (tabName === 'stats' && currentClientCard) {
+        loadClientStats(currentClientCard.name, currentClientCard.chatId);
     }
 }
 
@@ -1965,6 +1969,316 @@ function renderClientHistory(history) {
 // При смене клиента — сбрасываем кэш истории
 function resetClientHistoryCache() {
     clientHistoryLoadedFor = '';
+}
+
+// ========== ВКЛАДКА «СТАТИСТИКА» (Фаза 5) ==========
+
+var statsLoadedFor = '';
+var statsWeightChart = null;
+var statsVolumeChart = null;
+var statsBodyWeights = []; // [{date, weight}]
+
+async function loadClientStats(clientName, chatId) {
+    if (!clientName) return;
+    if (statsLoadedFor === clientName) return; // уже посчитано
+
+    // Сначала убеждаемся что есть история (для PR/объёма/consistency)
+    if (clientHistoryLoadedFor !== clientName) {
+        await loadClientHistory(clientName);
+    }
+    // Также подгружаем замеры (для графика веса тела)
+    statsBodyWeights = [];
+    if (chatId) {
+        try {
+            var url = APPS_SCRIPT_URL + '?action=getMeasurements&chatId=' + encodeURIComponent(chatId);
+            var resp = await fetch(url);
+            var data = await resp.json();
+            if (data && data.measurements) {
+                statsBodyWeights = (data.measurements || [])
+                    .filter(function(m) { return m && m.weight != null && parseFloat(m.weight) > 0; })
+                    .map(function(m) {
+                        // m.date может быть «dd.MM.yyyy» — конвертируем в Date
+                        var d = _parseDateRu(m.date);
+                        return { dateLabel: m.date, dateObj: d ? d.getTime() : 0, weight: parseFloat(m.weight) };
+                    })
+                    .filter(function(x) { return x.dateObj > 0; })
+                    .sort(function(a, b) { return a.dateObj - b.dateObj; });
+            }
+        } catch (_) {}
+    }
+
+    statsLoadedFor = clientName;
+    renderClientStats();
+}
+
+function _parseDateRu(s) {
+    if (!s) return null;
+    var str = s.toString().trim();
+    if (str.indexOf('.') !== -1) {
+        var parts = str.split('.');
+        if (parts.length >= 3) {
+            return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+        }
+    }
+    var d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+function _isoWeekKey(d) {
+    // Возвращает 'yyyy-WW' (ISO week)
+    var tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    var dayNum = tmp.getUTCDay() || 7;
+    tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+    var yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+    var weekNo = Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
+    return tmp.getUTCFullYear() + '-W' + (weekNo < 10 ? '0' + weekNo : weekNo);
+}
+
+function renderClientStats() {
+    var history = (clientHistoryCache[currentClientCard.name] || []).slice();
+    var now = Date.now();
+    var msDay = 24 * 60 * 60 * 1000;
+
+    // ── 1. Регулярность за 4 недели ──
+    var period = 28 * msDay;
+    var datesIn4Weeks = {};
+    history.forEach(function(day) {
+        if (now - day.dateObj <= period) {
+            // Используем YYYY-MM-DD как ключ
+            var d = new Date(day.dateObj);
+            var k = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+            datesIn4Weeks[k] = true;
+        }
+    });
+    var actual = Object.keys(datesIn4Weeks).length;
+
+    // Ожидаемое: из анкеты freq × 4 (если есть), иначе средняя частота за всю историю
+    var expected = 0;
+    var freqField = document.getElementById('prof-frequency');
+    var freqVal = freqField ? parseInt(freqField.value, 10) : 0;
+    if (freqVal > 0) {
+        expected = freqVal * 4;
+    } else if (history.length > 0) {
+        // средняя за всю историю: уник дат / (диапазон в днях / 28)
+        var firstDate = history[history.length - 1].dateObj;
+        var spanDays = Math.max(1, (now - firstDate) / msDay);
+        // считаем уникальные даты во всей истории
+        var allDates = {};
+        history.forEach(function(day) {
+            var d = new Date(day.dateObj);
+            var k = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+            allDates[k] = true;
+        });
+        var avgPer28 = Object.keys(allDates).length / spanDays * 28;
+        expected = Math.max(8, Math.round(avgPer28)); // минимум 8 (≈ 2 раза в неделю)
+    } else {
+        expected = 12; // дефолт
+    }
+
+    var percent = expected > 0 ? Math.round(actual / expected * 100) : 0;
+    if (percent > 100) percent = 100;
+
+    document.getElementById('stats-consistency-percent').textContent = percent + '%';
+    var subTxt = actual + ' тренировок из ~' + expected + ' ожидаемых';
+    if (freqVal > 0) subTxt += ' (по анкете ' + freqVal + ' в неделю)';
+    document.getElementById('stats-consistency-sub').textContent = subTxt;
+    var fill = document.getElementById('stats-consistency-fill');
+    fill.style.width = Math.max(2, percent) + '%';
+    fill.className = 'stats-consistency-fill';
+    if (percent >= 85)      fill.classList.add('cc-fill-good');
+    else if (percent >= 60) fill.classList.add('cc-fill-mid');
+    else                    fill.classList.add('cc-fill-low');
+
+    // ── 2. Топ-3 рекорда ──
+    var bestByExercise = {};
+    history.forEach(function(day) {
+        day.exercises.forEach(function(ex) {
+            var name = cleanExerciseName(ex.exercise);
+            if (!name) return;
+            var w = parseFloat(ex.weightFact);
+            var r = parseFloat(ex.repsFact);
+            if (isNaN(w) || w <= 0) return;
+            var cur = bestByExercise[name];
+            if (!cur || w > cur.weight || (w === cur.weight && (r || 0) > (cur.reps || 0))) {
+                bestByExercise[name] = { weight: w, reps: r || 0, date: day.date };
+            }
+        });
+    });
+    var prs = Object.keys(bestByExercise).map(function(name) {
+        var b = bestByExercise[name];
+        return { name: name, weight: b.weight, reps: b.reps, date: b.date };
+    });
+    prs.sort(function(a, b) { return b.weight - a.weight; });
+    prs = prs.slice(0, 3);
+
+    var prsEl = document.getElementById('stats-prs-list');
+    if (prs.length === 0) {
+        prsEl.innerHTML = '<div class="no-data">Нет данных</div>';
+    } else {
+        prsEl.innerHTML = prs.map(function(pr, idx) {
+            var medal = ['🥇', '🥈', '🥉'][idx] || '🏅';
+            var repsTxt = pr.reps ? ' × ' + pr.reps : '';
+            return '<div class="stats-pr-row">' +
+                '<div class="stats-pr-medal">' + medal + '</div>' +
+                '<div class="stats-pr-info">' +
+                    '<div class="stats-pr-name">' + pr.name + '</div>' +
+                    '<div class="stats-pr-date">' + pr.date + '</div>' +
+                '</div>' +
+                '<div class="stats-pr-weight">' + pr.weight + ' кг' + repsTxt + '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // ── 3. График веса тела ──
+    var wEmpty = document.getElementById('stats-weight-empty');
+    var wCanvas = document.getElementById('stats-weight-chart');
+    if (statsWeightChart) { try { statsWeightChart.destroy(); } catch (_) {} statsWeightChart = null; }
+    if (statsBodyWeights.length < 2) {
+        wEmpty.classList.remove('hidden');
+        wCanvas.style.display = 'none';
+        if (statsBodyWeights.length === 1) {
+            wEmpty.textContent = 'Только один замер: ' + statsBodyWeights[0].weight + ' кг (' + statsBodyWeights[0].dateLabel + ')';
+        } else {
+            wEmpty.textContent = 'Клиент ещё не вносил замеры веса';
+        }
+    } else {
+        wEmpty.classList.add('hidden');
+        wCanvas.style.display = '';
+        statsWeightChart = new Chart(wCanvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: statsBodyWeights.map(function(x) { return x.dateLabel; }),
+                datasets: [{
+                    label: 'Вес',
+                    data: statsBodyWeights.map(function(x) { return x.weight; }),
+                    borderColor: '#1565C0',
+                    backgroundColor: 'rgba(21,101,192,0.10)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#1565C0',
+                    pointBorderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { ticks: { callback: function(v) { return v + ' кг'; } } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // ── 4. Объём по неделям ──
+    var volumeByWeek = {};   // 'YYYY-WW' → { volume, weekStart }
+    history.forEach(function(day) {
+        var d = new Date(day.dateObj);
+        var key = _isoWeekKey(d);
+        if (!volumeByWeek[key]) volumeByWeek[key] = { volume: 0, weekStart: d.getTime() };
+        else if (d.getTime() < volumeByWeek[key].weekStart) volumeByWeek[key].weekStart = d.getTime();
+        day.exercises.forEach(function(ex) {
+            var w = parseFloat(ex.weightFact) || 0;
+            var r = parseFloat(ex.repsFact) || 0;
+            var s = parseFloat(ex.sets) || 1;
+            if (w > 0 && r > 0) volumeByWeek[key].volume += w * r * s;
+        });
+    });
+    var volList = Object.keys(volumeByWeek).map(function(k) {
+        return { week: k, volume: Math.round(volumeByWeek[k].volume), start: volumeByWeek[k].weekStart };
+    });
+    volList.sort(function(a, b) { return a.start - b.start; });
+    volList = volList.slice(-12);
+
+    var vEmpty = document.getElementById('stats-volume-empty');
+    var vCanvas = document.getElementById('stats-volume-chart');
+    if (statsVolumeChart) { try { statsVolumeChart.destroy(); } catch (_) {} statsVolumeChart = null; }
+    if (volList.length === 0) {
+        vEmpty.classList.remove('hidden');
+        vCanvas.style.display = 'none';
+    } else {
+        vEmpty.classList.add('hidden');
+        vCanvas.style.display = '';
+        statsVolumeChart = new Chart(vCanvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: volList.map(function(v) {
+                    var d = new Date(v.start);
+                    return d.getDate() + '.' + (d.getMonth() + 1);
+                }),
+                datasets: [{
+                    label: 'Тоннаж',
+                    data: volList.map(function(v) { return v.volume; }),
+                    backgroundColor: 'rgba(67,160,71,0.65)',
+                    borderColor: '#43A047',
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx2) { return ctx2.parsed.y.toLocaleString('ru-RU') + ' кг'; }
+                        }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: function(v) { return (v / 1000).toFixed(1) + 'т'; } } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // ── 5. Прогресс по упражнениям (последние 30 vs предыдущие 30) ──
+    var thirty = 30 * msDay;
+    var sixty  = 60 * msDay;
+    var bestRecent = {}, bestPrev = {};
+    history.forEach(function(day) {
+        var age = now - day.dateObj;
+        day.exercises.forEach(function(ex) {
+            var name = cleanExerciseName(ex.exercise);
+            if (!name) return;
+            var w = parseFloat(ex.weightFact);
+            if (isNaN(w) || w <= 0) return;
+            if (age <= thirty) {
+                if (!bestRecent[name] || w > bestRecent[name]) bestRecent[name] = w;
+            } else if (age <= sixty) {
+                if (!bestPrev[name] || w > bestPrev[name]) bestPrev[name] = w;
+            }
+        });
+    });
+    var progress = Object.keys(bestRecent).filter(function(name) {
+        return bestPrev[name] != null;
+    }).map(function(name) {
+        return { name: name, recent: bestRecent[name], prev: bestPrev[name], gain: bestRecent[name] - bestPrev[name] };
+    });
+    progress.sort(function(a, b) { return b.gain - a.gain; });
+    progress = progress.slice(0, 5);
+
+    var progEl = document.getElementById('stats-progress-list');
+    if (progress.length === 0) {
+        progEl.innerHTML = '<div class="no-data">Недостаточно данных за два периода по 30 дней</div>';
+    } else {
+        progEl.innerHTML = progress.map(function(p) {
+            var sign = p.gain > 0 ? '+' : '';
+            var cls = p.gain > 0 ? 'stats-progress-up' : (p.gain < 0 ? 'stats-progress-down' : 'stats-progress-flat');
+            var arrow = p.gain > 0 ? '▲' : (p.gain < 0 ? '▼' : '◆');
+            return '<div class="stats-progress-row">' +
+                '<div class="stats-progress-name">' + p.name + '</div>' +
+                '<div class="stats-progress-values">' +
+                    '<span class="stats-progress-prev">' + p.prev + ' кг</span> → ' +
+                    '<strong>' + p.recent + ' кг</strong>' +
+                '</div>' +
+                '<div class="stats-progress-gain ' + cls + '">' + arrow + ' ' + sign + p.gain.toFixed(1) + ' кг</div>' +
+            '</div>';
+        }).join('');
+    }
 }
 
 // ========== ВКЛАДКА «ЗАМЕТКИ» (Фаза 4) ==========

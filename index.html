@@ -354,9 +354,59 @@
             </div>
         </div>
 
-        <!-- Вкладка: Статистика (заглушка) -->
+        <!-- Вкладка: Статистика -->
         <div id="cc-stats-tab" class="cc-tab-content">
-            <div class="no-data">📊 Графики и статистика появятся в следующей фазе</div>
+            <div class="stats-grid">
+
+                <!-- 1. Регулярность за 4 недели -->
+                <div class="stats-card stats-card-consistency">
+                    <div class="stats-card-title">📅 Регулярность</div>
+                    <div class="stats-big-value" id="stats-consistency-percent">—</div>
+                    <div class="stats-big-sub" id="stats-consistency-sub">за последние 4 недели</div>
+                    <div class="stats-consistency-bar"><div class="stats-consistency-fill" id="stats-consistency-fill"></div></div>
+                </div>
+
+                <!-- 2. Топ-3 рекорда -->
+                <div class="stats-card stats-card-prs">
+                    <div class="stats-card-title">🏆 Топ-3 рекорда</div>
+                    <div class="stats-prs-list" id="stats-prs-list">
+                        <div class="no-data">—</div>
+                    </div>
+                </div>
+
+                <!-- 3. График веса тела -->
+                <div class="stats-card stats-card-bodyweight">
+                    <div class="stats-card-title">⚖️ Вес тела</div>
+                    <div class="stats-chart-wrap" style="height:180px;">
+                        <canvas id="stats-weight-chart"></canvas>
+                    </div>
+                    <div class="stats-empty hidden" id="stats-weight-empty">
+                        Клиент ещё не вносил замеры веса
+                    </div>
+                </div>
+
+                <!-- 4. Объём тренировок по неделям -->
+                <div class="stats-card stats-card-volume">
+                    <div class="stats-card-title">📊 Объём по неделям</div>
+                    <div class="stats-card-hint">тоннаж = вес × повторы × подходы</div>
+                    <div class="stats-chart-wrap" style="height:180px;">
+                        <canvas id="stats-volume-chart"></canvas>
+                    </div>
+                    <div class="stats-empty hidden" id="stats-volume-empty">
+                        Пока нет фактов тренировок
+                    </div>
+                </div>
+
+                <!-- 5. Прогресс по упражнениям -->
+                <div class="stats-card stats-card-progress">
+                    <div class="stats-card-title">💪 Прогресс за месяц</div>
+                    <div class="stats-card-hint">прирост лучшего веса (за последние 30 дней vs предыдущие 30)</div>
+                    <div class="stats-progress-list" id="stats-progress-list">
+                        <div class="no-data">—</div>
+                    </div>
+                </div>
+
+            </div>
         </div>
 
         <!-- Вкладка: Заметки тренера + Анкета клиента -->

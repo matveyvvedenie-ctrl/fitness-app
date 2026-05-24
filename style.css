@@ -2105,6 +2105,180 @@ body {
     }
 }
 
+/* ===== ВКЛАДКА «СТАТИСТИКА» В КАРТОЧКЕ КЛИЕНТА ===== */
+
+.cc-tab-content .stats-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.stats-card {
+    background: white;
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.stats-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 4px;
+}
+
+.stats-card-hint {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 10px;
+}
+
+.stats-big-value {
+    font-size: 38px;
+    font-weight: 800;
+    color: #1a1a2e;
+    line-height: 1;
+    margin: 6px 0 4px;
+}
+
+.stats-big-sub {
+    font-size: 12px;
+    color: #777;
+    margin-bottom: 10px;
+}
+
+.stats-consistency-bar {
+    height: 8px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.stats-consistency-fill {
+    height: 100%;
+    transition: width 0.5s ease;
+    border-radius: 4px;
+}
+
+.stats-consistency-fill.cc-fill-good { background: #43A047; }
+.stats-consistency-fill.cc-fill-mid  { background: #FB8C00; }
+.stats-consistency-fill.cc-fill-low  { background: #E53935; }
+
+.stats-prs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.stats-pr-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: linear-gradient(135deg, #FFF8E1, #ffffff);
+    border-left: 4px solid #FFC107;
+    border-radius: 8px;
+}
+
+.stats-pr-medal {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.stats-pr-info { flex: 1; min-width: 0; }
+
+.stats-pr-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.2;
+}
+
+.stats-pr-date {
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.stats-pr-weight {
+    font-size: 14px;
+    font-weight: 800;
+    color: #BF360C;
+    white-space: nowrap;
+}
+
+.stats-chart-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.stats-empty {
+    padding: 20px 10px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+    font-style: italic;
+}
+
+.stats-progress-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.stats-progress-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    background: #fafafa;
+    border-radius: 8px;
+}
+
+.stats-progress-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a1a;
+    grid-column: 1 / -1;
+    line-height: 1.2;
+}
+
+.stats-progress-values {
+    font-size: 12px;
+    color: #555;
+}
+
+.stats-progress-prev {
+    color: #999;
+    text-decoration: line-through;
+}
+
+.stats-progress-gain {
+    font-size: 12px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 8px;
+    text-align: right;
+}
+
+.stats-progress-up   { background: #E8F5E9; color: #2E7D32; }
+.stats-progress-down { background: #FFEBEE; color: #C62828; }
+.stats-progress-flat { background: #ECEFF1; color: #455A64; }
+
+/* На десктопе делаем сетку 2 колонки */
+@media (min-width: 900px) {
+    .cc-tab-content .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    .stats-card-bodyweight,
+    .stats-card-volume {
+        grid-column: 1 / -1;
+    }
+}
+
 /* ===== ВКЛАДКА «ЗАМЕТКИ» В КАРТОЧКЕ КЛИЕНТА ===== */
 
 .notes-new-card, .notes-list-section {
