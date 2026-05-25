@@ -652,12 +652,10 @@ function renderHome() {
     }
     document.getElementById('home-subtitle').textContent = subtitle;
 
-    // Номер недели
-    var weekNum = (weekTitle || '').replace(/^Неделя\s+/i, '').trim() || (weekTitle || '—');
-    document.getElementById('home-week-num').textContent = weekNum;
+    // Заголовок недели — показываем как есть (например «Месяц 2 Неделя 3»)
+    document.getElementById('home-week-num').textContent = (weekTitle || '—').toString();
 
-    // Кружки по дням: только реальные тренировочные дни (с упражнениями).
-    // Строки-разделители (📝 заметки, 🍽️ питание, 📊 план и т.п.) пропускаем.
+    // Карточки по дням: только реальные тренировочные дни (с упражнениями).
     var dotsContainer = document.getElementById('home-week-dots');
     dotsContainer.innerHTML = '';
     var trainingDays = workoutData.filter(function(d) {
@@ -672,14 +670,16 @@ function renderHome() {
         });
         var dot = document.createElement('div');
         dot.className = 'home-dot';
-        if (total > 0 && done >= total) { dot.classList.add('full'); doneDays++; }
-        else if (done > 0) dot.classList.add('partial');
-        // Метка кружка: первые 2 буквы названия дня без эмодзи и пробелов
+        var status = '○'; // не начато
+        if (total > 0 && done >= total) { dot.classList.add('full'); doneDays++; status = '✓'; }
+        else if (done > 0) { dot.classList.add('partial'); status = '⏳'; }
+        // Метка: первые 2 буквы названия дня без эмодзи
         var label = (day.day || '').toString()
-            .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '') // убираем эмодзи
+            .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
             .trim().substring(0, 2);
         dot.title = day.day + ': ' + done + '/' + total;
-        dot.textContent = label || '?';
+        dot.innerHTML = '<span class="home-dot-day">' + (label || '?') + '</span>' +
+                        '<span class="home-dot-status">' + status + '</span>';
         dotsContainer.appendChild(dot);
     });
 
