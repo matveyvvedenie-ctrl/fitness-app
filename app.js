@@ -2708,6 +2708,7 @@ function renderExerciseStats(clientName, exerciseName) {
 var currentEditingRow = null;
 var currentEditingMode = 'edit'; // 'edit' | 'add'
 var currentAddDay = '';          // используется в режиме 'add'
+var currentEditingPrefix = '';   // 'СЕТ: ' / 'ТРИСЕТ: ' / '' — чтобы не потерять при сохранении
 var currentSetType = 'single';   // 'single' | 'superset' | 'triset' (только в режиме add)
 var activeNameInputId = 'ex-edit-name'; // какое поле «Название» сейчас активно для библиотеки
 
@@ -2718,6 +2719,12 @@ function openExerciseEditor(rowIndex) {
     currentEditingMode = 'edit';
     currentAddDay = '';
     currentSetType = 'single';
+
+    // Запоминаем префикс «СЕТ:»/«ТРИСЕТ:» — чтобы при сохранении не разрушить связку
+    var rawName = (ex.exercise || '').toString();
+    if (/^\s*трисет\s*:/i.test(rawName)) currentEditingPrefix = 'ТРИСЕТ: ';
+    else if (/^\s*сет\s*:/i.test(rawName)) currentEditingPrefix = 'СЕТ: ';
+    else currentEditingPrefix = '';
 
     // Скрываем переключатель типа и блоки B/C при редактировании одного упражнения
     document.getElementById('ex-type-switch').classList.add('hidden');
@@ -2739,17 +2746,15 @@ function openExerciseEditor(rowIndex) {
     var saveBtn = document.getElementById('ex-edit-save-btn');
     if (saveBtn) saveBtn.textContent = '💾 Сохранить';
 
-    // Подсказка про последний факт
-    var hint = document.getElementById('ex-edit-history-hint');
-    var done = (ex.weightFact !== '' && ex.weightFact != null && ex.weightFact !== 0)
-        || (ex.repsFact !== '' && ex.repsFact != null && ex.repsFact !== 0);
-    if (done) {
-        hint.textContent = 'Последний факт клиента: ' + (ex.weightFact || '—') + ' кг × ' + (ex.repsFact || '—');
-        hint.classList.remove('hidden');
-    } else {
-        hint.textContent = '';
-        hint.classList.add('hidden');
-    }
+    // Подсказка «Последний раз» — сначала покажем из текущей программы, потом обогатим данными из истории
+    showLastResultHint({
+        weightFact: ex.weightFact,
+        repsFact: ex.repsFact,
+        rpe: ex.rpe,
+        date: '' // в текущей программе нет даты
+    });
+    // Параллельно запрашиваем самое свежее из истории (если упражнение не пустое)
+    loadAndShowLastResult(cleanExerciseName(ex.exercise));
 
     document.getElementById('ex-editor-modal').classList.remove('hidden');
 
@@ -2760,6 +2765,50 @@ function openExerciseEditor(rowIndex) {
     loadExerciseLibrary(); // фоном — потом откроется быстро по фокусу
 }
 
+// Показать подсказку «Последний раз» с переданными значениями
+function showLastResultHint(data) {
+    var hint = document.getElementById('ex-edit-history-hint');
+    if (!hint) return;
+    var w = data.weightFact, r = data.repsFact, rpe = data.rpe;
+    var hasFact = (w !== '' && w != null && w !== 0) || (r !== '' && r != null && r !== 0);
+    if (!hasFact) {
+        hint.textContent = '';
+        hint.classList.add('hidden');
+        return;
+    }
+    var parts = [];
+    if (w) parts.push(w + ' кг');
+    if (r) parts.push('× ' + r);
+    if (rpe) parts.push('RPE ' + rpe);
+    if (data.feedback && data.feedback.label) {
+        parts.push(data.feedback.emoji + ' ' + data.feedback.label);
+    }
+    var dateTxt = data.date ? ' (' + data.date + ')' : '';
+    hint.textContent = 'Последний раз: ' + parts.join(' · ') + dateTxt;
+    hint.classList.remove('hidden');
+}
+
+// Загрузить последний результат клиента по упражнению и показать в подсказке
+async function loadAndShowLastResult(exerciseName) {
+    if (!currentClientCard || !exerciseName) return;
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getLastExerciseResult' +
+            '&clientName=' + encodeURIComponent(currentClientCard.name) +
+            '&exerciseName=' + encodeURIComponent(exerciseName);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (data && !data.empty) {
+            showLastResultHint({
+                weightFact: data.weightFact,
+                repsFact: data.repsFact,
+                rpe: data.rpe,
+                feedback: data.feedback,
+                date: data.date
+            });
+        }
+    } catch (_) {}
+}
+
 // Открыть модалку для ДОБАВЛЕНИЯ нового упражнения / суперсета / трисета в указанный день
 function openAddExerciseModal(dayName) {
     if (!currentClientCard) return;
@@ -2767,6 +2816,7 @@ function openAddExerciseModal(dayName) {
     currentEditingMode = 'add';
     currentAddDay = dayName || '';
     currentSetType = 'single';
+    currentEditingPrefix = '';
 
     document.getElementById('ex-editor-title').textContent = '+ Новое упражнение' + (dayName ? ' · ' + dayName : '');
 
@@ -2888,11 +2938,13 @@ async function saveExerciseEdit() {
             saveBtn.textContent = origText;
             return;
         }
+        // Восстанавливаем префикс «СЕТ:»/«ТРИСЕТ:» если упражнение было частью связки
+        var nameWithPrefix = currentEditingPrefix ? (currentEditingPrefix + nameVal) : nameVal;
         params = {
             action: 'updateClientExercise',
             sheetName: currentClientCard.sheetName,
             rowIndex: currentEditingRow,
-            exercise: nameVal,
+            exercise: nameWithPrefix,
             weightPlan: document.getElementById('ex-edit-weight').value.trim(),
             reps: document.getElementById('ex-edit-reps').value.trim(),
             sets: document.getElementById('ex-edit-sets').value.trim(),
@@ -2915,7 +2967,25 @@ async function saveExerciseEdit() {
         }
         saveBtn.textContent = currentEditingMode === 'add' ? '✅ Добавлено' : '✅ Сохранено';
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        await loadClientProgram(currentClientCard.sheetName);
+
+        if (currentEditingMode === 'edit') {
+            // Точечно обновляем DOM-узел этого упражнения, без перерендера всей программы
+            updateExerciseInDOM(currentEditingRow, params);
+            // Обновляем кэш currentProgramExercisesByRow чтобы при следующем открытии редактора были свежие данные
+            var cached = currentProgramExercisesByRow[currentEditingRow];
+            if (cached) {
+                cached.exercise = params.exercise;
+                cached.weightPlan = params.weightPlan;
+                cached.reps = params.reps;
+                cached.sets = params.sets;
+                cached.rpe = params.rpe;
+                cached.note = params.note;
+            }
+        } else {
+            // Для add — структура листа изменилась, перезагружаем программу
+            await loadClientProgram(currentClientCard.sheetName);
+        }
+
         setTimeout(function() {
             closeExerciseEditor();
             saveBtn.disabled = false;
@@ -2965,6 +3035,64 @@ async function deleteExerciseEdit() {
         tg.showAlert('Ошибка соединения ❌');
         delBtn.disabled = false;
         delBtn.textContent = origText;
+    }
+}
+
+// Точечно обновить значения упражнения в DOM без полного перерендера программы.
+// fields: { exercise, weightPlan, reps, sets, rpe, note } — все поля как в params для бэка.
+function updateExerciseInDOM(rowIndex, fields) {
+    if (!rowIndex) return;
+    // Находим кнопку ✏️ с этим rowIndex — оттуда поднимаемся к .cc-ex-row
+    var editBtn = document.querySelector('.cc-ex-edit-btn[onclick*="openExerciseEditor(' + rowIndex + ')"]');
+    if (!editBtn) return;
+    var row = editBtn.closest('.cc-ex-row');
+    if (!row) return;
+
+    // ── Имя ──
+    if (fields.exercise !== undefined) {
+        var nameEl = row.querySelector('.cc-ex-name');
+        if (nameEl) {
+            // Сохраняем bind-метку A/B/C если есть
+            var labelEl = nameEl.querySelector('.cc-ex-suplabel');
+            var labelHtml = labelEl ? labelEl.outerHTML : '';
+            nameEl.innerHTML = labelHtml + cleanExerciseName(fields.exercise);
+        }
+    }
+
+    // ── Ячейки Вес / Повт. / Подх. / RPE ──
+    var cells = row.querySelectorAll('.cc-ex-cell .cc-cell-value');
+    if (cells.length >= 4) {
+        if (fields.weightPlan !== undefined) {
+            var v = fields.weightPlan;
+            cells[0].textContent = (v !== '' && v != null ? v : '—') + ' кг';
+        }
+        if (fields.reps !== undefined) {
+            cells[1].textContent = (fields.reps !== '' && fields.reps != null) ? fields.reps : '—';
+        }
+        if (fields.sets !== undefined) {
+            cells[2].textContent = (fields.sets !== '' && fields.sets != null) ? fields.sets : '—';
+        }
+        if (fields.rpe !== undefined) {
+            cells[3].textContent = (fields.rpe !== '' && fields.rpe != null) ? fields.rpe : '—';
+        }
+    }
+
+    // ── Заметка ──
+    if (fields.note !== undefined) {
+        var existingNote = row.querySelector('.cc-ex-note');
+        var noteText = (fields.note || '').toString().trim();
+        if (noteText) {
+            if (existingNote) {
+                existingNote.textContent = noteText;
+            } else {
+                var noteDiv = document.createElement('div');
+                noteDiv.className = 'cc-ex-note';
+                noteDiv.textContent = noteText;
+                row.appendChild(noteDiv);
+            }
+        } else if (existingNote) {
+            existingNote.remove();
+        }
     }
 }
 
@@ -3149,6 +3277,10 @@ function selectExerciseFromLibrary(name) {
     if (input) input.value = name;
     closeExerciseLibrary();
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    // После выбора упражнения — подгрузить «Последний раз» (только для главного поля A)
+    if (input && input.id === 'ex-edit-name') {
+        loadAndShowLastResult(name);
+    }
 }
 
 // ========== ДОБАВЛЕНИЕ БЛОКА (суперсет / трисет) ==========
