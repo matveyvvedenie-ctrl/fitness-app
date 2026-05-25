@@ -3094,16 +3094,46 @@ body {
 }
 
 .ex-editor-history-hint {
-    font-size: 12px;
+    font-size: 13px;
     color: #2E7D32;
     background: #e8f5e9;
-    padding: 8px 10px;
+    border-left: 3px solid #43A047;
+    padding: 9px 12px;
     border-radius: 8px;
     margin: 4px 0 12px;
     font-weight: 600;
+    line-height: 1.35;
+}
+
+.ex-editor-history-hint strong { color: #1B5E20; }
+
+.ex-editor-history-hint .ex-hint-feedback {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 8px;
+    font-weight: 700;
+    margin-left: 4px;
+    vertical-align: 1px;
 }
 
 .ex-editor-history-hint.hidden { display: none; }
+
+.ex-editor-history-hint.ex-hint-empty {
+    background: #f5f5f7;
+    border-left-color: #bdbdbd;
+    color: #666;
+    font-weight: 500;
+    font-style: italic;
+}
+
+.ex-editor-history-hint.ex-hint-loading {
+    background: #f5f5f7;
+    border-left-color: #bdbdbd;
+    color: #888;
+    font-weight: 500;
+    font-style: italic;
+}
 
 /* ── Выпадающая библиотека упражнений под полем «Название» ── */
 .ex-library-panel {

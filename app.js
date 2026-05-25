@@ -2932,29 +2932,79 @@ function showLastResultHint(data) {
         parts.push(data.feedback.emoji + ' ' + data.feedback.label);
     }
     var dateTxt = data.date ? ' (' + data.date + ')' : '';
-    hint.textContent = 'Последний раз: ' + parts.join(' · ') + dateTxt;
     hint.classList.remove('hidden');
+    hint.classList.remove('ex-hint-empty');
+    hint.classList.remove('ex-hint-loading');
+    hint.innerHTML = '💪 Последний раз: <strong>' + parts.join(' · ') + '</strong>' + dateTxt;
 }
 
-// Загрузить последний результат клиента по упражнению и показать в подсказке
-async function loadAndShowLastResult(exerciseName) {
-    if (!currentClientCard || !exerciseName) return;
-    try {
+// Сообщение «Это упражнение клиент ещё не выполнял»
+function showLastResultEmpty() {
+    var hint = document.getElementById('ex-edit-history-hint');
+    if (!hint) return;
+    hint.classList.remove('hidden');
+    hint.classList.remove('ex-hint-loading');
+    hint.classList.add('ex-hint-empty');
+    hint.textContent = 'ℹ️ Это упражнение клиент ещё не выполнял';
+}
+
+function showLastResultLoading() {
+    var hint = document.getElementById('ex-edit-history-hint');
+    if (!hint) return;
+    hint.classList.remove('hidden');
+    hint.classList.remove('ex-hint-empty');
+    hint.classList.add('ex-hint-loading');
+    hint.textContent = '⏳ Ищу последний результат…';
+}
+
+// Кэш: clientName||exerciseName → result | 'empty'
+var lastResultCache = {};
+var lastResultDebounceTimer = null;
+
+// Главная функция: подгружает и показывает последний результат клиента по упражнению.
+// Вызывается при открытии редактора, при выборе из библиотеки, при ручном вводе названия.
+function loadAndShowLastResult(exerciseName) {
+    if (!currentClientCard) return;
+    var name = (exerciseName || '').toString().trim();
+    var hint = document.getElementById('ex-edit-history-hint');
+    if (!name) {
+        hint.textContent = '';
+        hint.classList.add('hidden');
+        return;
+    }
+    var key = currentClientCard.name + '||' + name;
+    if (lastResultCache[key] !== undefined) {
+        var cached = lastResultCache[key];
+        if (cached === 'empty') showLastResultEmpty();
+        else showLastResultHint(cached);
+        return;
+    }
+
+    showLastResultLoading();
+    if (lastResultDebounceTimer) clearTimeout(lastResultDebounceTimer);
+    lastResultDebounceTimer = setTimeout(function() {
         var url = APPS_SCRIPT_URL + '?action=getLastExerciseResult' +
             '&clientName=' + encodeURIComponent(currentClientCard.name) +
-            '&exerciseName=' + encodeURIComponent(exerciseName);
-        var resp = await fetch(url);
-        var data = await resp.json();
-        if (data && !data.empty) {
-            showLastResultHint({
-                weightFact: data.weightFact,
-                repsFact: data.repsFact,
-                rpe: data.rpe,
-                feedback: data.feedback,
-                date: data.date
-            });
-        }
-    } catch (_) {}
+            '&exerciseName=' + encodeURIComponent(name);
+        fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+            if (data && !data.empty && !data.error) {
+                lastResultCache[key] = {
+                    weightFact: data.weightFact,
+                    repsFact: data.repsFact,
+                    rpe: data.rpe,
+                    feedback: data.feedback,
+                    date: data.date
+                };
+                showLastResultHint(lastResultCache[key]);
+            } else {
+                lastResultCache[key] = 'empty';
+                showLastResultEmpty();
+            }
+        }).catch(function() {
+            // Тихо — оставляем как есть
+            hint.classList.add('hidden');
+        });
+    }, 280);
 }
 
 // Открыть модалку для ДОБАВЛЕНИЯ нового упражнения / суперсета / трисета в указанный день
@@ -2984,7 +3034,7 @@ function openAddExerciseModal(dayName) {
     document.getElementById('ex-edit-rpe').value = '8';
     document.getElementById('ex-edit-note').value = '';
 
-    // Скрываем кнопку «Удалить» и подсказку фактов
+    // Скрываем кнопку «Удалить» и подсказку фактов (имя пустое — нечего показывать)
     var delBtn = document.getElementById('ex-edit-delete-btn');
     if (delBtn) delBtn.classList.add('hidden');
     var saveBtn = document.getElementById('ex-edit-save-btn');
@@ -2992,6 +3042,7 @@ function openAddExerciseModal(dayName) {
     var hint = document.getElementById('ex-edit-history-hint');
     hint.textContent = '';
     hint.classList.add('hidden');
+    hint.classList.remove('ex-hint-empty', 'ex-hint-loading');
 
     document.getElementById('ex-editor-modal').classList.remove('hidden');
 
@@ -3263,6 +3314,10 @@ function initExerciseEditor() {
             activeNameInputId = input.id;
             librarySearchText = (input.value || '').toLowerCase().trim();
             renderLibraryList();
+            // Для главного поля «Название» (блок A) — обновим подсказку с последним результатом
+            if (input.id === 'ex-edit-name') {
+                loadAndShowLastResult(input.value);
+            }
         });
     });
 }
