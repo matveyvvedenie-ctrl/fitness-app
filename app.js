@@ -1368,6 +1368,154 @@ function renderAdminClients() {
     }
 }
 
+// ========== МАСТЕР СОЗДАНИЯ НОВОГО КЛИЕНТА (Фаза 6) ==========
+
+var ncProgramType = 'empty'; // 'empty' | 'copy'
+
+function openNewClientWizard() {
+    // Сбросить все поля
+    document.getElementById('nc-name').value = '';
+    document.getElementById('nc-chatid').value = '';
+    document.querySelectorAll('input[name="nc-gender"]').forEach(function(el) { el.checked = false; });
+    document.getElementById('nc-age').value = '';
+    document.getElementById('nc-height').value = '';
+    document.getElementById('nc-weight').value = '';
+    document.getElementById('nc-goal').value = '';
+    document.getElementById('nc-level').value = '';
+    document.getElementById('nc-frequency').value = '';
+    document.querySelectorAll('.nc-limit-cb').forEach(function(cb) { cb.checked = false; });
+    document.getElementById('nc-limit-other').value = '';
+    document.getElementById('nc-inventory').value = '';
+    ncProgramType = 'empty';
+    selectProgramOption('empty');
+
+    // Показать
+    goToStep1();
+    document.getElementById('new-client-wizard').classList.remove('hidden');
+    document.body.classList.add('no-scroll');
+}
+
+function closeNewClientWizard() {
+    document.getElementById('new-client-wizard').classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+}
+
+function goToStep1() {
+    document.getElementById('nc-step-1').classList.add('active');
+    document.getElementById('nc-step-2').classList.remove('active');
+    document.getElementById('nc-step-meta').textContent = 'Шаг 1 из 2 — Анкета';
+}
+
+function goToStep2() {
+    // Минимальная валидация
+    var name = document.getElementById('nc-name').value.trim();
+    var chatId = document.getElementById('nc-chatid').value.trim();
+    if (!name) { tg.showAlert('Укажи имя клиента'); return; }
+    if (!chatId || !/^\d+$/.test(chatId)) { tg.showAlert('Укажи Telegram chat_id (число)'); return; }
+
+    // Заполнить список источников копирования (активные клиенты)
+    var sources = (adminClients || []).filter(function(c) { return !c.archived; });
+    var sel = document.getElementById('nc-source-select');
+    sel.innerHTML = '<option value="">— выбери клиента —</option>' + sources.map(function(c) {
+        return '<option value="' + (c.sheetName || '').replace(/"/g, '&quot;') + '">' + c.name + '</option>';
+    }).join('');
+
+    document.getElementById('nc-step-1').classList.remove('active');
+    document.getElementById('nc-step-2').classList.add('active');
+    document.getElementById('nc-step-meta').textContent = 'Шаг 2 из 2 — Программа';
+}
+
+function selectProgramOption(type) {
+    ncProgramType = type;
+    document.querySelectorAll('.nc-program-option').forEach(function(el) {
+        el.classList.toggle('selected', el.dataset.progType === type);
+    });
+    document.getElementById('nc-source-wrap').classList.toggle('hidden', type !== 'copy');
+}
+
+function _collectNewClientProfile() {
+    var gender = '';
+    var g = document.querySelector('input[name="nc-gender"]:checked');
+    if (g) gender = g.value;
+
+    var limits = [];
+    document.querySelectorAll('.nc-limit-cb').forEach(function(cb) {
+        if (cb.checked) limits.push(cb.value);
+    });
+    var other = (document.getElementById('nc-limit-other').value || '').trim();
+    if (other) other.split(',').forEach(function(s) {
+        var v = s.trim();
+        if (v) limits.push(v);
+    });
+
+    return {
+        name: document.getElementById('nc-name').value.trim(),
+        chatId: document.getElementById('nc-chatid').value.trim(),
+        gender: gender,
+        age: document.getElementById('nc-age').value.trim(),
+        height: document.getElementById('nc-height').value.trim(),
+        weight: document.getElementById('nc-weight').value.trim(),
+        goal: document.getElementById('nc-goal').value,
+        level: document.getElementById('nc-level').value,
+        frequency: document.getElementById('nc-frequency').value,
+        limitations: limits.join(','),
+        inventory: document.getElementById('nc-inventory').value
+    };
+}
+
+// Создаёт нового клиента (отправляет на бэк, открывает карточку при успехе).
+// Переопределяет глобальное имя — но window.createNewClient использует функцию ниже (в Apps Script роутере действие createNewClient).
+async function createNewClient() {
+    var btn = document.getElementById('nc-create-btn');
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Создание...';
+
+    var profile = _collectNewClientProfile();
+    var programOpts = { type: ncProgramType };
+    if (ncProgramType === 'copy') {
+        var src = document.getElementById('nc-source-select').value;
+        if (!src) {
+            tg.showAlert('Выбери клиента для копирования программы');
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+        programOpts.sourceSheetName = src;
+    }
+
+    try {
+        var qs = 'action=createNewClient' +
+            '&profile=' + encodeURIComponent(JSON.stringify(profile)) +
+            '&programOpts=' + encodeURIComponent(JSON.stringify(programOpts));
+        var resp = await fetch(APPS_SCRIPT_URL + '?' + qs);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        // Перезагружаем список клиентов
+        await loadAdminClients();
+        closeNewClientWizard();
+        btn.disabled = false;
+        btn.textContent = origText;
+        // Открыть карточку только что созданного клиента
+        var newC = (adminClients || []).find(function(c) { return c.chatId === data.chatId; });
+        if (newC) {
+            setTimeout(function() { openClientCard(data.chatId); }, 200);
+        }
+        tg.showAlert('✅ Клиент создан: ' + data.name);
+    } catch (e) {
+        console.error('Create client error:', e);
+        tg.showAlert('Ошибка соединения ❌');
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+
 // ========== АРХИВ КЛИЕНТОВ ==========
 
 async function toggleArchiveClient(chatId, archived) {

@@ -214,6 +214,11 @@
                 <div class="dashboard-date" id="dashboard-date"></div>
             </div>
 
+            <!-- Кнопка создания нового клиента -->
+            <button class="admin-new-client-btn" onclick="openNewClientWizard()">
+                + Новый клиент
+            </button>
+
             <!-- Сводные карточки по тренировкам -->
             <div class="admin-summary">
                 <div class="admin-summary-card">
@@ -304,6 +309,148 @@
                     </div>
                 </div>
             </details>
+        </div>
+    </div>
+
+    <!-- Мастер создания нового клиента (двухшаговый, поверх всего, только для тренера) -->
+    <div id="new-client-wizard" class="new-client-wizard hidden">
+        <div class="cc-header">
+            <button class="cc-back-btn" onclick="closeNewClientWizard()">←</button>
+            <div class="cc-header-text">
+                <div class="cc-header-name">+ Новый клиент</div>
+                <div class="cc-header-meta" id="nc-step-meta">Шаг 1 из 2 — Анкета</div>
+            </div>
+        </div>
+
+        <!-- ШАГ 1: Анкета -->
+        <div id="nc-step-1" class="nc-step active">
+            <div class="nc-section">
+                <div class="nc-section-title">Контакты</div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Имя клиента *</label>
+                    <input type="text" class="ex-editor-input" id="nc-name" placeholder="Например: Иван">
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Telegram chat_id *</label>
+                    <input type="text" inputmode="numeric" class="ex-editor-input" id="nc-chatid" placeholder="739299264">
+                    <div class="nc-hint">Спроси у клиента — он узнает через @userinfobot в Telegram</div>
+                </div>
+            </div>
+
+            <div class="nc-section">
+                <div class="nc-section-title">Параметры</div>
+                <div class="prof-field">
+                    <label>Пол</label>
+                    <div class="prof-radio-group">
+                        <label class="prof-radio"><input type="radio" name="nc-gender" value="male"><span>М</span></label>
+                        <label class="prof-radio"><input type="radio" name="nc-gender" value="female"><span>Ж</span></label>
+                    </div>
+                </div>
+                <div class="ex-editor-row">
+                    <div class="prof-field">
+                        <label>Возраст</label>
+                        <input type="number" inputmode="numeric" id="nc-age" class="prof-input" placeholder="25">
+                    </div>
+                    <div class="prof-field">
+                        <label>Рост, см</label>
+                        <input type="number" inputmode="numeric" id="nc-height" class="prof-input" placeholder="178">
+                    </div>
+                </div>
+                <div class="prof-field">
+                    <label>Вес, кг</label>
+                    <input type="number" inputmode="decimal" step="0.1" id="nc-weight" class="prof-input" placeholder="80">
+                </div>
+            </div>
+
+            <div class="nc-section">
+                <div class="nc-section-title">Тренировки</div>
+                <div class="prof-field">
+                    <label>Цель</label>
+                    <select id="nc-goal" class="prof-input">
+                        <option value="">—</option>
+                        <option value="loss">Похудение</option>
+                        <option value="mass">Набор массы</option>
+                        <option value="tone">Тонус / поддержание</option>
+                        <option value="strength">Сила</option>
+                    </select>
+                </div>
+                <div class="prof-field">
+                    <label>Уровень</label>
+                    <select id="nc-level" class="prof-input">
+                        <option value="">—</option>
+                        <option value="beginner">Новичок</option>
+                        <option value="intermediate">Средний</option>
+                        <option value="advanced">Продвинутый</option>
+                    </select>
+                </div>
+                <div class="prof-field">
+                    <label>Тренировок в неделю</label>
+                    <select id="nc-frequency" class="prof-input">
+                        <option value="">—</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </div>
+                <div class="prof-field">
+                    <label>Ограничения</label>
+                    <div class="prof-checks">
+                        <label class="prof-chk"><input type="checkbox" value="knee" class="nc-limit-cb"><span>Колено</span></label>
+                        <label class="prof-chk"><input type="checkbox" value="back" class="nc-limit-cb"><span>Поясница</span></label>
+                        <label class="prof-chk"><input type="checkbox" value="shoulder" class="nc-limit-cb"><span>Плечо</span></label>
+                        <label class="prof-chk"><input type="checkbox" value="wrist" class="nc-limit-cb"><span>Запястье</span></label>
+                    </div>
+                    <input type="text" id="nc-limit-other" class="prof-input" placeholder="Другое (через запятую)">
+                </div>
+                <div class="prof-field">
+                    <label>Инвентарь</label>
+                    <select id="nc-inventory" class="prof-input">
+                        <option value="">—</option>
+                        <option value="gym">Зал</option>
+                        <option value="home_dumbbells">Дом с гантелями</option>
+                        <option value="home_none">Дом без инвентаря</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="nc-step-actions">
+                <button class="nc-btn nc-btn-primary" onclick="goToStep2()">Дальше →</button>
+            </div>
+        </div>
+
+        <!-- ШАГ 2: Программа -->
+        <div id="nc-step-2" class="nc-step">
+            <div class="nc-section">
+                <div class="nc-section-title">Программа тренировок</div>
+
+                <div class="nc-program-option" data-prog-type="empty" onclick="selectProgramOption('empty')">
+                    <div class="nc-program-icon">🛠</div>
+                    <div class="nc-program-info">
+                        <div class="nc-program-name">Создать с нуля</div>
+                        <div class="nc-program-desc">Пустая программа — добавишь упражнения сам</div>
+                    </div>
+                </div>
+
+                <div class="nc-program-option" data-prog-type="copy" onclick="selectProgramOption('copy')">
+                    <div class="nc-program-icon">📋</div>
+                    <div class="nc-program-info">
+                        <div class="nc-program-name">Скопировать у другого клиента</div>
+                        <div class="nc-program-desc">Возьмём программу как заготовку, факты сбросятся</div>
+                    </div>
+                </div>
+
+                <!-- Выбор источника копирования (показывается при copy) -->
+                <div class="nc-source-wrap hidden" id="nc-source-wrap">
+                    <label class="ex-editor-label">Источник программы</label>
+                    <select id="nc-source-select" class="prof-input"></select>
+                </div>
+            </div>
+
+            <div class="nc-step-actions">
+                <button class="nc-btn" onclick="goToStep1()">← Назад</button>
+                <button class="nc-btn nc-btn-primary" onclick="createNewClient()" id="nc-create-btn">✅ Создать клиента</button>
+            </div>
         </div>
     </div>
 

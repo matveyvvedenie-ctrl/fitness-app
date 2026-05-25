@@ -2105,6 +2105,163 @@ body {
     }
 }
 
+/* ===== МАСТЕР СОЗДАНИЯ НОВОГО КЛИЕНТА ===== */
+
+.admin-new-client-btn {
+    display: block;
+    width: calc(100% - 16px);
+    margin: 8px auto 4px;
+    background: linear-gradient(135deg, #43A047, #2E7D32);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(46,125,50,0.25);
+    transition: all 0.15s ease;
+}
+
+.admin-new-client-btn:hover { opacity: 0.95; }
+.admin-new-client-btn:active { transform: scale(0.98); }
+
+.new-client-wizard {
+    position: fixed;
+    top: var(--tg-top-pad, 0);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #f5f5f7;
+    z-index: 1200;
+    overflow-y: auto;
+    animation: ccSlideIn 0.22s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.nc-step {
+    display: none;
+    padding: 12px;
+}
+
+.nc-step.active { display: block; }
+
+.nc-section {
+    background: white;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.nc-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.nc-section .ex-editor-field { margin-bottom: 12px; }
+
+.nc-section .prof-field { margin-bottom: 12px; }
+.nc-section .prof-field:last-child { margin-bottom: 0; }
+
+.nc-hint {
+    font-size: 11px;
+    color: #888;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+.nc-step-actions {
+    display: flex;
+    gap: 8px;
+    padding: 16px 12px max(24px, env(safe-area-inset-bottom));
+}
+
+.nc-btn {
+    flex: 1;
+    background: #f5f5f7;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.nc-btn:active { transform: scale(0.98); }
+.nc-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.nc-btn-primary {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: white;
+    box-shadow: 0 3px 8px rgba(26,26,46,0.2);
+}
+
+.nc-program-option {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: #f5f5f7;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: all 0.15s ease;
+}
+
+.nc-program-option:hover { background: #ebebf0; }
+.nc-program-option.selected {
+    background: #f0f4ff;
+    border-color: #1a1a2e;
+}
+
+.nc-program-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    background: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.nc-program-info { flex: 1; }
+
+.nc-program-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 2px;
+}
+
+.nc-program-desc {
+    font-size: 12px;
+    color: #777;
+    line-height: 1.3;
+}
+
+.nc-source-wrap {
+    margin-top: 10px;
+}
+
+@media (min-width: 900px) {
+    .nc-step {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+}
+
 /* ===== ВКЛАДКА «СТАТИСТИКА» В КАРТОЧКЕ КЛИЕНТА ===== */
 
 .cc-tab-content .stats-grid {
