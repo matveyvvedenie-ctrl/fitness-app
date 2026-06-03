@@ -1581,6 +1581,54 @@ body {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    /* Отступ снизу под плавающую кнопку «Сохранить изменения», чтобы она не перекрывала контент */
+    padding-bottom: 90px;
+}
+
+/* === Bulk save bar — плавающая кнопка сохранения всех изменений === */
+.cc-bulk-save-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 200;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(255,255,255,0.98) 60%, rgba(255,255,255,0));
+    pointer-events: none;
+}
+.cc-bulk-save-bar.hidden { display: none; }
+.cc-bulk-save-btn {
+    width: 100%;
+    pointer-events: auto;
+    background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 700;
+    box-shadow: 0 6px 18px rgba(76, 175, 80, 0.35);
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.cc-bulk-save-btn:active { transform: translateY(1px); }
+.cc-bulk-save-btn:disabled { opacity: 0.7; cursor: default; }
+
+/* Метка несохранённого изменения на строке упражнения */
+.cc-ex-row.cc-ex-pending {
+    position: relative;
+    background: linear-gradient(to right, rgba(255,193,7,0.10), rgba(255,193,7,0));
+    border-left: 3px solid #ffa726;
+    padding-left: 8px;
+    border-radius: 6px;
+}
+.cc-ex-row.cc-ex-pending::after {
+    content: '●';
+    color: #ffa726;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 10px;
 }
 
 .cc-day-block {

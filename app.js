@@ -1585,6 +1585,24 @@ function openClientCard(chatId) {
 }
 
 function closeClientCard() {
+    var pendingCount = Object.keys(pendingExerciseEdits).length;
+    if (pendingCount > 0) {
+        var msg = 'Есть несохранённые изменения упражнений: ' + pendingCount + '.\n\nЗакрыть карточку без сохранения?';
+        if (tg && tg.showConfirm) {
+            tg.showConfirm(msg, function(ok) {
+                if (!ok) return;
+                discardPendingExerciseEdits();
+                _doCloseClientCard();
+            });
+            return;
+        }
+        if (!confirm(msg)) return;
+        discardPendingExerciseEdits();
+    }
+    _doCloseClientCard();
+}
+
+function _doCloseClientCard() {
     var screen = document.getElementById('client-card-screen');
     screen.classList.add('hidden');
     document.body.classList.remove('no-scroll');
@@ -1651,6 +1669,12 @@ async function loadClientProgram(sheetName) {
             return;
         }
         renderClientProgram(data);
+        // После рендера DOM пересоздан — заново подсвечиваем строки, у которых остались
+        // не сохранённые правки (на случай если очередь не была пуста перед reload'ом).
+        Object.keys(pendingExerciseEdits).forEach(function(rowIdx) {
+            markExerciseDirty(rowIdx);
+        });
+        updateBulkSaveBar();
     } catch (error) {
         console.error('Load client program error:', error);
         container.innerHTML = '<div class="no-data">Ошибка загрузки программы</div>';
@@ -2858,6 +2882,11 @@ var currentEditingMode = 'edit'; // 'edit' | 'add'
 var currentAddDay = '';          // используется в режиме 'add'
 var currentEditingPrefix = '';   // 'СЕТ: ' / 'ТРИСЕТ: ' / '' — чтобы не потерять при сохранении
 var currentSetType = 'single';   // 'single' | 'superset' | 'triset' (только в режиме add)
+
+// Очередь несохранённых правок упражнений: { rowIndex: paramsForApi }
+// Когда тренер редактирует упражнения через модалку — изменения не уходят сразу в Google Sheets,
+// а копятся здесь. Финальный коммит делает кнопка «💾 Сохранить изменения» внизу программы.
+var pendingExerciseEdits = {};
 var activeNameInputId = 'ex-edit-name'; // какое поле «Название» сейчас активно для библиотеки
 
 function openExerciseEditor(rowIndex) {
@@ -2892,7 +2921,7 @@ function openExerciseEditor(rowIndex) {
     var delBtn = document.getElementById('ex-edit-delete-btn');
     if (delBtn) delBtn.classList.remove('hidden');
     var saveBtn = document.getElementById('ex-edit-save-btn');
-    if (saveBtn) saveBtn.textContent = '💾 Сохранить';
+    if (saveBtn) saveBtn.textContent = '✅ Применить';
 
     // Подсказка «Последний раз» — сначала покажем из текущей программы, потом обогатим данными из истории
     showLastResultHint({
@@ -3107,20 +3136,19 @@ async function saveExerciseEdit() {
     if (!currentClientCard) return;
     var saveBtn = document.getElementById('ex-edit-save-btn');
     var origText = saveBtn.textContent;
-    saveBtn.disabled = true;
-    saveBtn.textContent = '⏳ Сохранение...';
 
     var nameVal = document.getElementById('ex-edit-name').value.trim();
     if (!nameVal) {
         tg.showAlert('Укажи название упражнения');
-        saveBtn.disabled = false;
-        saveBtn.textContent = origText;
         return;
     }
 
-    var params;
+    // ── РЕЖИМ ДОБАВЛЕНИЯ — оставляем как было, сразу сохраняем и перегружаем программу ──
     if (currentEditingMode === 'add') {
-        params = {
+        saveBtn.disabled = true;
+        saveBtn.textContent = '⏳ Сохранение...';
+
+        var params = {
             action: 'addClientExercise',
             sheetName: currentClientCard.sheetName,
             dayName: currentAddDay,
@@ -3131,71 +3159,190 @@ async function saveExerciseEdit() {
             rpe: document.getElementById('ex-edit-rpe').value.trim(),
             note: document.getElementById('ex-edit-note').value.trim()
         };
-    } else {
-        if (!currentEditingRow) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = origText;
-            return;
-        }
-        // Восстанавливаем префикс «СЕТ:»/«ТРИСЕТ:» если упражнение было частью связки
-        var nameWithPrefix = currentEditingPrefix ? (currentEditingPrefix + nameVal) : nameVal;
-        params = {
-            action: 'updateClientExercise',
-            sheetName: currentClientCard.sheetName,
-            rowIndex: currentEditingRow,
-            exercise: nameWithPrefix,
-            weightPlan: document.getElementById('ex-edit-weight').value.trim(),
-            reps: document.getElementById('ex-edit-reps').value.trim(),
-            sets: document.getElementById('ex-edit-sets').value.trim(),
-            rpe: document.getElementById('ex-edit-rpe').value.trim(),
-            note: document.getElementById('ex-edit-note').value.trim()
-        };
-    }
 
-    try {
-        var query = Object.keys(params).map(function(k) {
-            return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
-        }).join('&');
-        var response = await fetch(APPS_SCRIPT_URL + '?' + query);
-        var data = await response.json();
-        if (!data.success) {
-            tg.showAlert('Ошибка сохранения: ' + (data.error || 'не удалось'));
-            saveBtn.disabled = false;
-            saveBtn.textContent = origText;
-            return;
-        }
-        saveBtn.textContent = currentEditingMode === 'add' ? '✅ Добавлено' : '✅ Сохранено';
-        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-
-        if (currentEditingMode === 'edit') {
-            // Точечно обновляем DOM-узел этого упражнения, без перерендера всей программы
-            updateExerciseInDOM(currentEditingRow, params);
-            // Обновляем кэш currentProgramExercisesByRow чтобы при следующем открытии редактора были свежие данные
-            var cached = currentProgramExercisesByRow[currentEditingRow];
-            if (cached) {
-                cached.exercise = params.exercise;
-                cached.weightPlan = params.weightPlan;
-                cached.reps = params.reps;
-                cached.sets = params.sets;
-                cached.rpe = params.rpe;
-                cached.note = params.note;
+        // Если есть несохранённые правки — сначала сливаем их, иначе порядковые rowIndex'ы могут уехать
+        if (Object.keys(pendingExerciseEdits).length > 0) {
+            saveBtn.textContent = '⏳ Сохраняю прошлые изменения...';
+            var flushOk = await flushPendingExerciseEdits();
+            if (!flushOk) {
+                tg.showAlert('Не удалось сохранить прошлые изменения — добавление отменено.');
+                saveBtn.disabled = false;
+                saveBtn.textContent = origText;
+                return;
             }
-        } else {
-            // Для add — структура листа изменилась, перезагружаем программу
-            await loadClientProgram(currentClientCard.sheetName);
         }
 
-        setTimeout(function() {
-            closeExerciseEditor();
+        try {
+            var query = Object.keys(params).map(function(k) {
+                return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+            }).join('&');
+            var response = await fetch(APPS_SCRIPT_URL + '?' + query);
+            var data = await response.json();
+            if (!data.success) {
+                tg.showAlert('Ошибка сохранения: ' + (data.error || 'не удалось'));
+                saveBtn.disabled = false;
+                saveBtn.textContent = origText;
+                return;
+            }
+            saveBtn.textContent = '✅ Добавлено';
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            await loadClientProgram(currentClientCard.sheetName);
+            setTimeout(function() {
+                closeExerciseEditor();
+                saveBtn.disabled = false;
+                saveBtn.textContent = origText;
+            }, 400);
+        } catch (error) {
+            console.error('Save exercise error:', error);
+            tg.showAlert('Ошибка соединения ❌');
             saveBtn.disabled = false;
             saveBtn.textContent = origText;
-        }, 400);
-    } catch (error) {
-        console.error('Save exercise error:', error);
-        tg.showAlert('Ошибка соединения ❌');
-        saveBtn.disabled = false;
-        saveBtn.textContent = origText;
+        }
+        return;
     }
+
+    // ── РЕЖИМ РЕДАКТИРОВАНИЯ — кладём в очередь, не дёргаем API ──
+    if (!currentEditingRow) return;
+    // Восстанавливаем префикс «СЕТ:»/«ТРИСЕТ:» если упражнение было частью связки
+    var nameWithPrefix = currentEditingPrefix ? (currentEditingPrefix + nameVal) : nameVal;
+    var editParams = {
+        action: 'updateClientExercise',
+        sheetName: currentClientCard.sheetName,
+        rowIndex: currentEditingRow,
+        exercise: nameWithPrefix,
+        weightPlan: document.getElementById('ex-edit-weight').value.trim(),
+        reps: document.getElementById('ex-edit-reps').value.trim(),
+        sets: document.getElementById('ex-edit-sets').value.trim(),
+        rpe: document.getElementById('ex-edit-rpe').value.trim(),
+        note: document.getElementById('ex-edit-note').value.trim()
+    };
+
+    // 1. Запоминаем правку в очередь (overwrite если ту же строку уже редактировали)
+    pendingExerciseEdits[currentEditingRow] = editParams;
+
+    // 2. Обновляем DOM оптимистично — клиент видит новые значения сразу
+    updateExerciseInDOM(currentEditingRow, editParams);
+
+    // 3. Обновляем кэш чтоб при повторном открытии модалки были свежие данные
+    var cached = currentProgramExercisesByRow[currentEditingRow];
+    if (cached) {
+        cached.exercise = editParams.exercise;
+        cached.weightPlan = editParams.weightPlan;
+        cached.reps = editParams.reps;
+        cached.sets = editParams.sets;
+        cached.rpe = editParams.rpe;
+        cached.note = editParams.note;
+    }
+
+    // 4. Помечаем строку как «есть несохранённое изменение»
+    markExerciseDirty(currentEditingRow);
+
+    // 5. Показываем/обновляем плавающую кнопку «Сохранить изменения (N)»
+    updateBulkSaveBar();
+
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    closeExerciseEditor();
+}
+
+
+// Поставить визуальную метку «есть несохранённое изменение» на строку упражнения
+function markExerciseDirty(rowIndex) {
+    if (!rowIndex) return;
+    var editBtn = document.querySelector('.cc-ex-edit-btn[onclick*="openExerciseEditor(' + rowIndex + ')"]');
+    if (!editBtn) return;
+    var row = editBtn.closest('.cc-ex-row');
+    if (row) row.classList.add('cc-ex-pending');
+}
+
+function unmarkExerciseDirty(rowIndex) {
+    if (!rowIndex) return;
+    var editBtn = document.querySelector('.cc-ex-edit-btn[onclick*="openExerciseEditor(' + rowIndex + ')"]');
+    if (!editBtn) return;
+    var row = editBtn.closest('.cc-ex-row');
+    if (row) row.classList.remove('cc-ex-pending');
+}
+
+// Показать/скрыть плавающую кнопку «Сохранить изменения», обновить счётчик
+function updateBulkSaveBar() {
+    var bar = document.getElementById('cc-bulk-save-bar');
+    if (!bar) return;
+    var count = Object.keys(pendingExerciseEdits).length;
+    var btn = document.getElementById('cc-bulk-save-btn');
+    if (count === 0) {
+        bar.classList.add('hidden');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '💾 Сохранить изменения';
+        }
+        return;
+    }
+    bar.classList.remove('hidden');
+    if (btn && !btn.disabled) {
+        btn.innerHTML = '💾 Сохранить изменения (' + count + ')';
+    }
+}
+
+// Сохранить все накопленные правки одним проходом (вызывается из плавающей кнопки)
+async function saveAllPendingEdits() {
+    var keys = Object.keys(pendingExerciseEdits);
+    if (keys.length === 0) return;
+    var btn = document.getElementById('cc-bulk-save-btn');
+    if (!btn) return;
+    btn.disabled = true;
+
+    var total = keys.length;
+    var saved = 0, failed = 0;
+    for (var i = 0; i < keys.length; i++) {
+        var rowIdx = keys[i];
+        var params = pendingExerciseEdits[rowIdx];
+        btn.innerHTML = '⏳ Сохранение ' + (i + 1) + '/' + total + '...';
+        try {
+            var query = Object.keys(params).map(function(k) {
+                return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+            }).join('&');
+            var resp = await fetch(APPS_SCRIPT_URL + '?' + query);
+            var data = await resp.json();
+            if (data.success) {
+                saved++;
+                delete pendingExerciseEdits[rowIdx];
+                unmarkExerciseDirty(rowIdx);
+            } else {
+                failed++;
+                console.error('Bulk save failed for row ' + rowIdx, data.error);
+            }
+        } catch (err) {
+            failed++;
+            console.error('Bulk save network error for row ' + rowIdx, err);
+        }
+    }
+
+    if (failed === 0) {
+        btn.innerHTML = '✅ Сохранено!';
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        setTimeout(function() {
+            updateBulkSaveBar();
+        }, 1200);
+    } else {
+        tg.showAlert('Сохранено: ' + saved + '\nОшибок: ' + failed + '\n\nНеудачные правки остались в очереди — попробуй сохранить ещё раз.');
+        btn.disabled = false;
+        updateBulkSaveBar();
+    }
+}
+
+// Утилита: синхронно дождаться сохранения очереди (используется перед add/delete/reload).
+// Возвращает true если очередь пустая или всё сохранилось без ошибок.
+async function flushPendingExerciseEdits() {
+    if (Object.keys(pendingExerciseEdits).length === 0) return true;
+    await saveAllPendingEdits();
+    return Object.keys(pendingExerciseEdits).length === 0;
+}
+
+// Сбросить очередь (например при закрытии карточки без сохранения)
+function discardPendingExerciseEdits() {
+    var keys = Object.keys(pendingExerciseEdits);
+    keys.forEach(function(k) { unmarkExerciseDirty(k); });
+    pendingExerciseEdits = {};
+    updateBulkSaveBar();
 }
 
 async function deleteExerciseEdit() {
@@ -3212,6 +3359,21 @@ async function deleteExerciseEdit() {
     var origText = delBtn.textContent;
     delBtn.disabled = true;
     delBtn.textContent = '⏳ Удаление...';
+
+    // Удаление сдвигает rowIndex'ы — сначала сливаем все накопленные правки,
+    // иначе они применятся не к тем упражнениям.
+    if (Object.keys(pendingExerciseEdits).length > 0) {
+        delBtn.textContent = '⏳ Сохраняю прошлые правки...';
+        var flushOk = await flushPendingExerciseEdits();
+        if (!flushOk) {
+            tg.showAlert('Не удалось сохранить прошлые изменения — удаление отменено.');
+            delBtn.disabled = false;
+            delBtn.textContent = origText;
+            return;
+        }
+        delBtn.textContent = '⏳ Удаление...';
+    }
+
     try {
         var url = APPS_SCRIPT_URL + '?action=deleteClientExercise' +
             '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
@@ -3622,20 +3784,26 @@ async function showAddDayDialog() {
 function openBlockModal(dayName, type) {
     currentBlockType = type;
     currentBlockDay = dayName || '';
+    // Чтобы библиотека упражнений знала, для какого дня показывать фильтр "Этот день"
+    currentEditingMode = 'add';
+    currentAddDay = dayName || '';
+    currentSetType = type; // 'superset' | 'triset'
     var count = type === 'triset' ? 3 : 2;
     var title = type === 'triset' ? '+ Новый трисет (3 упр.)' : '+ Новый суперсет (2 упр.)';
     document.getElementById('ex-block-title').textContent = title + (dayName ? ' · ' + dayName : '');
 
-    // Рендерим N секций
+    // Рендерим N секций. Каждому полю «Название» даём уникальный id и data-block,
+    // чтобы оно подключалось к выпадающему списку упражнений (как в одиночном режиме).
     var html = '';
     for (var i = 0; i < count; i++) {
         var label = String.fromCharCode(65 + i); // A, B, C
+        var nameInputId = 'ex-block-name-' + i;
         html +=
             '<div class="ex-block-section" data-block-idx="' + i + '">' +
                 '<div class="ex-block-section-title">' + label + ' — упражнение ' + (i + 1) + '</div>' +
                 '<div class="ex-editor-field">' +
                     '<label class="ex-editor-label">Название</label>' +
-                    '<input type="text" class="ex-editor-input ex-block-name" data-idx="' + i + '" placeholder="Например: Жим штанги лёжа">' +
+                    '<input type="text" id="' + nameInputId + '" class="ex-editor-input ex-block-name ex-name-field" data-idx="' + i + '" data-block="' + label + '" placeholder="Например: Жим штанги лёжа" autocomplete="off">' +
                 '</div>' +
                 '<div class="ex-editor-row">' +
                     '<div class="ex-editor-field">' +
@@ -3665,10 +3833,31 @@ function openBlockModal(dayName, type) {
     }
     document.getElementById('ex-block-body').innerHTML = html;
     document.getElementById('ex-block-modal').classList.remove('hidden');
+
+    // Подключаем слушатели к новым полям «Название» — на focus открываем библиотеку
+    document.querySelectorAll('#ex-block-body .ex-block-name').forEach(function(input) {
+        input.addEventListener('focus', function() {
+            activeNameInputId = input.id;
+            // Сбрасываем фильтр на «Этот день» при каждом фокусе, чтобы упражнения релевантные дню были видны сразу
+            libraryFilterMuscle = 'day';
+            openExerciseLibrary();
+        });
+        input.addEventListener('input', function() {
+            activeNameInputId = input.id;
+            librarySearchText = (input.value || '').toLowerCase().trim();
+            renderLibraryList();
+        });
+    });
+
+    // Прогреваем библиотеку в фоне, чтобы первый клик открыл её без задержки
+    libraryFilterMuscle = 'day';
+    closeExerciseLibrary();
+    loadExerciseLibrary();
 }
 
 function closeBlockModal() {
     document.getElementById('ex-block-modal').classList.add('hidden');
+    closeExerciseLibrary();
 }
 
 async function saveBlock() {
