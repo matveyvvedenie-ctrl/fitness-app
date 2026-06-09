@@ -1585,6 +1585,146 @@ body {
     padding-bottom: 90px;
 }
 
+/* === Переключатель Клиенты / Финансы внутри админ-таба === */
+.admin-section-tabs {
+    display: flex;
+    gap: 8px;
+    background: #f5f6fa;
+    padding: 4px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+}
+.admin-section-btn {
+    flex: 1;
+    background: transparent;
+    color: #5a5e6e;
+    border: none;
+    padding: 10px;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.admin-section-btn.active {
+    background: white;
+    color: #1a1a2e;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.admin-section { display: none; }
+.admin-section.active { display: block; }
+
+/* === Финансы — карточки клиентов === */
+.finance-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.finance-summary-card {
+    background: white;
+    border-radius: 12px;
+    padding: 14px 8px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    border-left: 4px solid #c5c8d6;
+}
+.finance-summary-active { border-left-color: #4caf50; }
+.finance-summary-warning { border-left-color: #ffa726; }
+.finance-summary-expired { border-left-color: #ef5350; }
+.finance-summary-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+.finance-summary-label {
+    font-size: 12px;
+    color: #5a5e6e;
+    margin-top: 2px;
+}
+
+.finance-clients-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.finance-client-card {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    border-left: 4px solid #c5c8d6;
+}
+.finance-client-card.fc-active { border-left-color: #4caf50; }
+.finance-client-card.fc-expiring_week { border-left-color: #ffd54f; }
+.finance-client-card.fc-expiring_soon { border-left-color: #ffa726; }
+.finance-client-card.fc-expired { border-left-color: #ef5350; }
+.finance-client-card.fc-none { border-left-color: #9e9e9e; }
+
+.fc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+.fc-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+.fc-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+.fc-status-badge.b-active { background: #e8f5e9; color: #2e7d32; }
+.fc-status-badge.b-expiring_week { background: #fffde7; color: #f57f17; }
+.fc-status-badge.b-expiring_soon { background: #fff3e0; color: #ef6c00; }
+.fc-status-badge.b-expired { background: #ffebee; color: #c62828; }
+.fc-status-badge.b-none { background: #f5f5f5; color: #757575; }
+
+.fc-info {
+    margin-top: 8px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: #5a5e6e;
+}
+.fc-info-item strong { color: #1a1a2e; font-weight: 600; }
+
+.fc-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+}
+.fc-pay-btn {
+    flex: 1;
+    background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.fc-pay-btn:active { transform: translateY(1px); }
+.fc-delete-btn {
+    background: #ffebee;
+    color: #c62828;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
 /* === Bulk save bar — плавающая кнопка сохранения всех изменений === */
 .cc-bulk-save-bar {
     position: fixed;

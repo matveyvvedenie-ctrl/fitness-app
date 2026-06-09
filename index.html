@@ -214,6 +214,14 @@
                 <div class="dashboard-date" id="dashboard-date"></div>
             </div>
 
+            <!-- Переключатель: Клиенты / Финансы -->
+            <div class="admin-section-tabs">
+                <button class="admin-section-btn active" data-admin-section="clients">👥 Клиенты</button>
+                <button class="admin-section-btn" data-admin-section="finances">💰 Финансы</button>
+            </div>
+
+            <!-- ======= БЛОК «КЛИЕНТЫ» ======= -->
+            <div id="admin-section-clients" class="admin-section active">
             <!-- Кнопка создания нового клиента -->
             <button class="admin-new-client-btn" onclick="openNewClientWizard()">
                 + Новый клиент
@@ -309,6 +317,58 @@
                     </div>
                 </div>
             </details>
+            </div>
+            <!-- ======= КОНЕЦ БЛОКА «КЛИЕНТЫ» ======= -->
+
+            <!-- ======= БЛОК «ФИНАНСЫ» ======= -->
+            <div id="admin-section-finances" class="admin-section">
+                <div class="finance-summary">
+                    <div class="finance-summary-card finance-summary-active">
+                        <div class="finance-summary-value" id="finance-active-count">-</div>
+                        <div class="finance-summary-label">Активны</div>
+                    </div>
+                    <div class="finance-summary-card finance-summary-warning">
+                        <div class="finance-summary-value" id="finance-expiring-count">-</div>
+                        <div class="finance-summary-label">Истекают</div>
+                    </div>
+                    <div class="finance-summary-card finance-summary-expired">
+                        <div class="finance-summary-value" id="finance-expired-count">-</div>
+                        <div class="finance-summary-label">Истёк</div>
+                    </div>
+                </div>
+                <div id="finance-clients-list" class="finance-clients-list">
+                    <div class="no-data">Загрузка финансов...</div>
+                </div>
+            </div>
+            <!-- ======= КОНЕЦ БЛОКА «ФИНАНСЫ» ======= -->
+        </div>
+    </div>
+
+    <!-- Модалка: записать оплату -->
+    <div id="payment-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closePaymentModal()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title" id="payment-modal-title">💰 Записать оплату</div>
+                <button class="ex-editor-close" onclick="closePaymentModal()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Сумма (₽)</label>
+                    <input type="number" inputmode="numeric" class="ex-editor-input" id="payment-amount" placeholder="5000">
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Месяцев</label>
+                    <input type="number" inputmode="numeric" class="ex-editor-input" id="payment-months" placeholder="1" value="1">
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Комментарий (опционально)</label>
+                    <input type="text" class="ex-editor-input" id="payment-comment" placeholder="">
+                </div>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-save" id="payment-save-btn" onclick="savePaymentFromModal()">💾 Записать</button>
+            </div>
         </div>
     </div>
 

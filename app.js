@@ -964,6 +964,7 @@ function initAdminTab() {
         document.getElementById('tabs-container').classList.add('tabs-5');
         initFilters();
         initAdminClientsControls();
+        initAdminSectionTabs();
         initClientCardTabs();
         initExerciseEditor();
         initAddTypeDialog();
@@ -1164,6 +1165,240 @@ function formatDaysAgo(days) {
     if (days < 21) return days + ' дн назад';
     var weeks = Math.floor(days / 7);
     return weeks + ' нед назад';
+}
+
+// ========== ПЕРЕКЛЮЧАТЕЛЬ КЛИЕНТЫ / ФИНАНСЫ ==========
+
+function switchAdminSection(sectionName) {
+    document.querySelectorAll('.admin-section-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.adminSection === sectionName);
+    });
+    document.querySelectorAll('.admin-section').forEach(function(s) {
+        s.classList.remove('active');
+    });
+    var target = document.getElementById('admin-section-' + sectionName);
+    if (target) target.classList.add('active');
+    if (sectionName === 'finances') loadFinances();
+}
+
+function initAdminSectionTabs() {
+    document.querySelectorAll('.admin-section-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            switchAdminSection(btn.dataset.adminSection);
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        });
+    });
+}
+
+// ========== ФИНАНСЫ ==========
+
+var financesData = []; // последний загруженный список из getFinances
+var allClientsForFinance = []; // полный список клиентов (включая без оплат) из getClients
+
+async function loadFinances() {
+    var list = document.getElementById('finance-clients-list');
+    if (list) list.innerHTML = '<div class="no-data">Загрузка финансов...</div>';
+    try {
+        // Загружаем параллельно: статусы абонементов + полный список клиентов (для тех у кого ещё нет ни одной оплаты)
+        var [finResp, clientsResp] = await Promise.all([
+            fetch(APPS_SCRIPT_URL + '?action=getFinances'),
+            fetch(APPS_SCRIPT_URL + '?action=getClients')
+        ]);
+        var finData = await finResp.json();
+        var clientsData = await clientsResp.json();
+        if (finData.error) {
+            if (list) list.innerHTML = '<div class="no-data">Ошибка: ' + finData.error + '</div>';
+            return;
+        }
+        financesData = finData.clients || [];
+        allClientsForFinance = (clientsData.clients || []).filter(function(c) { return !c.archived; });
+
+        renderFinanceSummary();
+        renderFinanceList();
+    } catch (error) {
+        console.error('Load finances error:', error);
+        if (list) list.innerHTML = '<div class="no-data">Ошибка загрузки</div>';
+    }
+}
+
+function renderFinanceSummary() {
+    var active = 0, expiring = 0, expired = 0;
+    financesData.forEach(function(c) {
+        if (c.status === 'active') active++;
+        else if (c.status === 'expiring_soon' || c.status === 'expiring_week') expiring++;
+        else if (c.status === 'expired') expired++;
+    });
+    document.getElementById('finance-active-count').textContent = active;
+    document.getElementById('finance-expiring-count').textContent = expiring;
+    document.getElementById('finance-expired-count').textContent = expired;
+}
+
+function renderFinanceList() {
+    var list = document.getElementById('finance-clients-list');
+    if (!list) return;
+    // Объединяем: для каждого активного клиента смотрим есть ли оплата.
+    // Если есть — берём данные из financesData, иначе показываем как «без оплат».
+    var byChatId = {};
+    financesData.forEach(function(c) { byChatId[c.chatId] = c; });
+
+    var merged = [];
+    allClientsForFinance.forEach(function(c) {
+        var fin = byChatId[c.chatId];
+        if (fin) {
+            merged.push(fin);
+        } else {
+            merged.push({
+                chatId: c.chatId,
+                name: c.name,
+                status: 'none',
+                daysLeft: null,
+                endDate: '',
+                amount: null,
+                lastPayment: ''
+            });
+        }
+    });
+
+    // Сортируем: просрочка → истекает → нет оплат → активные (по убыванию daysLeft)
+    var statusOrder = { expired: 0, expiring_soon: 1, expiring_week: 2, none: 3, active: 4 };
+    merged.sort(function(a, b) {
+        var so = (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+        if (so !== 0) return so;
+        return (a.daysLeft || 0) - (b.daysLeft || 0);
+    });
+
+    if (merged.length === 0) {
+        list.innerHTML = '<div class="no-data">Нет активных клиентов</div>';
+        return;
+    }
+
+    var labels = {
+        active: 'активен',
+        expiring_week: 'неделя',
+        expiring_soon: 'скоро',
+        expired: 'истёк',
+        none: 'без оплат'
+    };
+
+    list.innerHTML = merged.map(function(c) {
+        var statusLabel = labels[c.status] || c.status;
+        var daysText;
+        if (c.status === 'none') {
+            daysText = '<span class="fc-info-item">Оплат ещё нет</span>';
+        } else if (c.daysLeft === null || c.daysLeft === undefined) {
+            daysText = '';
+        } else if (c.daysLeft < 0) {
+            daysText = '<span class="fc-info-item">Истёк <strong>' + Math.abs(c.daysLeft) + ' дн. назад</strong></span>';
+        } else if (c.daysLeft === 0) {
+            daysText = '<span class="fc-info-item"><strong>Истекает сегодня</strong></span>';
+        } else {
+            daysText = '<span class="fc-info-item">Осталось <strong>' + c.daysLeft + ' дн.</strong></span>';
+        }
+        var endText = c.endDate ? '<span class="fc-info-item">До <strong>' + c.endDate + '</strong></span>' : '';
+        var amountText = c.amount ? '<span class="fc-info-item">Последняя оплата: <strong>' + c.amount + ' ₽</strong></span>' : '';
+        var safeName = (c.name || '').replace(/'/g, "\\'");
+        return '<div class="finance-client-card fc-' + c.status + '">' +
+            '<div class="fc-row">' +
+                '<div class="fc-name">' + (c.name || '—') + '</div>' +
+                '<div class="fc-status-badge b-' + c.status + '">' + statusLabel + '</div>' +
+            '</div>' +
+            '<div class="fc-info">' + daysText + endText + amountText + '</div>' +
+            '<div class="fc-actions">' +
+                '<button class="fc-pay-btn" onclick="openPaymentModal(\'' + c.chatId + '\', \'' + safeName + '\')">💰 Записать оплату</button>' +
+                '<button class="fc-delete-btn" onclick="deleteClientCompletely(\'' + c.chatId + '\', \'' + safeName + '\')" title="Удалить клиента">🗑️</button>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+
+// Модалка оплаты
+var currentPaymentClient = null;
+
+function openPaymentModal(chatId, clientName) {
+    currentPaymentClient = { chatId: chatId, name: clientName };
+    document.getElementById('payment-modal-title').textContent = '💰 Оплата — ' + clientName;
+    document.getElementById('payment-amount').value = '';
+    document.getElementById('payment-months').value = '1';
+    document.getElementById('payment-comment').value = '';
+    var btn = document.getElementById('payment-save-btn');
+    btn.disabled = false;
+    btn.textContent = '💾 Записать';
+    document.getElementById('payment-modal').classList.remove('hidden');
+}
+
+function closePaymentModal() {
+    document.getElementById('payment-modal').classList.add('hidden');
+    currentPaymentClient = null;
+}
+
+async function savePaymentFromModal() {
+    if (!currentPaymentClient) return;
+    var amount = parseFloat(document.getElementById('payment-amount').value);
+    var months = parseInt(document.getElementById('payment-months').value);
+    var comment = document.getElementById('payment-comment').value.trim();
+    if (!amount || amount <= 0) {
+        tg.showAlert('Укажи сумму больше 0');
+        return;
+    }
+    if (!months || months <= 0) {
+        tg.showAlert('Укажи кол-во месяцев больше 0');
+        return;
+    }
+    var btn = document.getElementById('payment-save-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+    try {
+        var url = APPS_SCRIPT_URL + '?action=savePaymentDirect' +
+            '&clientChatId=' + encodeURIComponent(currentPaymentClient.chatId) +
+            '&clientName=' + encodeURIComponent(currentPaymentClient.name) +
+            '&amount=' + encodeURIComponent(amount) +
+            '&months=' + encodeURIComponent(months) +
+            '&comment=' + encodeURIComponent(comment);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            btn.disabled = false;
+            btn.textContent = '💾 Записать';
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        btn.textContent = '✅ Записано';
+        setTimeout(function() {
+            closePaymentModal();
+            loadFinances();
+        }, 600);
+    } catch (error) {
+        console.error('Save payment error:', error);
+        tg.showAlert('Ошибка соединения');
+        btn.disabled = false;
+        btn.textContent = '💾 Записать';
+    }
+}
+
+async function deleteClientCompletely(chatId, clientName) {
+    var msg = 'Удалить клиента «' + clientName + '» из системы?\n\nЛисты с программой и данными остаются (на случай восстановления), но клиент потеряет доступ к боту.';
+    var confirmed = await new Promise(function(resolve) {
+        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
+        else resolve(confirm(msg));
+    });
+    if (!confirmed) return;
+    try {
+        var url = APPS_SCRIPT_URL + '?action=deleteClient&targetChatId=' + encodeURIComponent(chatId);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        loadFinances();
+        // Обновим основной список клиентов
+        if (typeof loadAdminClients === 'function') loadAdminClients();
+    } catch (error) {
+        console.error('Delete client error:', error);
+        tg.showAlert('Ошибка соединения');
+    }
 }
 
 async function loadAdminClients() {
