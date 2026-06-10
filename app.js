@@ -1190,6 +1190,7 @@ function switchAdminSection(sectionName) {
     var target = document.getElementById('admin-section-' + sectionName);
     if (target) target.classList.add('active');
     if (sectionName === 'finances') loadFinances();
+    if (sectionName === 'reports') loadMonthlyReports();
 }
 
 function initAdminSectionTabs() {
@@ -1384,6 +1385,107 @@ async function savePaymentFromModal() {
         tg.showAlert('Ошибка соединения');
         btn.disabled = false;
         btn.textContent = '💾 Записать';
+    }
+}
+
+// ========== МЕСЯЧНЫЕ ОТЧЁТЫ ==========
+
+var monthlyReports = []; // последний загруженный список превью
+var currentReportSendingClient = null; // {chatId, name, msg}
+
+async function loadMonthlyReports() {
+    var list = document.getElementById('reports-list');
+    if (list) list.innerHTML = '<div class="no-data">Считаю прогресс…</div>';
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getMonthlyReportsPreview');
+        var data = await resp.json();
+        if (data.error) {
+            if (list) list.innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
+            return;
+        }
+        monthlyReports = data.reports || [];
+        renderMonthlyReports();
+    } catch (e) {
+        console.error('loadMonthlyReports error:', e);
+        if (list) list.innerHTML = '<div class="no-data">Ошибка загрузки</div>';
+    }
+}
+
+function renderMonthlyReports() {
+    var list = document.getElementById('reports-list');
+    if (!list) return;
+    if (monthlyReports.length === 0) {
+        list.innerHTML = '<div class="no-data">Нет активных платящих клиентов</div>';
+        return;
+    }
+    list.innerHTML = monthlyReports.map(function(r, idx) {
+        var noData = !r.hasData;
+        var safeName = (r.name || '').replace(/'/g, "\\'");
+        var statusClass = noData ? 's-empty' : 's-ok';
+        var statusText = noData ? 'нет данных' : 'есть прогресс';
+        return '<div class="report-card' + (noData ? ' no-data' : '') + '">' +
+            '<div class="report-card-name">' + (r.name || '—') + '</div>' +
+            '<div class="report-card-summary">' + (r.summary || '') + '</div>' +
+            '<span class="report-card-status ' + statusClass + '">' + statusText + '</span>' +
+            '<div class="report-card-actions">' +
+                '<button class="report-preview-btn" onclick="previewReport(' + idx + ')">👁 Превью</button>' +
+                '<button class="report-send-btn-card" onclick="quickSendReport(' + idx + ')"' + (noData ? ' disabled' : '') + '>📤 Отправить</button>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+
+function previewReport(idx) {
+    var r = monthlyReports[idx];
+    if (!r) return;
+    currentReportSendingClient = { chatId: r.chatId, name: r.name };
+    document.getElementById('report-preview-title').textContent = '📊 ' + r.name;
+    document.getElementById('report-preview-text').textContent = r.msgPreview || '(пусто — нет данных за месяц)';
+    var sendBtn = document.getElementById('report-send-btn');
+    sendBtn.disabled = !r.hasData;
+    sendBtn.textContent = r.hasData ? '📤 Отправить клиенту' : 'Нечего отправлять';
+    document.getElementById('report-preview-modal').classList.remove('hidden');
+}
+
+function closeReportPreview() {
+    document.getElementById('report-preview-modal').classList.add('hidden');
+    currentReportSendingClient = null;
+}
+
+async function confirmSendReport() {
+    if (!currentReportSendingClient) return;
+    await _doSendReport(currentReportSendingClient.chatId, currentReportSendingClient.name);
+    closeReportPreview();
+}
+
+async function quickSendReport(idx) {
+    var r = monthlyReports[idx];
+    if (!r || !r.hasData) return;
+    var confirmed = await new Promise(function(resolve) {
+        var msg = 'Отправить месячный отчёт клиенту «' + r.name + '»?';
+        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
+        else resolve(confirm(msg));
+    });
+    if (!confirmed) return;
+    await _doSendReport(r.chatId, r.name);
+}
+
+async function _doSendReport(chatId, clientName) {
+    try {
+        var url = APPS_SCRIPT_URL + '?action=sendMonthlyReportToClient' +
+            '&targetChatId=' + encodeURIComponent(chatId) +
+            '&clientName=' + encodeURIComponent(clientName);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Не удалось: ' + (data.error || 'ошибка'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        tg.showAlert('Отчёт отправлен клиенту «' + clientName + '» ✅');
+    } catch (e) {
+        console.error('send report error:', e);
+        tg.showAlert('Ошибка соединения');
     }
 }
 

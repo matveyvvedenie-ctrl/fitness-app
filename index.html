@@ -214,10 +214,11 @@
                 <div class="dashboard-date" id="dashboard-date"></div>
             </div>
 
-            <!-- Переключатель: Клиенты / Финансы -->
+            <!-- Переключатель: Клиенты / Финансы / Отчёты -->
             <div class="admin-section-tabs">
                 <button class="admin-section-btn active" data-admin-section="clients">👥 Клиенты</button>
                 <button class="admin-section-btn" data-admin-section="finances">💰 Финансы</button>
+                <button class="admin-section-btn" data-admin-section="reports">📊 Отчёты</button>
             </div>
 
             <!-- ======= БЛОК «КЛИЕНТЫ» ======= -->
@@ -341,6 +342,35 @@
                 </div>
             </div>
             <!-- ======= КОНЕЦ БЛОКА «ФИНАНСЫ» ======= -->
+
+            <!-- ======= БЛОК «ОТЧЁТЫ» ======= -->
+            <div id="admin-section-reports" class="admin-section">
+                <div class="reports-hint">
+                    📊 <b>Месячные отчёты</b> для активных платящих клиентов.<br>
+                    Можно посмотреть превью и решить — отправлять или нет.
+                </div>
+                <div id="reports-list" class="reports-list">
+                    <div class="no-data">Загрузка...</div>
+                </div>
+            </div>
+            <!-- ======= КОНЕЦ БЛОКА «ОТЧЁТЫ» ======= -->
+        </div>
+    </div>
+
+    <!-- Модалка: превью отчёта перед отправкой -->
+    <div id="report-preview-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeReportPreview()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title" id="report-preview-title">📊 Отчёт</div>
+                <button class="ex-editor-close" onclick="closeReportPreview()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <pre id="report-preview-text" class="report-preview-text"></pre>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-save" id="report-send-btn" onclick="confirmSendReport()">📤 Отправить клиенту</button>
+            </div>
         </div>
     </div>
 

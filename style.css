@@ -1725,6 +1725,70 @@ body {
     cursor: pointer;
 }
 
+/* === Отчёты === */
+.reports-hint {
+    background: #eef4ff;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    font-size: 14px;
+    color: #1a1a2e;
+    line-height: 1.45;
+}
+.reports-list { display: flex; flex-direction: column; gap: 10px; }
+.report-card {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    border-left: 4px solid #2196f3;
+}
+.report-card.no-data { border-left-color: #9e9e9e; opacity: 0.85; }
+.report-card-name { font-size: 16px; font-weight: 700; color: #1a1a2e; }
+.report-card-summary { font-size: 13px; color: #5a5e6e; margin-top: 4px; }
+.report-card-status {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 8px;
+    margin-top: 6px;
+    display: inline-block;
+}
+.report-card-status.s-ok { background: #e8f5e9; color: #2e7d32; }
+.report-card-status.s-empty { background: #f5f5f5; color: #757575; }
+.report-card-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+}
+.report-preview-btn, .report-send-btn-card {
+    flex: 1;
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.report-preview-btn { background: #eef4ff; color: #1565c0; }
+.report-send-btn-card { background: linear-gradient(135deg, #2196f3 0%, #1565c0 100%); color: white; }
+.report-send-btn-card:disabled { opacity: 0.5; cursor: default; }
+
+.report-preview-text {
+    background: #f5f6fa;
+    border-radius: 10px;
+    padding: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #1a1a2e;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
 /* === Bulk save bar — плавающая кнопка сохранения всех изменений === */
 .cc-bulk-save-bar {
     position: fixed;
