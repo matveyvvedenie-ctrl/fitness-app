@@ -133,6 +133,10 @@ async function init() {
         }
     } catch (error) {
         console.error('ERROR:', error);
+        if (vkLaunchUserId && /Client not found/.test(error.message)) {
+            renderVkAccessRequest();
+            return;
+        }
         document.getElementById('loading').innerHTML =
             '<div style="color: red; padding: 20px; text-align: center;">' +
             '<h3>Ошибка загрузки</h3>' +
@@ -140,6 +144,28 @@ async function init() {
             '<button onclick="location.reload()" style="padding: 10px 20px; margin-top: 10px;">Перезагрузить</button>' +
             '</div>';
     }
+}
+
+// Клиент открыл мини-апп во VK, но тренер ещё не выдал доступ (в VK нет
+// бота-шлагбаума перед мини-аппом, как в Telegram, поэтому проверяем здесь).
+function renderVkAccessRequest() {
+    var chatId = tg.initDataUnsafe.user.id; // 'vk_<numeric id>'
+    document.getElementById('loading').innerHTML =
+        '<div style="padding: 24px; text-align: center;">' +
+        '<h3>Доступа пока нет</h3>' +
+        '<p>Тренер уже получил уведомление о твоей заявке. Если долго нет ответа — просто скажи ему этот код:</p>' +
+        '<p style="font-size: 20px; font-weight: bold; margin: 12px 0;">' + chatId + '</p>' +
+        '<button onclick="location.reload()" style="padding: 10px 20px; margin-top: 10px;">Проверить ещё раз</button>' +
+        '</div>';
+
+    function ping(name) {
+        fetch(APPS_SCRIPT_URL + '?action=requestAccess&chatId=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent(name || '')).catch(function() {});
+    }
+    try {
+        window.vkBridge.send('VKWebAppGetUserInfo').then(function(data) {
+            ping(((data.first_name || '') + ' ' + (data.last_name || '')).trim());
+        }).catch(function() { ping(''); });
+    } catch (_) { ping(''); }
 }
  
 async function loadWorkoutData() {
