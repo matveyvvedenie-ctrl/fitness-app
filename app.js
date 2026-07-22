@@ -229,13 +229,15 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
     var card = document.createElement('div');
     card.className = 'exercise-card';
     var videoStr = exercise.video != null ? String(exercise.video) : '';
-    var hasVideo = videoStr && (videoStr.indexOf('http') !== -1 || videoStr.indexOf('📽️') !== -1);
+    var videoVkStr = exercise.videoVk != null ? String(exercise.videoVk) : '';
+    var hasVideo = (videoStr && (videoStr.indexOf('http') !== -1 || videoStr.indexOf('📽️') !== -1)) ||
+        (videoVkStr && videoVkStr.indexOf('http') !== -1);
     var photo1 = exercise.photo1 || '';
     var photo2 = exercise.photo2 || '';
     var photoHtml1 = photo1 ? '<img src="' + photo1 + '" alt="Photo 1" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'🏋️\'">' : '🏋️';
     var photoHtml2 = photo2 ? '<img src="' + photo2 + '" alt="Photo 2" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'💪\'">' : '💪';
     var noteHtml = exercise.note ? '<div class="trainer-note">💬 ' + exercise.note + '</div>' : '';
-    var videoHtml = hasVideo ? '<button class="video-btn" onclick="openVideo(\'' + videoStr + '\')">📹 ВИДЕО ТЕХНИКИ</button>' : '';
+    var videoHtml = hasVideo ? '<button class="video-btn" onclick="openVideo(\'' + videoStr.replace(/'/g, "\\'") + '\', \'' + videoVkStr.replace(/'/g, "\\'") + '\')">📹 ВИДЕО ТЕХНИКИ</button>' : '';
     var commentValue = exercise.comment || '';
     if (commentValue && /^\d{4}-\d{2}-\d{2}T/.test(commentValue)) commentValue = '';
     if (commentValue && /^\d{2}\.\d{2}\.\d{4}/.test(commentValue)) commentValue = '';
@@ -658,15 +660,19 @@ document.getElementById('save-btn').addEventListener('click', async function() {
     }
 });
  
-function openVideo(url) {
-    if (!url || url === '📽️') {
+function openVideo(url, urlVk) {
+    // Во VK свои ссылки на видео (обычно vk.com/video...), т.к. t.me-ссылки
+    // там не откроешь без Telegram. Если для упражнения такая ссылка ещё не
+    // добавлена в таблицу — просто используем старую (Telegram) ссылку.
+    var target = (vkLaunchUserId && urlVk) ? urlVk : url;
+    if (!target || target === '📽️') {
         tg.showAlert('Ссылка на видео отсутствует');
         return;
     }
-    if (url.indexOf('t.me') !== -1) {
-        tg.openTelegramLink(url);
-    } else if (url.indexOf('http') !== -1) {
-        tg.openLink(url);
+    if (target.indexOf('t.me') !== -1) {
+        tg.openTelegramLink(target);
+    } else if (target.indexOf('http') !== -1) {
+        tg.openLink(target);
     } else {
         tg.showAlert('Неверный формат ссылки');
     }
