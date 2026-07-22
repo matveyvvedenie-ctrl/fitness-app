@@ -6,7 +6,48 @@ let tg;
 let workoutData = [];
 let completedCount = 0;
 let totalExercises = 0;
- 
+
+// Платформа определяется по параметрам запуска: VK Mini Apps всегда добавляют
+// vk_user_id в URL при открытии. Если его нет — считаем, что это Telegram
+// (или обычный браузер для тестирования на десктопе, см. catch-фоллбэк ниже).
+var vkLaunchUserId = new URLSearchParams(window.location.search).get('vk_user_id');
+
+if (vkLaunchUserId) {
+    try { window.vkBridge && window.vkBridge.send('VKWebAppInit'); } catch (_) {}
+    tg = {
+        initDataUnsafe: { user: { id: 'vk_' + vkLaunchUserId } },
+        showAlert: function(msg) {
+            try {
+                window.vkBridge.send('VKWebAppShowSnackbar', { text: String(msg) }).catch(function() { alert(msg); });
+            } catch (_) { alert(msg); }
+        },
+        showConfirm: function(msg, callback) {
+            try {
+                window.vkBridge.send('VKWebAppShowDialogBox', { title: '', text: String(msg) })
+                    .then(function(data) { if (callback) callback(!!(data && data.result)); })
+                    .catch(function() { if (callback) callback(confirm(msg)); });
+            } catch (_) { if (callback) callback(confirm(msg)); }
+        },
+        HapticFeedback: {
+            impactOccurred: function(style) {
+                try { window.vkBridge.send('VKWebAppTapticImpactOccurred', { style: style || 'light' }); } catch (_) {}
+            },
+            notificationOccurred: function(type) {
+                try { window.vkBridge.send('VKWebAppTapticNotificationOccurred', { type: type || 'success' }); } catch (_) {}
+            }
+        },
+        openLink: function(url) {
+            try { window.vkBridge.send('VKWebAppOpenLink', { link: url }); } catch (_) { window.open(url, '_blank'); }
+        },
+        openTelegramLink: function(url) { window.open(url, '_blank'); },
+        onEvent: function() {},
+        ready: function() {},
+        expand: function() {},
+        isFullscreen: false,
+        contentSafeAreaInset: { top: 0 }
+    };
+    document.documentElement.style.setProperty('--tg-top-pad', '0px');
+} else {
 try {
     tg = window.Telegram.WebApp;
     tg.ready();
@@ -46,6 +87,7 @@ try {
         openTelegramLink: (url) => window.open(url, '_blank'),
         HapticFeedback: null
     };
+}
 }
  
 document.addEventListener('DOMContentLoaded', init);
@@ -4522,15 +4564,12 @@ function renderMeasurementsHistory() {
 function messageClient(chatId, name) {
     var msg = prompt('Сообщение для ' + name + ':');
     if (!msg || !msg.trim()) return;
-    var url = 'https://api.telegram.org/bot' + '8752235431:AAHuCD1j65HCVd233kG1EvBm8sQX_dX9eW0' + '/sendMessage';
-    fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: '💬 Сообщение от тренера:\n\n' + msg })
-    }).then(function(resp) { return resp.json(); })
-    .then(function(data) {
-        if (data.ok) tg.showAlert('Сообщение отправлено! ✅');
-        else tg.showAlert('Ошибка отправки ❌');
-    }).catch(function() { tg.showAlert('Ошибка отправки ❌'); });
+    var text = '💬 Сообщение от тренера:\n\n' + msg;
+    fetch(APPS_SCRIPT_URL + '?action=notifyClient&targetChatId=' + encodeURIComponent(chatId) + '&message=' + encodeURIComponent(text))
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            if (data.success) tg.showAlert('Сообщение отправлено! ✅');
+            else tg.showAlert('Ошибка отправки ❌');
+        }).catch(function() { tg.showAlert('Ошибка отправки ❌'); });
 }
  
