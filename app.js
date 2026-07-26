@@ -228,11 +228,23 @@ function renderWorkout() {
     updateProgress();
 }
  
+// Экранирование для вставки произвольной строки (ссылки) внутрь HTML-атрибута.
+// Раньше ссылка на видео шла прямо в onclick="..." со «своим» экранированием
+// под JS-строку — если в ссылке (скопированной из таблицы) оказывалась хоть
+// одна двойная кавычка/перенос строки, вся кнопка молча ломалась.
+function _escHtmlAttr(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 function createExerciseCard(exercise, dayIndex, exIndex) {
     var card = document.createElement('div');
     card.className = 'exercise-card';
-    var videoStr = exercise.video != null ? String(exercise.video) : '';
-    var videoVkStr = exercise.videoVk != null ? String(exercise.videoVk) : '';
+    var videoStr = exercise.video != null ? String(exercise.video).trim() : '';
+    var videoVkStr = exercise.videoVk != null ? String(exercise.videoVk).trim() : '';
     var hasVideo = (videoStr && (videoStr.indexOf('http') !== -1 || videoStr.indexOf('📽️') !== -1)) ||
         (videoVkStr && videoVkStr.indexOf('http') !== -1);
     var photo1 = exercise.photo1 || '';
@@ -240,7 +252,7 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
     var photoHtml1 = photo1 ? '<img src="' + photo1 + '" alt="Photo 1" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'🏋️\'">' : '🏋️';
     var photoHtml2 = photo2 ? '<img src="' + photo2 + '" alt="Photo 2" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'💪\'">' : '💪';
     var noteHtml = exercise.note ? '<div class="trainer-note">💬 ' + exercise.note + '</div>' : '';
-    var videoHtml = hasVideo ? '<button class="video-btn" onclick="openVideo(\'' + videoStr.replace(/'/g, "\\'") + '\', \'' + videoVkStr.replace(/'/g, "\\'") + '\')">📹 ВИДЕО ТЕХНИКИ</button>' : '';
+    var videoHtml = hasVideo ? '<button class="video-btn" data-video="' + _escHtmlAttr(videoStr) + '" data-video-vk="' + _escHtmlAttr(videoVkStr) + '" onclick="openVideo(this.dataset.video, this.dataset.videoVk)">📹 ВИДЕО ТЕХНИКИ</button>' : '';
     var commentValue = exercise.comment || '';
     if (commentValue && /^\d{4}-\d{2}-\d{2}T/.test(commentValue)) commentValue = '';
     if (commentValue && /^\d{2}\.\d{2}\.\d{4}/.test(commentValue)) commentValue = '';
@@ -674,11 +686,22 @@ function openVideo(url, urlVk) {
     }
     if (target.indexOf('t.me') !== -1) {
         tg.openTelegramLink(target);
-    } else if (target.indexOf('http') !== -1) {
-        tg.openLink(target);
-    } else {
-        tg.showAlert('Неверный формат ссылки');
+        return;
     }
+    if (target.indexOf('http') === -1) {
+        tg.showAlert('Неверный формат ссылки');
+        return;
+    }
+    // Открываем обычной ссылкой напрямую, без мостовых API (VKWebAppOpenLink
+    // иногда молча отказывает на ссылки vk.com, а запасной window.open после
+    // такого отказа браузер блокирует как всплывающее окно вне клика).
+    var a = document.createElement('a');
+    a.href = target;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
  
 var progressChart = null;
