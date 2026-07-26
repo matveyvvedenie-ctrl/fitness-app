@@ -403,6 +403,43 @@
         </div>
     </div>
 
+    <!-- Модалка: заморозить/продлить абонемент -->
+    <div id="freeze-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeFreezeModal()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title" id="freeze-modal-title">❄️ Заморозка / продление</div>
+                <button class="ex-editor-close" onclick="closeFreezeModal()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">На сколько дней сдвинуть окончание абонемента</label>
+                    <input type="number" inputmode="numeric" class="ex-editor-input" id="freeze-days" placeholder="14">
+                    <div class="ex-editor-hint">Положительное число — заморозка/продление (дата окончания сдвигается вперёд). Отрицательное — если нужно скорректировать ошибку.</div>
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Комментарий (опционально)</label>
+                    <input type="text" class="ex-editor-input" id="freeze-comment" placeholder="Например: отпуск с 1 по 14 августа">
+                </div>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-save" id="freeze-save-btn" onclick="saveFreezeFromModal()">💾 Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка: питание клиента по дням (дриллдаун из дашборда) -->
+    <div id="food-log-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeFoodLogModal()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title" id="food-log-title">📋 Питание</div>
+                <button class="ex-editor-close" onclick="closeFoodLogModal()">✕</button>
+            </div>
+            <div class="ex-editor-body" id="food-log-body"></div>
+        </div>
+    </div>
+
     <!-- Мастер создания нового клиента (двухшаговый, поверх всего, только для тренера) -->
     <div id="new-client-wizard" class="new-client-wizard hidden">
         <div class="cc-header">

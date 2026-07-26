@@ -1203,6 +1203,7 @@ function renderClientCards() {
 
         // Кнопка написать
         var msgBtn = client.chatId ? '<button class="msg-client-btn" onclick="messageClient(\'' + client.chatId + '\', \'' + (client.name || '') + '\')">✉️ Написать</button>' : '';
+        var foodLogBtn = client.chatId ? '<button class="food-log-btn" data-chat-id="' + _escHtmlAttr(client.chatId) + '" data-name="' + _escHtmlAttr(client.name || '') + '" onclick="openFoodLogModal(this.dataset.chatId, this.dataset.name)">📋 Питание по дням</button>' : '';
 
         return '<div class="client-card ' + statusClass + '">' +
             '<div class="client-header">' +
@@ -1227,7 +1228,7 @@ function renderClientCards() {
             '</div>' +
             calHtml +
             alertHtml +
-            msgBtn +
+            '<div class="client-card-actions">' + foodLogBtn + msgBtn + '</div>' +
         '</div>';
     }).join('');
 
@@ -1255,6 +1256,60 @@ function drawSparkline(canvas, data) {
         else ctx.lineTo(x, y);
     });
     ctx.stroke();
+}
+
+// Дриллдаун из дашборда питания: что именно клиент ел по дням, а не только
+// суммарные цифры за сегодня.
+var FOOD_VERDICT_EMOJI = { excellent: '⭐⭐⭐⭐⭐', good: '⭐⭐⭐⭐', acceptable: '⭐⭐⭐', needs_adjustment: '⭐⭐', poor: '⭐' };
+
+async function openFoodLogModal(chatId, name) {
+    document.getElementById('food-log-title').textContent = '📋 Питание — ' + (name || 'Клиент');
+    var body = document.getElementById('food-log-body');
+    body.innerHTML = '<div class="no-data">Загрузка...</div>';
+    document.getElementById('food-log-modal').classList.remove('hidden');
+    try {
+        var url = APPS_SCRIPT_URL + '?action=getClientFoodEntries&chatId=' + encodeURIComponent(chatId) + '&days=14';
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (data.error) {
+            body.innerHTML = '<div class="no-data">' + data.error + '</div>';
+            return;
+        }
+        if (!data.days || data.days.length === 0) {
+            body.innerHTML = '<div class="no-data">Нет записей питания за последние 14 дней</div>';
+            return;
+        }
+        body.innerHTML = data.days.map(function(day) {
+            var entriesHtml = day.entries.map(function(e) {
+                var noteHtml = e.note ? '<div class="food-log-note">' + e.note + '</div>' : '';
+                return '<div class="food-log-entry">' +
+                    '<div class="food-log-entry-head">' +
+                        '<span class="food-log-time">' + (e.time || '') + '</span>' +
+                        '<span>' + (e.mealType || '') + '</span>' +
+                        '<span>' + (FOOD_VERDICT_EMOJI[e.verdict] || '') + '</span>' +
+                    '</div>' +
+                    '<div class="food-log-macros">' +
+                        Math.round(e.calories) + ' ккал · Б' + Math.round(e.protein) + ' · Ж' + Math.round(e.fats) + ' · У' + Math.round(e.carbs) +
+                    '</div>' +
+                    noteHtml +
+                '</div>';
+            }).join('');
+            return '<div class="food-log-day">' +
+                '<div class="food-log-day-header">' +
+                    '<span>' + day.date + '</span>' +
+                    '<span>' + Math.round(day.totals.calories) + ' ккал · Б' + Math.round(day.totals.protein) + ' Ж' + Math.round(day.totals.fats) + ' У' + Math.round(day.totals.carbs) + '</span>' +
+                '</div>' +
+                entriesHtml +
+            '</div>';
+        }).join('');
+    } catch (error) {
+        console.error('Food log error:', error);
+        body.innerHTML = '<div class="no-data">Ошибка загрузки</div>';
+    }
+}
+
+function closeFoodLogModal() {
+    document.getElementById('food-log-modal').classList.add('hidden');
 }
 
 // ========== ADMIN: КЛИЕНТЫ ПО ТРЕНИРОВКАМ ==========
@@ -1422,6 +1477,7 @@ function renderFinanceList() {
             '<div class="fc-info">' + daysText + endText + amountText + '</div>' +
             '<div class="fc-actions">' +
                 '<button class="fc-pay-btn" onclick="openPaymentModal(\'' + c.chatId + '\', \'' + safeName + '\')">💰 Записать оплату</button>' +
+                (c.status !== 'none' ? '<button class="fc-freeze-btn" onclick="openFreezeModal(\'' + c.chatId + '\', \'' + safeName + '\')" title="Заморозить / продлить">❄️</button>' : '') +
                 '<button class="fc-delete-btn" onclick="deleteClientCompletely(\'' + c.chatId + '\', \'' + safeName + '\')" title="Удалить клиента">🗑️</button>' +
             '</div>' +
         '</div>';
@@ -1490,6 +1546,63 @@ async function savePaymentFromModal() {
         tg.showAlert('Ошибка соединения');
         btn.disabled = false;
         btn.textContent = '💾 Записать';
+    }
+}
+
+// Модалка заморозки/продления абонемента
+var currentFreezeClient = null;
+
+function openFreezeModal(chatId, clientName) {
+    currentFreezeClient = { chatId: chatId, name: clientName };
+    document.getElementById('freeze-modal-title').textContent = '❄️ Заморозка — ' + clientName;
+    document.getElementById('freeze-days').value = '';
+    document.getElementById('freeze-comment').value = '';
+    var btn = document.getElementById('freeze-save-btn');
+    btn.disabled = false;
+    btn.textContent = '💾 Сохранить';
+    document.getElementById('freeze-modal').classList.remove('hidden');
+}
+
+function closeFreezeModal() {
+    document.getElementById('freeze-modal').classList.add('hidden');
+    currentFreezeClient = null;
+}
+
+async function saveFreezeFromModal() {
+    if (!currentFreezeClient) return;
+    var days = parseInt(document.getElementById('freeze-days').value);
+    var comment = document.getElementById('freeze-comment').value.trim();
+    if (!days) {
+        tg.showAlert('Укажи количество дней (не 0)');
+        return;
+    }
+    var btn = document.getElementById('freeze-save-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+    try {
+        var url = APPS_SCRIPT_URL + '?action=adjustSubscriptionEnd' +
+            '&clientChatId=' + encodeURIComponent(currentFreezeClient.chatId) +
+            '&days=' + encodeURIComponent(days) +
+            '&comment=' + encodeURIComponent(comment);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            btn.disabled = false;
+            btn.textContent = '💾 Сохранить';
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        btn.textContent = '✅ Сохранено';
+        setTimeout(function() {
+            closeFreezeModal();
+            loadFinances();
+        }, 600);
+    } catch (error) {
+        console.error('Adjust subscription error:', error);
+        tg.showAlert('Ошибка соединения');
+        btn.disabled = false;
+        btn.textContent = '💾 Сохранить';
     }
 }
 

@@ -980,6 +980,71 @@ body {
     opacity: 0.9;
 }
 
+.client-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+.client-card-actions .msg-client-btn,
+.client-card-actions .food-log-btn {
+    flex: 1;
+    width: auto;
+    margin-top: 0;
+}
+.food-log-btn {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.food-log-btn:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+}
+
+.food-log-day {
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #f0f0f0;
+}
+.food-log-day:last-child { border-bottom: none; }
+.food-log-day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-weight: 700;
+    color: #1a1a2e;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+.food-log-day-header span:last-child {
+    font-weight: 500;
+    color: #666;
+    font-size: 12px;
+}
+.food-log-entry {
+    background: #f8f8fa;
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+}
+.food-log-entry-head {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a2e;
+}
+.food-log-time { color: #999; font-weight: 500; }
+.food-log-macros { font-size: 12px; color: #666; margin-top: 2px; }
+.food-log-note { font-size: 12px; color: #888; margin-top: 4px; font-style: italic; }
+
 /* ========== ADMIN: КЛИЕНТЫ ПО ТРЕНИРОВКАМ ========== */
 
 .admin-summary {
@@ -1720,6 +1785,16 @@ body {
 .fc-delete-btn {
     background: #ffebee;
     color: #c62828;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.fc-freeze-btn {
+    background: #e3f2fd;
+    color: #1565c0;
     border: none;
     border-radius: 10px;
     padding: 10px 14px;
@@ -3322,6 +3397,13 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.3px;
     margin-bottom: 4px;
+}
+
+.ex-editor-hint {
+    font-size: 12px;
+    color: #999;
+    margin-top: 6px;
+    line-height: 1.4;
 }
 
 .ex-editor-input,
