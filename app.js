@@ -37,7 +37,9 @@ if (vkLaunchUserId) {
             }
         },
         openLink: function(url) {
-            try { window.vkBridge.send('VKWebAppOpenLink', { link: url }); } catch (_) { window.open(url, '_blank'); }
+            try {
+                window.vkBridge.send('VKWebAppOpenLink', { link: url }).catch(function() { window.open(url, '_blank'); });
+            } catch (_) { window.open(url, '_blank'); }
         },
         openTelegramLink: function(url) { window.open(url, '_blank'); },
         onEvent: function() {},
@@ -47,6 +49,7 @@ if (vkLaunchUserId) {
         contentSafeAreaInset: { top: 0 }
     };
     document.documentElement.style.setProperty('--tg-top-pad', '0px');
+    document.documentElement.style.setProperty('--vk-right-pad', '110px');
 } else {
 try {
     tg = window.Telegram.WebApp;
