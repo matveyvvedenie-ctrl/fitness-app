@@ -1,6 +1,11 @@
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqpppW2wnxH4nAYrZDaIu0XedFB5wfOeUXXokxFz4TpslB-GqD24B9GsPp0i_nTJ4GVA/exec';
- 
+
 const TRAINER_CHAT_ID = '739299264';
+const TRAINER_VK_CHAT_ID = 'vk_458191089'; // тот же тренер, но заходит через VK
+
+function isTrainer(chatId) {
+    return chatId === TRAINER_CHAT_ID || chatId === TRAINER_VK_CHAT_ID;
+}
 
 let tg;
 let workoutData = [];
@@ -1069,8 +1074,8 @@ var dashboardClients = [];
 var currentFilter = 'all';
 
 function initAdminTab() {
-    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '';
-    if (chatId === TRAINER_CHAT_ID) {
+    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    if (isTrainer(chatId)) {
         document.getElementById('admin-tab-btn').classList.remove('hidden');
         document.getElementById('tabs-container').classList.add('tabs-5');
         initFilters();
