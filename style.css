@@ -1,3 +1,11 @@
+/* Основной брендовый цвет (тёмно-синий по умолчанию) — единственное, что
+   реально меняется по тренерам сейчас. Переопределяется в рантайме из JS
+   (applyTenantTheme в app.js) по теме тенанта; без темы — эти же значения. */
+:root {
+    --color-primary: #1a1a2e;
+    --color-primary-dark: #16213e;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -694,7 +702,7 @@ body {
 /* ========== ADMIN DASHBOARD ========== */
 
 .dashboard-header {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
     padding: 20px 16px;
     color: white;
     display: flex;
@@ -742,7 +750,7 @@ body {
 .summary-value {
     font-size: 24px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     margin-bottom: 4px;
 }
 
@@ -842,7 +850,7 @@ body {
 .client-stat-value {
     font-size: 16px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
 }
 
 .client-alert {
@@ -893,9 +901,9 @@ body {
 }
 
 .filter-btn.active {
-    background: #1a1a2e;
+    background: var(--color-primary);
     color: white;
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
 }
 
 .filter-btn:active {
@@ -1018,7 +1026,7 @@ body {
     justify-content: space-between;
     align-items: baseline;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     font-size: 14px;
     margin-bottom: 8px;
 }
@@ -1039,7 +1047,7 @@ body {
     align-items: center;
     font-size: 13px;
     font-weight: 600;
-    color: #1a1a2e;
+    color: var(--color-primary);
 }
 .food-log-time { color: #999; font-weight: 500; }
 .food-log-macros { font-size: 12px; color: #666; margin-top: 2px; }
@@ -1083,7 +1091,7 @@ body {
 .admin-summary-value {
     font-size: 24px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     margin-bottom: 2px;
 }
 
@@ -1115,7 +1123,7 @@ body {
 }
 
 .admin-search:focus {
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
     background: white;
 }
 
@@ -1154,9 +1162,9 @@ body {
 }
 
 .admin-filter-btn.active {
-    background: #1a1a2e;
+    background: var(--color-primary);
     color: white;
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
 }
 
 .admin-filter-btn:active {
@@ -1248,7 +1256,7 @@ body {
 .admin-card-meta-value {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
 }
 
 .admin-card-badge {
@@ -1294,7 +1302,7 @@ body {
 }
 
 .admin-card-btn-primary {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     color: white;
 }
 
@@ -1349,7 +1357,7 @@ body {
 }
 
 .admin-clients-table th {
-    background: #1a1a2e;
+    background: var(--color-primary);
     color: white;
     text-align: left;
     padding: 12px 14px;
@@ -1420,7 +1428,7 @@ body {
     padding: 14px 16px;
     font-weight: 700;
     font-size: 14px;
-    color: #1a1a2e;
+    color: var(--color-primary);
     cursor: pointer;
     background: linear-gradient(135deg, #f5f5f5, #ffffff);
     list-style: none;
@@ -1492,7 +1500,7 @@ body {
 }
 
 .cc-header {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
     color: white;
     padding: 16px 14px;
     display: flex;
@@ -1575,8 +1583,8 @@ body {
 }
 
 .cc-tab-btn.active {
-    color: #1a1a2e;
-    border-bottom-color: #1a1a2e;
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
 }
 
 .cc-tab-content {
@@ -1625,7 +1633,7 @@ body {
 }
 
 .cc-action-week {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     color: white;
     box-shadow: 0 2px 8px rgba(26,26,46,0.18);
 }
@@ -1676,7 +1684,7 @@ body {
 }
 .admin-section-btn.active {
     background: white;
-    color: #1a1a2e;
+    color: var(--color-primary);
     box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 .admin-section { display: none; }
@@ -1703,7 +1711,7 @@ body {
 .finance-summary-value {
     font-size: 26px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
 }
 .finance-summary-label {
     font-size: 12px;
@@ -1738,7 +1746,7 @@ body {
 .fc-name {
     font-size: 16px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
 }
 .fc-status-badge {
     font-size: 11px;
@@ -1763,7 +1771,7 @@ body {
     font-size: 13px;
     color: #5a5e6e;
 }
-.fc-info-item strong { color: #1a1a2e; font-weight: 600; }
+.fc-info-item strong { color: var(--color-primary); font-weight: 600; }
 
 .fc-actions {
     margin-top: 12px;
@@ -1810,7 +1818,7 @@ body {
     padding: 12px 14px;
     margin-bottom: 14px;
     font-size: 14px;
-    color: #1a1a2e;
+    color: var(--color-primary);
     line-height: 1.45;
 }
 .reports-list { display: flex; flex-direction: column; gap: 10px; }
@@ -1822,7 +1830,7 @@ body {
     border-left: 4px solid #2196f3;
 }
 .report-card.no-data { border-left-color: #9e9e9e; opacity: 0.85; }
-.report-card-name { font-size: 16px; font-weight: 700; color: #1a1a2e; }
+.report-card-name { font-size: 16px; font-weight: 700; color: var(--color-primary); }
 .report-card-summary { font-size: 13px; color: #5a5e6e; margin-top: 4px; }
 .report-card-status {
     font-size: 11px;
@@ -1860,7 +1868,7 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', Menlo, monospace;
     font-size: 12px;
     line-height: 1.5;
-    color: #1a1a2e;
+    color: var(--color-primary);
     white-space: pre-wrap;
     word-break: break-word;
     max-height: 60vh;
@@ -1924,7 +1932,7 @@ body {
     width: calc(100% - 12px);
     margin: 8px 6px 0;
     background: white;
-    color: #1a1a2e;
+    color: var(--color-primary);
     border: 2px dashed #c5c8d6;
     border-radius: 10px;
     padding: 10px 12px;
@@ -1936,7 +1944,7 @@ body {
 
 .cc-add-ex-btn:hover {
     background: #f5f5f7;
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
 }
 
 .cc-add-ex-btn:active {
@@ -1946,7 +1954,7 @@ body {
 .cc-day-title {
     font-size: 14px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     padding: 6px 8px 10px;
     flex: 1;
 }
@@ -1971,14 +1979,14 @@ body {
     transition: all 0.15s ease;
 }
 
-.cc-day-menu-btn:hover { background: #f5f5f7; color: #1a1a2e; }
+.cc-day-menu-btn:hover { background: #f5f5f7; color: var(--color-primary); }
 .cc-day-menu-btn:active { transform: scale(0.92); }
 
 /* Кнопка «+ Добавить день тренировки» под всеми днями */
 .cc-add-day-btn {
     width: 100%;
     margin-top: 16px;
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     color: white;
     border: none;
     border-radius: 12px;
@@ -2055,7 +2063,7 @@ body {
 .cc-exercise:last-child { border-bottom: none; }
 
 .cc-ex-num {
-    background: #1a1a2e;
+    background: var(--color-primary);
     color: white;
     width: 22px;
     height: 22px;
@@ -2084,7 +2092,7 @@ body {
 
 .cc-ex-suplabel {
     display: inline-block;
-    background: #1a1a2e;
+    background: var(--color-primary);
     color: white;
     font-size: 10px;
     font-weight: 800;
@@ -2122,7 +2130,7 @@ body {
 .cc-cell-value {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
 }
 
 .cc-ex-fact {
@@ -2187,7 +2195,7 @@ body {
 .ex-block-section-title {
     font-size: 13px;
     font-weight: 800;
-    color: #1a1a2e;
+    color: var(--color-primary);
     margin-bottom: 8px;
     text-transform: uppercase;
     letter-spacing: 0.4px;
@@ -2294,7 +2302,7 @@ body {
 }
 
 .ex-stat-header {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
     color: white;
     padding: 14px;
     display: flex;
@@ -2386,7 +2394,7 @@ body {
 .ex-stat-table-title {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     margin-bottom: 8px;
 }
 
@@ -2414,7 +2422,7 @@ body {
 }
 
 .ex-stat-row-value {
-    color: #1a1a2e;
+    color: var(--color-primary);
 }
 
 .ex-stat-row-rpe {
@@ -2488,7 +2496,7 @@ body {
 .nc-section-title {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     margin-bottom: 12px;
     text-transform: uppercase;
     letter-spacing: 0.4px;
@@ -2515,7 +2523,7 @@ body {
 .nc-btn {
     flex: 1;
     background: #f5f5f7;
-    color: #1a1a2e;
+    color: var(--color-primary);
     border: none;
     border-radius: 12px;
     padding: 14px;
@@ -2529,7 +2537,7 @@ body {
 .nc-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .nc-btn-primary {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     color: white;
     box-shadow: 0 3px 8px rgba(26,26,46,0.2);
 }
@@ -2550,7 +2558,7 @@ body {
 .nc-program-option:hover { background: #ebebf0; }
 .nc-program-option.selected {
     background: #f0f4ff;
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
 }
 
 .nc-program-icon {
@@ -2571,7 +2579,7 @@ body {
 .nc-program-name {
     font-size: 14px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     margin-bottom: 2px;
 }
 
@@ -2610,7 +2618,7 @@ body {
 .stats-card-title {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     margin-bottom: 4px;
 }
 
@@ -2623,7 +2631,7 @@ body {
 .stats-big-value {
     font-size: 38px;
     font-weight: 800;
-    color: #1a1a2e;
+    color: var(--color-primary);
     line-height: 1;
     margin: 6px 0 4px;
 }
@@ -2779,7 +2787,7 @@ body {
 .notes-card-title {
     font-size: 14px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     margin-bottom: 10px;
 }
 
@@ -2799,7 +2807,7 @@ body {
 }
 
 .notes-textarea:focus {
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
     background: white;
 }
 
@@ -2824,7 +2832,7 @@ body {
 .notes-checkbox-label input { width: 16px; height: 16px; cursor: pointer; }
 
 .notes-save-btn {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     color: white;
     border: none;
     border-radius: 10px;
@@ -2847,7 +2855,7 @@ body {
     background: #fafafa;
     border-radius: 10px;
     padding: 10px 12px;
-    border-left: 4px solid #1a1a2e;
+    border-left: 4px solid var(--color-primary);
 }
 
 .notes-item-important {
@@ -2906,7 +2914,7 @@ body {
     padding: 14px;
     font-weight: 700;
     font-size: 14px;
-    color: #1a1a2e;
+    color: var(--color-primary);
     cursor: pointer;
     list-style: none;
     user-select: none;
@@ -2963,7 +2971,7 @@ body {
     font-family: inherit;
 }
 
-.prof-input:focus { background: white; border-color: #1a1a2e; }
+.prof-input:focus { background: white; border-color: var(--color-primary); }
 
 .prof-radio-group { display: flex; gap: 6px; }
 .prof-radio {
@@ -2977,16 +2985,16 @@ body {
     user-select: none;
     font-weight: 700;
     font-size: 14px;
-    color: #1a1a2e;
+    color: var(--color-primary);
     transition: all 0.15s ease;
 }
 
 .prof-radio input { display: none; }
 
 .prof-radio:has(input:checked) {
-    background: #1a1a2e;
+    background: var(--color-primary);
     color: white;
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
 }
 
 .prof-checks {
@@ -3038,7 +3046,7 @@ body {
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     overflow: hidden;
-    border-left: 4px solid #1a1a2e;
+    border-left: 4px solid var(--color-primary);
 }
 
 .hh-day-summary {
@@ -3084,7 +3092,7 @@ body {
 .hh-date {
     font-size: 14px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
 }
 
 .hh-ago {
@@ -3143,7 +3151,7 @@ body {
 .hh-ex-fact-value { font-weight: 700; }
 
 .hh-ex-rpe {
-    color: #1a1a2e;
+    color: var(--color-primary);
     font-weight: 600;
 }
 
@@ -3224,7 +3232,7 @@ body {
 .ex-add-type-title {
     font-size: 18px;
     font-weight: 800;
-    color: #1a1a2e;
+    color: var(--color-primary);
 }
 
 .ex-add-type-subtitle {
@@ -3250,7 +3258,7 @@ body {
 .ex-add-type-option:hover,
 .ex-add-type-option:active {
     background: #ebebf0;
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
     transform: scale(0.985);
 }
 
@@ -3272,7 +3280,7 @@ body {
 .ex-add-type-name {
     font-size: 15px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     margin-bottom: 2px;
 }
 
@@ -3350,7 +3358,7 @@ body {
 .ex-editor-title {
     font-size: 16px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3427,7 +3435,7 @@ body {
 .ex-editor-input:focus,
 .ex-editor-textarea:focus {
     background: white;
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
 }
 
 .ex-editor-history-hint {
@@ -3507,9 +3515,9 @@ body {
 }
 
 .ex-lib-tab.active {
-    background: #1a1a2e;
+    background: var(--color-primary);
     color: white;
-    border-color: #1a1a2e;
+    border-color: var(--color-primary);
 }
 
 .ex-library-list {
@@ -3586,7 +3594,7 @@ body {
 }
 
 .ex-editor-btn-save {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     color: white;
     flex: 1.5;
 }
@@ -3594,7 +3602,7 @@ body {
 /* На десктопе карточка клиента — по центру, ограничена по ширине */
 @media (min-width: 900px) {
     .client-card-screen {
-        background: linear-gradient(180deg, #1a1a2e 0%, #1a1a2e 200px, #f5f5f7 200px);
+        background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary) 200px, #f5f5f7 200px);
     }
     .cc-header,
     .cc-tabs,
@@ -3891,7 +3899,7 @@ body {
 .home-card-title {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-primary);
     text-transform: uppercase;
     letter-spacing: 0.4px;
     margin-bottom: 14px;
@@ -3921,7 +3929,7 @@ body {
 .home-dot-day {
     font-size: 15px;
     font-weight: 800;
-    color: #1a1a2e;
+    color: var(--color-primary);
     line-height: 1;
 }
 

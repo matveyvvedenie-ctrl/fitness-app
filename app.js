@@ -3,8 +3,86 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqpppW2wnxH4nA
 const TRAINER_CHAT_ID = '739299264';
 const TRAINER_VK_CHAT_ID = 'vk_458191089'; // тот же тренер, но заходит через VK
 
+// Мульти-тенантность: если мини-апп открыт из сообщества тренера, VK кладёт
+// vk_group_id в параметры запуска — это и есть trainerId для бэкенда (см.
+// apps_script.js _resolveTenant). Без него (Telegram, или VK без группы) —
+// пусто, бэкенд использует тенанта по умолчанию (Matvey), как и раньше.
+const CURRENT_TRAINER_ID = new URLSearchParams(window.location.search).get('vk_group_id') || '';
+
+// Тема текущего тенанта, подтягивается в init() через loadTenantConfig().
+// tenantTrainerChatId — фоллбэк для isTrainer() у тренеров, подключённых
+// после этого шага (у самого Matvey и так есть хардкод выше, на всякий случай).
+let tenantTheme = null;
+let tenantTrainerChatId = '';
+
 function isTrainer(chatId) {
-    return chatId === TRAINER_CHAT_ID || chatId === TRAINER_VK_CHAT_ID;
+    return chatId === TRAINER_CHAT_ID || chatId === TRAINER_VK_CHAT_ID ||
+        (!!tenantTrainerChatId && chatId === tenantTrainerChatId);
+}
+
+// Прозрачно добавляем trainerId ко всем запросам к Apps Script, не трогая
+// каждый из ~40 существующих fetch(...) по всему файлу. Без CURRENT_TRAINER_ID
+// (обычный Telegram-запуск или VK без группы) ничего не добавляется —
+// поведение как раньше.
+(function() {
+    var nativeFetch = window.fetch.bind(window);
+    window.fetch = function(input, init) {
+        if (CURRENT_TRAINER_ID && typeof input === 'string' && input.indexOf(APPS_SCRIPT_URL) === 0) {
+            var sep = input.indexOf('?') === -1 ? '?' : '&';
+            input = input + sep + 'trainerId=' + encodeURIComponent(CURRENT_TRAINER_ID);
+        }
+        return nativeFetch(input, init);
+    };
+})();
+
+// Затемняет hex-цвет на заданную долю (0..1) — чтобы из ОДНОГО присланного
+// тренером акцентного цвета получить вторую точку градиента, не требуя от
+// тренера подбирать пару цветов вручную.
+function _darkenHex(hex, amount) {
+    try {
+        var h = hex.replace('#', '');
+        if (h.length === 3) h = h.split('').map(function(c) { return c + c; }).join('');
+        var num = parseInt(h, 16);
+        var r = Math.max(0, Math.round(((num >> 16) & 0xFF) * (1 - amount)));
+        var g = Math.max(0, Math.round(((num >> 8) & 0xFF) * (1 - amount)));
+        var b = Math.max(0, Math.round((num & 0xFF) * (1 - amount)));
+        return '#' + [r, g, b].map(function(v) { return v.toString(16).padStart(2, '0'); }).join('');
+    } catch (_) { return hex; }
+}
+
+function applyTenantTheme(theme) {
+    if (!theme || !theme.primary) return;
+    var root = document.documentElement;
+    root.style.setProperty('--color-primary', theme.primary);
+    root.style.setProperty('--color-primary-dark', _darkenHex(theme.primary, 0.2));
+    if (theme.displayName) {
+        var titleEl = document.querySelector('title');
+        if (titleEl) titleEl.textContent = theme.displayName;
+    }
+}
+
+// Возвращает false, если доступ тенанта заблокирован (демо истекло/отключён) —
+// в этом случае сообщение уже показано и init() должен остановиться, ничего
+// больше не загружая.
+async function loadTenantConfig() {
+    if (!CURRENT_TRAINER_ID) return true; // тенант по умолчанию — тема как есть, ничего не грузим
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getTenantConfig');
+        var data = await resp.json();
+        if (data && data.blocked) {
+            document.body.innerHTML = '<div style="padding:40px 20px;text-align:center;font-family:sans-serif;">' +
+                (data.error || 'Доступ недоступен') + '</div>';
+            return false;
+        }
+        if (data && !data.error) {
+            tenantTheme = data.theme || null;
+            tenantTrainerChatId = data.trainerChatId || '';
+            applyTenantTheme(tenantTheme);
+        }
+    } catch (e) {
+        console.error('loadTenantConfig failed:', e);
+    }
+    return true;
 }
 
 let tg;
@@ -106,6 +184,8 @@ var weekTitle = '';
 async function init() {
     console.log('Init started...');
     try {
+        const tenantOk = await loadTenantConfig();
+        if (!tenantOk) return;
         const response = await loadWorkoutData();
         console.log('Data received:', response);
         clientName = response.clientName || '';
