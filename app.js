@@ -221,6 +221,20 @@ async function init() {
         }
     } catch (error) {
         console.error('ERROR:', error);
+        var currentChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '';
+        if (/Client not found/.test(error.message) && isTrainer(currentChatId)) {
+            // Тренер открыл свою же панель, но у него нет "своей" карточки клиента
+            // (в отличие от Matvey, у которого в таблице есть тестовая запись о
+            // себе — исторически) — это нормально. Ведём сразу в админку, а не на
+            // экран "запросить доступ у тренера" (это же и есть тренер).
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('main-screen').classList.remove('hidden');
+            initializeTabs();
+            initAdminTab();
+            var adminTabBtn = document.querySelector('.tab-btn[data-tab="admin"]');
+            if (adminTabBtn) adminTabBtn.click();
+            return;
+        }
         if (vkLaunchUserId && /Client not found/.test(error.message)) {
             renderVkAccessRequest();
             return;
