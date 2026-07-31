@@ -4278,6 +4278,17 @@ function exerciseMatchesMuscles(ex, muscles) {
 async function openExerciseLibrary() {
     var panel = document.getElementById('ex-library-panel');
     if (!panel) return;
+    // Панель библиотеки — один общий элемент на два модальных окна (одиночное
+    // упражнение и суперсет/трисет). Физически она живёт внутри #ex-editor-modal;
+    // когда открыт #ex-block-modal, тот спрятан (display:none у родителя), и
+    // просто снять .hidden с самой панели недостаточно — надо перенести её узел
+    // в слот нужной модалки, иначе выпадающий список не будет виден вообще.
+    var targetSlot = currentSetType === 'single'
+        ? document.querySelector('#ex-editor-modal .ex-editor-body')
+        : document.getElementById('ex-block-library-slot');
+    if (targetSlot && panel.parentElement !== targetSlot) {
+        targetSlot.appendChild(panel);
+    }
     panel.classList.remove('hidden');
     librarySearchText = '';
 
@@ -4504,14 +4515,77 @@ async function deleteCurrentDay() {
     }
 }
 
-async function showAddDayDialog() {
+// День недели (один) + группы мышц (несколько) галочками — вместо ручного
+// набора текста вида "Пт Грудь-Трицепс". Итоговая строка собирается сама и
+// уходит в addClientDay тем же способом, что и раньше.
+var ADD_DAY_WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+var addDaySelectedWeekday = '';
+var addDaySelectedMuscles = [];
+
+function _capitalizeMuscle(m) {
+    return m.charAt(0).toUpperCase() + m.slice(1);
+}
+
+function showAddDayDialog() {
     if (!currentClientCard) return;
-    var dayName = prompt('Название нового дня (например: «Пт Грудь-Трицепс»):');
-    if (!dayName || !dayName.trim()) return;
+    addDaySelectedWeekday = '';
+    addDaySelectedMuscles = [];
+
+    var weekdayRow = document.getElementById('add-day-weekday-row');
+    weekdayRow.innerHTML = ADD_DAY_WEEKDAYS.map(function(d) {
+        return '<button type="button" class="add-day-chip" data-day="' + d + '" onclick="selectAddDayWeekday(\'' + d + '\')">' + d + '</button>';
+    }).join('');
+
+    var muscleGrid = document.getElementById('add-day-muscle-grid');
+    muscleGrid.innerHTML = KNOWN_MUSCLES.map(function(m) {
+        return '<button type="button" class="add-day-chip" data-muscle="' + m + '" onclick="toggleAddDayMuscle(\'' + m + '\')">' + _capitalizeMuscle(m) + '</button>';
+    }).join('');
+
+    updateAddDayPreview();
+    document.getElementById('add-day-modal').classList.remove('hidden');
+}
+
+function closeAddDayModal() {
+    document.getElementById('add-day-modal').classList.add('hidden');
+}
+
+function selectAddDayWeekday(day) {
+    addDaySelectedWeekday = day;
+    document.querySelectorAll('#add-day-weekday-row .add-day-chip').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.day === day);
+    });
+    updateAddDayPreview();
+}
+
+function toggleAddDayMuscle(muscle) {
+    var idx = addDaySelectedMuscles.indexOf(muscle);
+    if (idx === -1) addDaySelectedMuscles.push(muscle); else addDaySelectedMuscles.splice(idx, 1);
+    document.querySelectorAll('#add-day-muscle-grid .add-day-chip').forEach(function(btn) {
+        btn.classList.toggle('active', addDaySelectedMuscles.indexOf(btn.dataset.muscle) !== -1);
+    });
+    updateAddDayPreview();
+}
+
+function updateAddDayPreview() {
+    var muscleLabel = addDaySelectedMuscles.map(_capitalizeMuscle).join('-');
+    document.getElementById('add-day-preview').value = (addDaySelectedWeekday + ' ' + muscleLabel).trim();
+}
+
+async function submitAddDay() {
+    if (!currentClientCard) return;
+    var dayName = (document.getElementById('add-day-preview').value || '').trim();
+    if (!dayName) {
+        tg.showAlert('Выбери день недели и хотя бы одну группу мышц (или впиши название вручную в поле выше)');
+        return;
+    }
+    var btn = document.getElementById('add-day-save-btn');
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Добавление...';
     try {
         var url = APPS_SCRIPT_URL + '?action=addClientDay' +
             '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
-            '&dayName=' + encodeURIComponent(dayName.trim());
+            '&dayName=' + encodeURIComponent(dayName);
         var resp = await fetch(url);
         var data = await resp.json();
         if (!data.success) {
@@ -4519,10 +4593,14 @@ async function showAddDayDialog() {
             return;
         }
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        closeAddDayModal();
         await loadClientProgram(currentClientCard.sheetName);
     } catch (error) {
         console.error('Add day error:', error);
         tg.showAlert('Ошибка соединения ❌');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = origText;
     }
 }
 

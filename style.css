@@ -3465,6 +3465,30 @@ body {
 
 .ex-editor-row .ex-editor-field { margin-bottom: 12px; }
 
+/* Чипы выбора дня недели / групп мышц в модалке "Добавить день" */
+.add-day-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.add-day-chip {
+    border: 1px solid #e0e0e0;
+    background: white;
+    color: #666;
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.add-day-chip.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
 .ex-editor-label {
     display: block;
     font-size: 11px;

@@ -1038,8 +1038,41 @@
             <div class="ex-editor-body" id="ex-block-body">
                 <!-- секции вставляются JS-ом -->
             </div>
+            <!-- Сюда JS переносит #ex-library-panel, пока открыт этот модал (см.
+                 openExerciseLibrary в app.js) — сам панель общий на оба модала,
+                 иначе внутри спрятанного #ex-editor-modal он был бы невидим. -->
+            <div id="ex-block-library-slot"></div>
             <div class="ex-editor-actions">
                 <button class="ex-editor-btn ex-editor-btn-save" id="ex-block-save-btn">➕ Добавить блок</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка добавления дня тренировки: день недели + группы мышц галочками,
+         вместо ручного набора текста вида "Пт Грудь-Трицепс" -->
+    <div id="add-day-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeAddDayModal()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title">+ Новый день тренировки</div>
+                <button class="ex-editor-close" onclick="closeAddDayModal()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">День недели</label>
+                    <div class="add-day-chip-row" id="add-day-weekday-row"></div>
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Группы мышц (можно несколько)</label>
+                    <div class="add-day-chip-row" id="add-day-muscle-grid"></div>
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Название дня (можно поправить вручную)</label>
+                    <input type="text" id="add-day-preview" class="ex-editor-input" placeholder="Пн Грудь-Бицепс-Трицепс">
+                </div>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-save" id="add-day-save-btn" onclick="submitAddDay()">➕ Добавить день</button>
             </div>
         </div>
     </div>
