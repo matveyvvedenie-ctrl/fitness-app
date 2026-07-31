@@ -2587,7 +2587,8 @@ function renderClientProgram(data) {
         });
     });
     if (days.length === 0) {
-        container.innerHTML = '<div class="no-data">В программе пока нет упражнений</div>';
+        container.innerHTML = '<div class="no-data">В программе пока нет упражнений</div>' +
+            '<button class="cc-add-day-btn" onclick="showAddDayDialog()">+ Добавить день тренировки</button>';
         return;
     }
 
