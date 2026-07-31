@@ -213,6 +213,7 @@ async function init() {
         document.getElementById('main-screen').classList.remove('hidden');
         initializeTabs();
         initAdminTab();
+        initSuperAdminTab();
         // Опрос самочувствия — один раз при первом входе в тренировку.
         // Если клиент закроет/пропустит — считается «Бодрый», веса как есть.
         if (!wellnessAsked && workoutData.length > 0) {
@@ -231,6 +232,7 @@ async function init() {
             document.getElementById('main-screen').classList.remove('hidden');
             initializeTabs();
             initAdminTab();
+        initSuperAdminTab();
             var adminTabBtn = document.querySelector('.tab-btn[data-tab="admin"]');
             if (adminTabBtn) adminTabBtn.click();
             return;
@@ -1179,6 +1181,88 @@ function initAdminTab() {
         initExerciseEditor();
         initAddTypeDialog();
         initBlockModal();
+    }
+}
+
+// Супер-админка — список ВСЕХ тренеров (не только текущего тенанта). Видна
+// только буквально Matvey (хардкод TRAINER_CHAT_ID/TRAINER_VK_CHAT_ID), а не
+// tenantTrainerChatId — иначе тренер, тестирующий своё демо, тоже бы её увидел.
+var SUPERADMIN_STATUS_LABELS = { active: 'Активен', demo: 'Демо', disabled: 'Отключён' };
+
+function isMatveySuperAdmin(chatId) {
+    return chatId === TRAINER_CHAT_ID || chatId === TRAINER_VK_CHAT_ID;
+}
+
+function initSuperAdminTab() {
+    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    if (!isMatveySuperAdmin(chatId)) return;
+    document.getElementById('superadmin-tab-btn').classList.remove('hidden');
+    var tabsContainer = document.getElementById('tabs-container');
+    tabsContainer.classList.remove('tabs-5');
+    tabsContainer.classList.add('tabs-6');
+    loadSuperAdminTrainers();
+}
+
+async function loadSuperAdminTrainers() {
+    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    var container = document.getElementById('superadmin-trainers-list');
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getTrainersOverview&chatId=' + encodeURIComponent(chatId));
+        var data = await resp.json();
+        if (data.error) {
+            container.innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
+            return;
+        }
+        renderSuperAdminTrainers(data.trainers || []);
+    } catch (e) {
+        container.innerHTML = '<div class="no-data">Не удалось загрузить</div>';
+    }
+}
+
+function renderSuperAdminTrainers(trainers) {
+    var container = document.getElementById('superadmin-trainers-list');
+    if (!trainers.length) {
+        container.innerHTML = '<div class="no-data">Тренеров пока нет</div>';
+        return;
+    }
+    container.innerHTML = trainers.map(function(t) {
+        var statusLabel = SUPERADMIN_STATUS_LABELS[t.status] || t.status || '—';
+        var isDisabled = t.status === 'disabled';
+        var expiresLine = t.demoExpiresAt
+            ? ('<div class="superadmin-trainer-meta">Демо до: ' + new Date(t.demoExpiresAt).toLocaleString('ru-RU') + '</div>')
+            : '';
+        var name = (t.displayName || t.trainerId || '').toString();
+        return (
+            '<div class="superadmin-trainer-row">' +
+                '<div class="superadmin-trainer-info">' +
+                    '<div class="superadmin-trainer-name">' + name + '</div>' +
+                    '<div class="superadmin-trainer-meta">ID: ' + t.trainerId +
+                        (t.vkGroupId ? (' · группа ' + t.vkGroupId) : '') + '</div>' +
+                    expiresLine +
+                    '<span class="superadmin-status-badge status-' + (t.status || '') + '">' + statusLabel + '</span>' +
+                '</div>' +
+                '<button class="superadmin-toggle-btn' + (isDisabled ? ' is-disabled' : '') +
+                    '" onclick="toggleTrainerStatus(\'' + t.trainerId + '\', \'' + (isDisabled ? 'active' : 'disabled') + '\')">' +
+                    (isDisabled ? 'Включить' : 'Отключить') +
+                '</button>' +
+            '</div>'
+        );
+    }).join('');
+}
+
+async function toggleTrainerStatus(trainerId, newStatus) {
+    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=setTrainerStatus&chatId=' + encodeURIComponent(chatId) +
+            '&targetTrainerId=' + encodeURIComponent(trainerId) + '&status=' + encodeURIComponent(newStatus));
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Не получилось: ' + (data.error || 'ошибка'));
+            return;
+        }
+        loadSuperAdminTrainers();
+    } catch (e) {
+        tg.showAlert('Ошибка сети');
     }
 }
 

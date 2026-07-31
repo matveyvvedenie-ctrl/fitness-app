@@ -26,6 +26,7 @@
             <button class="tab-btn" data-tab="progress">📊 Прогресс</button>
             <button class="tab-btn" data-tab="measurements">📏 Замеры</button>
             <button class="tab-btn hidden" data-tab="admin" id="admin-tab-btn">👑 Админ <span class="tab-badge hidden" id="admin-badge">0</span></button>
+            <button class="tab-btn hidden" data-tab="superadmin" id="superadmin-tab-btn">🛠 Тренеры</button>
         </div>
 
         <!-- Home Tab -->
@@ -355,6 +356,17 @@
                 </div>
             </div>
             <!-- ======= КОНЕЦ БЛОКА «ОТЧЁТЫ» ======= -->
+        </div>
+
+        <!-- Супер-админка: список всех тренеров (только для Matvey, независимо
+             от того, чью таблицу сейчас показывает основная админка выше) -->
+        <div id="superadmin-tab" class="tab-content">
+            <div class="dashboard-header">
+                <h2 class="dashboard-title">🛠 Все тренеры</h2>
+            </div>
+            <div id="superadmin-trainers-list">
+                <div class="no-data">Загрузка...</div>
+            </div>
         </div>
     </div>
 
