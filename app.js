@@ -1264,6 +1264,9 @@ function renderSuperAdminTrainers(trainers) {
             ? ('<div class="superadmin-trainer-meta">Демо до: ' + new Date(t.demoExpiresAt).toLocaleString('ru-RU') + '</div>')
             : '';
         var name = (t.displayName || t.trainerId || '').toString();
+        var sheetLink = t.spreadsheetId
+            ? ('<a class="superadmin-sheet-link" href="https://docs.google.com/spreadsheets/d/' + t.spreadsheetId + '" target="_blank" onclick="event.stopPropagation()">📊 Таблица</a>')
+            : '';
         return (
             '<div class="superadmin-trainer-row">' +
                 '<div class="superadmin-trainer-info">' +
@@ -1272,6 +1275,7 @@ function renderSuperAdminTrainers(trainers) {
                         (t.vkGroupId ? (' · группа ' + t.vkGroupId) : '') + '</div>' +
                     expiresLine +
                     '<span class="superadmin-status-badge status-' + (t.status || '') + '">' + statusLabel + '</span>' +
+                    sheetLink +
                 '</div>' +
                 '<button class="superadmin-toggle-btn' + (isDisabled ? ' is-disabled' : '') +
                     '" onclick="toggleTrainerStatus(\'' + t.trainerId + '\', \'' + (isDisabled ? 'active' : 'disabled') + '\')">' +
@@ -1280,6 +1284,67 @@ function renderSuperAdminTrainers(trainers) {
             '</div>'
         );
     }).join('');
+}
+
+function openNewTrainerForm() {
+    document.getElementById('nt-name').value = '';
+    document.getElementById('nt-vkgroup').value = '';
+    document.getElementById('nt-chatid').value = '';
+    document.getElementById('nt-color').value = '';
+    document.getElementById('nt-status').value = 'active';
+    document.getElementById('new-trainer-modal').classList.remove('hidden');
+    document.body.classList.add('no-scroll');
+}
+
+function closeNewTrainerForm() {
+    document.getElementById('new-trainer-modal').classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+}
+
+async function submitNewTrainer() {
+    var name = document.getElementById('nt-name').value.trim();
+    var vkGroupId = document.getElementById('nt-vkgroup').value.trim();
+    if (!name) { tg.showAlert('Укажи имя тренера'); return; }
+    if (!vkGroupId || !/^\d+$/.test(vkGroupId)) { tg.showAlert('Укажи ID VK-группы (число)'); return; }
+
+    var chatIdRaw = document.getElementById('nt-chatid').value.trim();
+    var trainerChatId = chatIdRaw ? ('vk_' + chatIdRaw.replace(/\D/g, '')) : '';
+    var color = document.getElementById('nt-color').value.trim();
+    var status = document.getElementById('nt-status').value;
+    var myChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+
+    var btn = document.getElementById('nt-create-btn');
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Создание...';
+
+    try {
+        var qs = 'action=createTrainer&chatId=' + encodeURIComponent(myChatId) +
+            '&displayName=' + encodeURIComponent(name) +
+            '&vkGroupId=' + encodeURIComponent(vkGroupId) +
+            '&trainerChatId=' + encodeURIComponent(trainerChatId) +
+            '&themePrimary=' + encodeURIComponent(color) +
+            '&status=' + encodeURIComponent(status);
+        var resp = await fetch(APPS_SCRIPT_URL + '?' + qs);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось создать'));
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        closeNewTrainerForm();
+        btn.disabled = false;
+        btn.textContent = origText;
+        await loadSuperAdminTrainers();
+        tg.showAlert('✅ Тренер создан. Пустая таблица тоже готова — ссылка есть в списке.');
+    } catch (e) {
+        console.error('submitNewTrainer error:', e);
+        tg.showAlert('Ошибка соединения ❌');
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
 }
 
 async function toggleTrainerStatus(trainerId, newStatus) {

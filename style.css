@@ -751,6 +751,16 @@ body {
 .superadmin-status-badge.status-demo { background: #FFF3E0; color: #E65100; }
 .superadmin-status-badge.status-disabled { background: #F5F5F5; color: #999; }
 
+.superadmin-sheet-link {
+    display: inline-block;
+    margin-top: 4px;
+    margin-left: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
 .superadmin-toggle-btn {
     border: none;
     border-radius: 8px;
