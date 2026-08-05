@@ -1943,6 +1943,81 @@ body {
     overflow-y: auto;
 }
 
+/* ===== Библиотека упражнений (фото/видео техники, самостоятельная загрузка) ===== */
+.ex-media-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+.ex-media-item {
+    background: white;
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+}
+.ex-media-item:active { transform: scale(0.99); }
+.ex-media-thumbs { display: flex; gap: 4px; flex-shrink: 0; }
+.ex-media-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: #f5f5f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    overflow: hidden;
+}
+.ex-media-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ex-media-info { flex: 1; min-width: 0; }
+.ex-media-name { font-size: 15px; font-weight: 700; color: var(--color-primary); }
+.ex-media-badges { margin-top: 3px; display: flex; gap: 6px; flex-wrap: wrap; }
+.ex-media-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 8px;
+    background: #f5f5f5;
+    color: #9e9e9e;
+}
+.ex-media-badge.filled { background: #e8f5e9; color: #2e7d32; }
+.ex-media-edit-icon { font-size: 18px; color: #b0b3c0; flex-shrink: 0; }
+
+.ex-media-photos-row { gap: 12px; }
+.ex-media-photo-field { flex: 1; text-align: center; }
+.ex-media-photo-preview {
+    width: 100%;
+    aspect-ratio: 1;
+    max-height: 140px;
+    border-radius: 12px;
+    background: #f5f5f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.ex-media-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.ex-media-file-input { width: 100%; font-size: 12px; }
+.ex-media-photo-clear {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    background: none;
+    border: none;
+    color: #C62828;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px;
+}
+
 /* === Bulk save bar — плавающая кнопка сохранения всех изменений === */
 .cc-bulk-save-bar {
     position: fixed;

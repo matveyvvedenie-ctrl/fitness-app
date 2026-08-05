@@ -1181,7 +1181,39 @@ function initAdminTab() {
         initExerciseEditor();
         initAddTypeDialog();
         initBlockModal();
+        initNewClientPlatformToggle();
+        initExerciseMediaLibrary();
     }
+}
+
+// Переключатель VK / Telegram в форме нового клиента — меняет подпись, плейсхолдер
+// и подсказку под полем chat_id в зависимости от выбранной платформы.
+function _updateNcChatIdLabel() {
+    var platform = _ncSelectedPlatform();
+    var label = document.getElementById('nc-chatid-label');
+    var hint = document.getElementById('nc-chatid-hint');
+    var input = document.getElementById('nc-chatid');
+    if (!label || !hint || !input) return;
+    if (platform === 'telegram') {
+        label.textContent = 'Telegram chat_id *';
+        input.placeholder = '739299264';
+        hint.textContent = 'Спроси у клиента — он узнает через @userinfobot в Telegram';
+    } else {
+        label.textContent = 'ID клиента ВКонтакте *';
+        input.placeholder = '123456789';
+        hint.textContent = 'Из ссылки на профиль: vk.com/id123456789 → 123456789. Если у клиента короткое имя (vk.com/ivan_petrov) — попроси переслать в сообщения группы любое сообщение, id придёт в уведомлении.';
+    }
+}
+
+function _ncSelectedPlatform() {
+    var checked = document.querySelector('input[name="nc-platform"]:checked');
+    return checked ? checked.value : 'vk';
+}
+
+function initNewClientPlatformToggle() {
+    document.querySelectorAll('input[name="nc-platform"]').forEach(function(el) {
+        el.addEventListener('change', _updateNcChatIdLabel);
+    });
 }
 
 // Супер-админка — список ВСЕХ тренеров (не только текущего тенанта). Видна
@@ -1529,6 +1561,7 @@ function switchAdminSection(sectionName) {
     if (target) target.classList.add('active');
     if (sectionName === 'finances') loadFinances();
     if (sectionName === 'reports') loadMonthlyReports();
+    if (sectionName === 'exercises') loadExerciseMediaLibrary();
 }
 
 function initAdminSectionTabs() {
@@ -1538,6 +1571,181 @@ function initAdminSectionTabs() {
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         });
     });
+}
+
+// ========== БИБЛИОТЕКА УПРАЖНЕНИЙ (фото/видео техники, тренер сам загружает) ==========
+
+var exerciseMediaData = []; // последний загруженный список из getExerciseMediaLibrary
+var exerciseMediaEditingName = ''; // название упражнения, которое сейчас редактируется ('' — новое)
+var exerciseMediaPending = {}; // { photo1Base64, photo1Mime, photo2Base64, photo2Mime, removePhoto1, removePhoto2 } — накапливается до сохранения
+
+function initExerciseMediaLibrary() {
+    var search = document.getElementById('ex-media-search');
+    if (search) search.addEventListener('input', function() {
+        renderExerciseMediaList(search.value.trim().toLowerCase());
+    });
+    ['1', '2'].forEach(function(slot) {
+        var fileInput = document.getElementById('ex-media-photo' + slot + '-file');
+        var clearBtn = document.getElementById('ex-media-photo' + slot + '-clear');
+        if (fileInput) fileInput.addEventListener('change', function() {
+            var file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            _compressImageFile(file, 1280, 0.82, function(result) {
+                exerciseMediaPending['photo' + slot + 'Base64'] = result.base64;
+                exerciseMediaPending['photo' + slot + 'Mime'] = result.mime;
+                exerciseMediaPending['removePhoto' + slot] = false;
+                var preview = document.getElementById('ex-media-photo' + slot + '-preview');
+                if (preview) preview.innerHTML = '<img src="data:' + result.mime + ';base64,' + result.base64 + '">';
+            });
+        });
+        if (clearBtn) clearBtn.addEventListener('click', function() {
+            exerciseMediaPending['photo' + slot + 'Base64'] = '';
+            exerciseMediaPending['removePhoto' + slot] = true;
+            if (fileInput) fileInput.value = '';
+            var preview = document.getElementById('ex-media-photo' + slot + '-preview');
+            if (preview) preview.innerHTML = slot === '1' ? '🏋️' : '💪';
+        });
+    });
+}
+
+async function loadExerciseMediaLibrary() {
+    var list = document.getElementById('ex-media-list');
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getExerciseMediaLibrary');
+        var data = await resp.json();
+        exerciseMediaData = data.exercises || [];
+        renderExerciseMediaList(document.getElementById('ex-media-search') ? document.getElementById('ex-media-search').value.trim().toLowerCase() : '');
+    } catch (e) {
+        console.error('loadExerciseMediaLibrary failed:', e);
+        if (list) list.innerHTML = '<div class="no-data">Не удалось загрузить ❌</div>';
+    }
+}
+
+function renderExerciseMediaList(filter) {
+    var list = document.getElementById('ex-media-list');
+    if (!list) return;
+    var items = exerciseMediaData.filter(function(ex) {
+        return !filter || ex.name.toLowerCase().indexOf(filter) !== -1;
+    });
+    if (!items.length) {
+        list.innerHTML = '<div class="no-data">' + (filter ? 'Ничего не найдено' : 'Упражнений пока нет — добавь первое') + '</div>';
+        return;
+    }
+    list.innerHTML = items.map(function(ex) {
+        var thumb1 = ex.photo1 ? '<img src="' + ex.photo1 + '">' : '🏋️';
+        var thumb2 = ex.photo2 ? '<img src="' + ex.photo2 + '">' : '💪';
+        var hasVideo = !!(ex.video || ex.videoVk);
+        return '<div class="ex-media-item" onclick="openExerciseMediaEditor(\'' + ex.name.replace(/'/g, "\\'") + '\')">' +
+            '<div class="ex-media-thumbs">' +
+                '<div class="ex-media-thumb">' + thumb1 + '</div>' +
+                '<div class="ex-media-thumb">' + thumb2 + '</div>' +
+            '</div>' +
+            '<div class="ex-media-info">' +
+                '<div class="ex-media-name">' + ex.name + '</div>' +
+                '<div class="ex-media-badges">' +
+                    '<span class="ex-media-badge ' + (ex.photo1 && ex.photo2 ? 'filled' : '') + '">📷 фото</span>' +
+                    '<span class="ex-media-badge ' + (hasVideo ? 'filled' : '') + '">🎬 видео</span>' +
+                '</div>' +
+            '</div>' +
+            '<div class="ex-media-edit-icon">✏️</div>' +
+        '</div>';
+    }).join('');
+}
+
+function openExerciseMediaEditor(name) {
+    exerciseMediaEditingName = name || '';
+    exerciseMediaPending = {};
+    var ex = name ? exerciseMediaData.find(function(e) { return e.name === name; }) : null;
+
+    document.getElementById('ex-media-title').textContent = name ? 'Упражнение' : 'Новое упражнение';
+    var nameInput = document.getElementById('ex-media-name');
+    nameInput.value = ex ? ex.name : '';
+    nameInput.disabled = !!ex; // у существующего упражнения название не трогаем (иначе потеряется связь со старой записью)
+
+    document.getElementById('ex-media-video').value = ex ? (ex.video || '') : '';
+    document.getElementById('ex-media-video-vk').value = ex ? (ex.videoVk || '') : '';
+
+    ['1', '2'].forEach(function(slot) {
+        var fileInput = document.getElementById('ex-media-photo' + slot + '-file');
+        if (fileInput) fileInput.value = '';
+        var preview = document.getElementById('ex-media-photo' + slot + '-preview');
+        var url = ex ? ex['photo' + slot] : '';
+        if (preview) preview.innerHTML = url ? '<img src="' + url + '">' : (slot === '1' ? '🏋️' : '💪');
+    });
+
+    document.getElementById('ex-media-modal').classList.remove('hidden');
+    document.body.classList.add('no-scroll');
+}
+
+function closeExerciseMediaEditor() {
+    document.getElementById('ex-media-modal').classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+}
+
+async function saveExerciseMediaEntry() {
+    var name = (document.getElementById('ex-media-name').value || '').trim();
+    if (!name) { tg.showAlert('Укажи название упражнения'); return; }
+
+    var btn = document.getElementById('ex-media-save-btn');
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+
+    var payload = Object.assign({
+        name: name,
+        video: document.getElementById('ex-media-video').value.trim(),
+        videoVk: document.getElementById('ex-media-video-vk').value.trim()
+    }, exerciseMediaPending);
+
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=saveExerciseMedia', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось сохранить'));
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        closeExerciseMediaEditor();
+        btn.disabled = false;
+        btn.textContent = origText;
+        await loadExerciseMediaLibrary();
+        tg.showAlert('✅ Сохранено');
+    } catch (e) {
+        console.error('saveExerciseMediaEntry error:', e);
+        tg.showAlert('Ошибка соединения ❌');
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+
+// Сжимает фото в браузере перед отправкой (иначе фото с телефона по 5-10 МБ
+// будут долго улетать и быстро съедят место в Google Drive). Возвращает через
+// callback { base64, mime } — без префикса "data:...;base64,".
+function _compressImageFile(file, maxDim, quality, callback) {
+    var img = new Image();
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        img.onload = function() {
+            var w = img.width, h = img.height;
+            if (w > maxDim || h > maxDim) {
+                if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+                else { w = Math.round(w * maxDim / h); h = maxDim; }
+            }
+            var canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            var dataUrl = canvas.toDataURL('image/jpeg', quality);
+            callback({ base64: dataUrl.split(',')[1], mime: 'image/jpeg' });
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
 }
 
 // ========== ФИНАНСЫ ==========
@@ -2120,6 +2328,9 @@ function openNewClientWizard() {
     // Сбросить все поля
     document.getElementById('nc-name').value = '';
     document.getElementById('nc-chatid').value = '';
+    var vkRadio = document.querySelector('input[name="nc-platform"][value="vk"]');
+    if (vkRadio) vkRadio.checked = true;
+    _updateNcChatIdLabel();
     document.querySelectorAll('input[name="nc-gender"]').forEach(function(el) { el.checked = false; });
     document.getElementById('nc-age').value = '';
     document.getElementById('nc-height').value = '';
@@ -2154,8 +2365,9 @@ function goToStep2() {
     // Минимальная валидация
     var name = document.getElementById('nc-name').value.trim();
     var chatId = document.getElementById('nc-chatid').value.trim();
+    var platformLabel = _ncSelectedPlatform() === 'telegram' ? 'Telegram chat_id' : 'VK ID клиента';
     if (!name) { tg.showAlert('Укажи имя клиента'); return; }
-    if (!chatId || !/^\d+$/.test(chatId)) { tg.showAlert('Укажи Telegram chat_id (число)'); return; }
+    if (!chatId || !/^\d+$/.test(chatId)) { tg.showAlert('Укажи ' + platformLabel + ' (число)'); return; }
 
     // Заполнить список источников копирования (активные клиенты)
     var sources = (adminClients || []).filter(function(c) { return !c.archived; });
@@ -2192,9 +2404,17 @@ function _collectNewClientProfile() {
         if (v) limits.push(v);
     });
 
+    // Платформа клиента: VK-id уходит на бэк с префиксом "vk_" (тот же формат,
+    // что уже понимает _sendNotification/setClientChatId), Telegram — как есть,
+    // числом (совместимость со старыми клиентами).
+    var rawChatId = document.getElementById('nc-chatid').value.trim();
+    var chatId = _ncSelectedPlatform() === 'vk' && rawChatId.indexOf('vk_') !== 0
+        ? 'vk_' + rawChatId.replace(/\D/g, '')
+        : rawChatId;
+
     return {
         name: document.getElementById('nc-name').value.trim(),
-        chatId: document.getElementById('nc-chatid').value.trim(),
+        chatId: chatId,
         gender: gender,
         age: document.getElementById('nc-age').value.trim(),
         height: document.getElementById('nc-height').value.trim(),

@@ -221,6 +221,7 @@
                 <button class="admin-section-btn active" data-admin-section="clients">👥 Клиенты</button>
                 <button class="admin-section-btn" data-admin-section="finances">💰 Финансы</button>
                 <button class="admin-section-btn" data-admin-section="reports">📊 Отчёты</button>
+                <button class="admin-section-btn" data-admin-section="exercises">🎬 Упражнения</button>
             </div>
 
             <!-- ======= БЛОК «КЛИЕНТЫ» ======= -->
@@ -356,6 +357,22 @@
                 </div>
             </div>
             <!-- ======= КОНЕЦ БЛОКА «ОТЧЁТЫ» ======= -->
+
+            <!-- ======= БЛОК «УПРАЖНЕНИЯ» (фото/видео техники) ======= -->
+            <div id="admin-section-exercises" class="admin-section">
+                <div class="reports-hint">
+                    🎬 Здесь можно самому добавить фото и ссылку на видео техники для любого упражнения —
+                    оно сразу появится у клиентов в тренировке.
+                </div>
+                <button class="admin-new-client-btn" onclick="openExerciseMediaEditor('')">
+                    + Добавить упражнение
+                </button>
+                <input type="text" class="admin-search" id="ex-media-search" placeholder="🔍 Поиск по названию...">
+                <div id="ex-media-list" class="ex-media-list">
+                    <div class="no-data">Загрузка библиотеки...</div>
+                </div>
+            </div>
+            <!-- ======= КОНЕЦ БЛОКА «УПРАЖНЕНИЯ» ======= -->
         </div>
 
         <!-- Супер-админка: список всех тренеров (только для Matvey, независимо
@@ -452,6 +469,51 @@
         </div>
     </div>
 
+    <!-- Модалка: фото/видео техники упражнения (тренер сам заводит, без Matvey) -->
+    <div id="ex-media-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeExerciseMediaEditor()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title" id="ex-media-title">Упражнение</div>
+                <button class="ex-editor-close" onclick="closeExerciseMediaEditor()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Название упражнения</label>
+                    <input type="text" class="ex-editor-input" id="ex-media-name" placeholder="Например: Жим штанги лёжа" autocomplete="off">
+                </div>
+
+                <div class="ex-editor-row ex-media-photos-row">
+                    <div class="ex-media-photo-field">
+                        <label class="ex-editor-label">Фото 1</label>
+                        <div class="ex-media-photo-preview" id="ex-media-photo1-preview">🏋️</div>
+                        <input type="file" accept="image/*" id="ex-media-photo1-file" class="ex-media-file-input">
+                        <button type="button" class="ex-media-photo-clear" id="ex-media-photo1-clear">Удалить фото</button>
+                    </div>
+                    <div class="ex-media-photo-field">
+                        <label class="ex-editor-label">Фото 2</label>
+                        <div class="ex-media-photo-preview" id="ex-media-photo2-preview">💪</div>
+                        <input type="file" accept="image/*" id="ex-media-photo2-file" class="ex-media-file-input">
+                        <button type="button" class="ex-media-photo-clear" id="ex-media-photo2-clear">Удалить фото</button>
+                    </div>
+                </div>
+
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Ссылка на видео (YouTube и т.п.)</label>
+                    <input type="text" class="ex-editor-input" id="ex-media-video" placeholder="https://...">
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Ссылка на видео VK</label>
+                    <input type="text" class="ex-editor-input" id="ex-media-video-vk" placeholder="https://vk.com/video...">
+                </div>
+                <div class="nc-hint">Видео проще всего загрузить в свою группу VK (Управление → Видео → Загрузить), а сюда просто вставить ссылку на него.</div>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-save" id="ex-media-save-btn" onclick="saveExerciseMediaEntry()">💾 Сохранить</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Мастер создания нового клиента (двухшаговый, поверх всего, только для тренера) -->
     <div id="new-client-wizard" class="new-client-wizard hidden">
         <div class="cc-header">
@@ -470,10 +532,17 @@
                     <label class="ex-editor-label">Имя клиента *</label>
                     <input type="text" class="ex-editor-input" id="nc-name" placeholder="Например: Иван">
                 </div>
+                <div class="prof-field">
+                    <label>Платформа клиента</label>
+                    <div class="prof-radio-group">
+                        <label class="prof-radio"><input type="radio" name="nc-platform" value="vk" checked><span>VK</span></label>
+                        <label class="prof-radio"><input type="radio" name="nc-platform" value="telegram"><span>Telegram</span></label>
+                    </div>
+                </div>
                 <div class="ex-editor-field">
-                    <label class="ex-editor-label">Telegram chat_id *</label>
-                    <input type="text" inputmode="numeric" class="ex-editor-input" id="nc-chatid" placeholder="739299264">
-                    <div class="nc-hint">Спроси у клиента — он узнает через @userinfobot в Telegram</div>
+                    <label class="ex-editor-label" id="nc-chatid-label">ID клиента ВКонтакте *</label>
+                    <input type="text" inputmode="numeric" class="ex-editor-input" id="nc-chatid" placeholder="123456789">
+                    <div class="nc-hint" id="nc-chatid-hint">Из ссылки на профиль: vk.com/id123456789 → 123456789. Если у клиента короткое имя (vk.com/ivan_petrov) — попроси переслать в сообщения группы любое сообщение, id придёт в уведомлении.</div>
                 </div>
             </div>
 
