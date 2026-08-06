@@ -1291,6 +1291,7 @@ function openNewTrainerForm() {
     document.getElementById('nt-vkgroup').value = '';
     document.getElementById('nt-chatid').value = '';
     document.getElementById('nt-color').value = '';
+    document.getElementById('nt-vktoken').value = '';
     document.getElementById('nt-status').value = 'active';
     document.getElementById('new-trainer-modal').classList.remove('hidden');
     document.body.classList.add('no-scroll');
@@ -1310,6 +1311,7 @@ async function submitNewTrainer() {
     var chatIdRaw = document.getElementById('nt-chatid').value.trim();
     var trainerChatId = chatIdRaw ? ('vk_' + chatIdRaw.replace(/\D/g, '')) : '';
     var color = document.getElementById('nt-color').value.trim();
+    var vkToken = document.getElementById('nt-vktoken').value.trim();
     var status = document.getElementById('nt-status').value;
     var myChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
 
@@ -1324,6 +1326,7 @@ async function submitNewTrainer() {
             '&vkGroupId=' + encodeURIComponent(vkGroupId) +
             '&trainerChatId=' + encodeURIComponent(trainerChatId) +
             '&themePrimary=' + encodeURIComponent(color) +
+            '&vkToken=' + encodeURIComponent(vkToken) +
             '&status=' + encodeURIComponent(status);
         var resp = await fetch(APPS_SCRIPT_URL + '?' + qs);
         var data = await resp.json();
@@ -2658,6 +2661,9 @@ function switchClientCardTab(tabName) {
     if (tabName === 'stats' && currentClientCard) {
         loadClientStats(currentClientCard.name, currentClientCard.chatId);
     }
+    if (tabName === 'nutrition' && currentClientCard) {
+        loadClientMealPlan(currentClientCard.chatId);
+    }
 }
 
 function initClientCardTabs() {
@@ -2667,6 +2673,238 @@ function initClientCardTabs() {
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         });
     });
+}
+
+// ========== ПЛАН ПИТАНИЯ (вкладка "🍽 Питание" в карточке клиента) ==========
+
+var currentMealPlanData = null;   // последний загруженный/сгенерированный план текущего клиента
+var MEAL_PLAN_DEFAULT_MEALS = [
+    { time: '8:00-9:00',   name: 'Завтрак' },
+    { time: '13:00-14:00', name: 'Обед' },
+    { time: '19:00-20:00', name: 'Ужин' },
+    { time: '',            name: 'Перекус' }
+];
+
+// Собирает читаемое "Состав" из foods[] (для показа/редактирования одной строкой) —
+// AI присылает продукты по отдельности, а для ручного ввода это одна строка текста.
+function _mealFoodsToText(foods) {
+    return (foods || []).map(function(f) {
+        return f.name + (f.grams ? ' (' + f.grams + 'г)' : '');
+    }).join(', ');
+}
+
+async function loadClientMealPlan(chatId) {
+    var box = document.getElementById('mp-summary');
+    box.innerHTML = '<div class="no-data">Загрузка плана питания...</div>';
+    currentMealPlanData = null;
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getMealPlanForClient&targetChatId=' + encodeURIComponent(chatId));
+        var data = await resp.json();
+        if (data.error) { box.innerHTML = '<div class="no-data">Не удалось загрузить ❌</div>'; return; }
+        if (!data.exists) {
+            box.innerHTML = '<div class="no-data">Плана питания пока нет — составь вручную или сгенерируй через ИИ</div>';
+            return;
+        }
+        currentMealPlanData = data;
+        renderMealPlanSummary(data);
+    } catch (e) {
+        console.error('loadClientMealPlan failed:', e);
+        box.innerHTML = '<div class="no-data">Не удалось загрузить ❌</div>';
+    }
+}
+
+function renderMealPlanSummary(data) {
+    var box = document.getElementById('mp-summary');
+    var html = '<div class="mp-macro-grid">' +
+        '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_calories || 0) + '</div><div class="mp-macro-label">ккал</div></div>' +
+        '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_protein || 0) + '</div><div class="mp-macro-label">белки</div></div>' +
+        '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_fats || 0) + '</div><div class="mp-macro-label">жиры</div></div>' +
+        '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_carbs || 0) + '</div><div class="mp-macro-label">углеводы</div></div>' +
+    '</div>';
+    (data.meals || []).forEach(function(meal) {
+        html += '<div class="mp-meal-summary-item">' +
+            '<div class="mp-meal-summary-name">' + (meal.name || 'Приём пищи') + '</div>' +
+            '<div class="mp-meal-summary-meta">' + (meal.time || '') +
+                (meal.total_calories ? ' · ' + meal.total_calories + ' ккал' : '') +
+                (meal.total_protein ? ' · Б: ' + meal.total_protein + 'г' : '') + '</div>' +
+            (meal.foods && meal.foods.length ? '<div class="mp-meal-summary-desc">' + _mealFoodsToText(meal.foods) + '</div>' : '') +
+        '</div>';
+    });
+    if (data.notes) {
+        html += '<div class="mp-notes-summary">💬 ' + data.notes + '</div>';
+    }
+    box.innerHTML = html;
+}
+
+function openMealPlanEditor() {
+    var d = currentMealPlanData;
+    document.getElementById('mp-calories').value = d ? d.target_calories : '';
+    document.getElementById('mp-protein').value = d ? d.target_protein : '';
+    document.getElementById('mp-fats').value = d ? d.target_fats : '';
+    document.getElementById('mp-carbs').value = d ? d.target_carbs : '';
+    document.getElementById('mp-notes').value = d ? (d.notes || '') : '';
+
+    var meals = (d && d.meals && d.meals.length) ? d.meals : MEAL_PLAN_DEFAULT_MEALS;
+    var list = document.getElementById('mp-meals-list');
+    list.innerHTML = meals.map(function(meal, i) {
+        return '<div class="mp-meal-block">' +
+            '<div class="mp-meal-block-title">Приём пищи ' + (i + 1) + '</div>' +
+            '<div class="mp-meal-row">' +
+                '<input type="text" class="ex-editor-input" data-mp="name" placeholder="Название" value="' + (meal.name || '').replace(/"/g, '&quot;') + '">' +
+                '<input type="text" class="ex-editor-input" data-mp="time" placeholder="Время" value="' + (meal.time || '').replace(/"/g, '&quot;') + '">' +
+            '</div>' +
+            '<div class="mp-meal-row">' +
+                '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="calories" placeholder="Калории" value="' + (meal.total_calories || '') + '">' +
+                '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="protein" placeholder="Белки, г" value="' + (meal.total_protein || '') + '">' +
+            '</div>' +
+            '<textarea class="ex-editor-textarea" data-mp="desc" rows="2" placeholder="Состав (например: Овсянка 80г, банан 1шт)">' +
+                (meal.foods ? _mealFoodsToText(meal.foods) : '') +
+            '</textarea>' +
+        '</div>';
+    }).join('');
+
+    document.getElementById('mp-editor-modal').classList.remove('hidden');
+    document.body.classList.add('no-scroll');
+}
+
+function closeMealPlanEditor() {
+    document.getElementById('mp-editor-modal').classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+}
+
+async function saveMealPlanFromEditor() {
+    if (!currentClientCard) return;
+    var btn = document.getElementById('mp-save-btn');
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+
+    var meals = [];
+    document.querySelectorAll('#mp-meals-list .mp-meal-block').forEach(function(block) {
+        var name = block.querySelector('[data-mp="name"]').value.trim();
+        var time = block.querySelector('[data-mp="time"]').value.trim();
+        var calories = parseInt(block.querySelector('[data-mp="calories"]').value, 10) || 0;
+        var protein = parseInt(block.querySelector('[data-mp="protein"]').value, 10) || 0;
+        var desc = block.querySelector('[data-mp="desc"]').value.trim();
+        if (!name && !calories && !desc) return; // полностью пустой блок — пропускаем
+        meals.push({
+            name: name || 'Приём пищи',
+            time: time,
+            foods: desc ? [{ name: desc, grams: 0, calories: calories, protein: protein, fats: 0, carbs: 0 }] : [],
+            total_calories: calories,
+            total_protein: protein
+        });
+    });
+
+    var payload = {
+        client_name: currentClientCard.name,
+        plan: {
+            target_calories: parseInt(document.getElementById('mp-calories').value, 10) || 0,
+            target_protein: parseInt(document.getElementById('mp-protein').value, 10) || 0,
+            target_fats: parseInt(document.getElementById('mp-fats').value, 10) || 0,
+            target_carbs: parseInt(document.getElementById('mp-carbs').value, 10) || 0,
+            meals: meals,
+            notes: document.getElementById('mp-notes').value.trim()
+        },
+        client_data: {
+            weight: '', height: '', age: '', goal: '', allergies: ''
+        }
+    };
+
+    try {
+        var myChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=saveMealPlan&chatId=' + encodeURIComponent(myChatId), {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось сохранить'));
+            btn.disabled = false;
+            btn.textContent = origText;
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        closeMealPlanEditor();
+        btn.disabled = false;
+        btn.textContent = origText;
+        await loadClientMealPlan(currentClientCard.chatId);
+        tg.showAlert('✅ План питания сохранён');
+    } catch (e) {
+        console.error('saveMealPlanFromEditor error:', e);
+        tg.showAlert('Ошибка соединения ❌');
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+
+async function openMealPlanAiForm() {
+    if (!currentClientCard) return;
+    document.getElementById('mp-ai-weight').value = '';
+    document.getElementById('mp-ai-height').value = '';
+    document.getElementById('mp-ai-age').value = '';
+    document.getElementById('mp-ai-goal').value = '';
+    document.getElementById('mp-ai-allergies').value = '';
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getClientProfile&targetChatId=' + encodeURIComponent(currentClientCard.chatId));
+        var p = await resp.json();
+        if (!p.error) {
+            document.getElementById('mp-ai-weight').value = p.weight || '';
+            document.getElementById('mp-ai-height').value = p.height || '';
+            document.getElementById('mp-ai-age').value = p.age || '';
+            var goalLabels = { loss: 'Похудение', mass: 'Набор массы', tone: 'Тонус / поддержание', strength: 'Сила' };
+            document.getElementById('mp-ai-goal').value = goalLabels[p.goal] || p.goal || '';
+        }
+    } catch (e) { /* анкета не обязательна — просто оставим поля пустыми */ }
+
+    document.getElementById('mp-ai-modal').classList.remove('hidden');
+    document.body.classList.add('no-scroll');
+}
+
+function closeMealPlanAiForm() {
+    document.getElementById('mp-ai-modal').classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+}
+
+async function runMealPlanAiGeneration() {
+    if (!currentClientCard) return;
+    var btn = document.getElementById('mp-ai-generate-btn');
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '🤖 Генерирую... (~30 сек)';
+
+    var payload = {
+        clientName: currentClientCard.name,
+        weight: document.getElementById('mp-ai-weight').value.trim(),
+        height: document.getElementById('mp-ai-height').value.trim(),
+        age: document.getElementById('mp-ai-age').value.trim(),
+        goal: document.getElementById('mp-ai-goal').value.trim(),
+        allergies: document.getElementById('mp-ai-allergies').value.trim()
+    };
+
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=generateMealPlanAI', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        var data = await resp.json();
+        btn.disabled = false;
+        btn.textContent = origText;
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось сгенерировать'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        closeMealPlanAiForm();
+        // Открываем редактор сразу с результатом ИИ — тренер проверяет/правит перед сохранением.
+        currentMealPlanData = Object.assign({ exists: true, name: currentClientCard.name }, data.plan);
+        openMealPlanEditor();
+    } catch (e) {
+        console.error('runMealPlanAiGeneration error:', e);
+        tg.showAlert('Ошибка соединения ❌');
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
 }
 
 function toggleArchiveFromCard() {

@@ -418,6 +418,11 @@
                         <div class="nc-hint">Необязательно — можно поменять позже. Без цвета будет тема по умолчанию.</div>
                     </div>
                     <div class="ex-editor-field">
+                        <label class="ex-editor-label">VK-токен сообщества</label>
+                        <input type="password" class="ex-editor-input" id="nt-vktoken" placeholder="vk1.a....">
+                        <div class="nc-hint">Из «Управление → Работа с API» группы тренера, права «Сообщения сообщества» + «Управление сообществом». Без него бот не сможет отвечать в этой группе — можно добавить позже.</div>
+                    </div>
+                    <div class="ex-editor-field">
                         <label class="ex-editor-label">Статус</label>
                         <select class="prof-input" id="nt-status">
                             <option value="active">Боевой (active)</option>
@@ -726,6 +731,7 @@
             <button class="cc-tab-btn" data-cc-tab="history">История</button>
             <button class="cc-tab-btn" data-cc-tab="stats">Статистика</button>
             <button class="cc-tab-btn" data-cc-tab="notes">Заметки</button>
+            <button class="cc-tab-btn" data-cc-tab="nutrition">🍽 Питание</button>
         </div>
 
         <!-- Вкладка: Программа -->
@@ -920,6 +926,110 @@
                     <button class="notes-save-btn" onclick="saveClientProfile()">💾 Сохранить анкету</button>
                 </div>
             </details>
+        </div>
+
+        <!-- Вкладка: План питания -->
+        <div id="cc-nutrition-tab" class="cc-tab-content">
+            <div id="mp-summary" class="mp-summary">
+                <div class="no-data">Загрузка плана питания...</div>
+            </div>
+            <div class="cc-program-actions">
+                <button class="cc-action-btn cc-action-notify" onclick="openMealPlanEditor()">
+                    <span class="cc-action-icon">✏️</span>
+                    <span class="cc-action-text">Составить / изменить</span>
+                </button>
+                <button class="cc-action-btn cc-action-week" onclick="openMealPlanAiForm()">
+                    <span class="cc-action-icon">🤖</span>
+                    <span class="cc-action-text">Сгенерировать через ИИ</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка: генерация плана питания через ИИ (параметры клиента) -->
+    <div id="mp-ai-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeMealPlanAiForm()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title">🤖 Генерация плана питания</div>
+                <button class="ex-editor-close" onclick="closeMealPlanAiForm()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <div class="nc-hint">Заполнены данными из анкеты клиента — поправь при необходимости.</div>
+                <div class="ex-editor-row">
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Вес, кг</label>
+                        <input type="number" inputmode="decimal" class="ex-editor-input" id="mp-ai-weight">
+                    </div>
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Рост, см</label>
+                        <input type="number" inputmode="numeric" class="ex-editor-input" id="mp-ai-height">
+                    </div>
+                </div>
+                <div class="ex-editor-row">
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Возраст</label>
+                        <input type="number" inputmode="numeric" class="ex-editor-input" id="mp-ai-age">
+                    </div>
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Цель</label>
+                        <input type="text" class="ex-editor-input" id="mp-ai-goal" placeholder="Похудение">
+                    </div>
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Аллергии / ограничения в питании</label>
+                    <input type="text" class="ex-editor-input" id="mp-ai-allergies" placeholder="Например: непереносимость лактозы">
+                </div>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-save" id="mp-ai-generate-btn" onclick="runMealPlanAiGeneration()">🤖 Сгенерировать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка: редактор плана питания (вручную или после ИИ) -->
+    <div id="mp-editor-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeMealPlanEditor()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title">План питания</div>
+                <button class="ex-editor-close" onclick="closeMealPlanEditor()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Цели на день</label>
+                </div>
+                <div class="ex-editor-row">
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Калории</label>
+                        <input type="number" inputmode="numeric" class="ex-editor-input" id="mp-calories" placeholder="2000">
+                    </div>
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Белки, г</label>
+                        <input type="number" inputmode="numeric" class="ex-editor-input" id="mp-protein" placeholder="150">
+                    </div>
+                </div>
+                <div class="ex-editor-row">
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Жиры, г</label>
+                        <input type="number" inputmode="numeric" class="ex-editor-input" id="mp-fats" placeholder="65">
+                    </div>
+                    <div class="ex-editor-field">
+                        <label class="ex-editor-label">Углеводы, г</label>
+                        <input type="number" inputmode="numeric" class="ex-editor-input" id="mp-carbs" placeholder="200">
+                    </div>
+                </div>
+
+                <div id="mp-meals-list"></div>
+
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Рекомендации</label>
+                    <textarea class="ex-editor-textarea" id="mp-notes" rows="3" placeholder="Например: пить больше воды, не есть за 2 часа до сна"></textarea>
+                </div>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-save" id="mp-save-btn" onclick="saveMealPlanFromEditor()">💾 Сохранить план</button>
+            </div>
         </div>
     </div>
 

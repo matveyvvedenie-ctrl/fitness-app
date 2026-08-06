@@ -4393,3 +4393,54 @@ body {
     font-weight: normal;
     margin-left: 4px;
 }
+
+/* ===== План питания (вкладка "🍽 Питание" в карточке клиента) ===== */
+.mp-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.mp-macro-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+.mp-macro-card {
+    background: white;
+    border-radius: 10px;
+    padding: 10px 4px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.mp-macro-value { font-size: 17px; font-weight: 700; color: var(--color-primary); }
+.mp-macro-label { font-size: 11px; color: #888; margin-top: 2px; }
+
+.mp-meal-summary-item {
+    background: white;
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.mp-meal-summary-name { font-weight: 700; font-size: 14px; color: var(--color-primary); }
+.mp-meal-summary-meta { font-size: 12px; color: #888; margin-top: 2px; }
+.mp-meal-summary-desc { font-size: 13px; color: #555; margin-top: 4px; }
+.mp-notes-summary {
+    background: #f5f6fa;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #555;
+    white-space: pre-wrap;
+}
+
+.mp-meal-block {
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+.mp-meal-block-title { font-weight: 700; font-size: 13px; color: var(--color-primary); margin-bottom: 6px; }
+.mp-meal-row { display: flex; gap: 8px; margin-bottom: 6px; }
+.mp-meal-row .ex-editor-input { margin-bottom: 0; }
