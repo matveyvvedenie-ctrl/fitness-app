@@ -7,7 +7,12 @@ const TRAINER_VK_CHAT_ID = 'vk_458191089'; // тот же тренер, но з�
 // vk_group_id в параметры запуска — это и есть trainerId для бэкенда (см.
 // apps_script.js _resolveTenant). Без него (Telegram, или VK без группы) —
 // пусто, бэкенд использует тенанта по умолчанию (Matvey), как и раньше.
-const CURRENT_TRAINER_ID = new URLSearchParams(window.location.search).get('vk_group_id') || '';
+// НЕ const: VK не всегда пробрасывает vk_group_id в ссылку (например, если
+// открыть мини-апп не той самой ссылкой из сообщения бота) — в этом случае
+// бэкенд сам находит тенанта по chatId (см. _resolveTrainerIdByChatId в
+// apps_script.js), а loadTenantConfig() ниже подхватывает узнанный trainerId
+// и переучивает эту переменную, чтобы ВСЕ следующие запросы тоже шли верно.
+let CURRENT_TRAINER_ID = new URLSearchParams(window.location.search).get('vk_group_id') || '';
 
 // Тема текущего тенанта, подтягивается в init() через loadTenantConfig().
 // tenantTrainerChatId — фоллбэк для isTrainer() у тренеров, подключённых
@@ -65,9 +70,15 @@ function applyTenantTheme(theme) {
 // в этом случае сообщение уже показано и init() должен остановиться, ничего
 // больше не загружая.
 async function loadTenantConfig() {
-    if (!CURRENT_TRAINER_ID) return true; // тенант по умолчанию — тема как есть, ничего не грузим
+    // Без vk_group_id в ссылке, но внутри VK (vkLaunchUserId есть) — всё
+    // равно спрашиваем бэкенд: он найдёт тенанта по chatId сам (см. выше).
+    // Только чистый Telegram-запуск пропускаем — там тенант всегда Matvey.
+    if (!CURRENT_TRAINER_ID && !vkLaunchUserId) return true;
     try {
-        var resp = await fetch(APPS_SCRIPT_URL + '?action=getTenantConfig');
+        var myChatId = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '';
+        var url = APPS_SCRIPT_URL + '?action=getTenantConfig' +
+            (myChatId ? '&chatId=' + encodeURIComponent(myChatId) : '');
+        var resp = await fetch(url);
         var data = await resp.json();
         if (data && data.blocked) {
             document.body.innerHTML = '<div style="padding:40px 20px;text-align:center;font-family:sans-serif;">' +
@@ -77,6 +88,13 @@ async function loadTenantConfig() {
         if (data && !data.error) {
             tenantTheme = data.theme || null;
             tenantTrainerChatId = data.trainerChatId || '';
+            // Бэкенд мог сам разрулить тенанта по chatId, не по trainerId из
+            // ссылки (которого у нас не было) — подхватываем узнанный id,
+            // чтобы все дальнейшие запросы (через monkey-patch fetch выше)
+            // тоже шли в правильную таблицу, а не только этот один.
+            if (data.trainerId && data.trainerId !== 'default') {
+                CURRENT_TRAINER_ID = data.trainerId;
+            }
             applyTenantTheme(tenantTheme);
         }
     } catch (e) {
