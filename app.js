@@ -3084,37 +3084,54 @@ function renderExerciseRow(ex, label) {
 
 // Дублировать неделю — план остаётся, факты стираются, заголовок инкрементируется
 // (автоподбор весов временно отключён, подключим в следующей итерации через ИИ)
-async function duplicateWeekFlow() {
+function duplicateWeekFlow() {
     if (!currentClientCard) return;
     var name = currentClientCard.name || 'клиента';
+    document.getElementById('new-week-client-line').textContent =
+        'Для ' + name + '. План упражнений остаётся тем же, факты прошлой недели будут стёрты.';
+    document.getElementById('new-week-autoprogress').checked = true;
+    document.getElementById('new-week-modal').classList.remove('hidden');
+    document.body.classList.add('no-scroll');
+}
 
-    var confirmed = await new Promise(function(resolve) {
-        var msg = 'Создать новую неделю для ' + name + '?\n' +
-                  'План упражнений остаётся тем же, факты прошлой недели будут стёрты.';
-        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
-        else resolve(confirm(msg));
-    });
-    if (!confirmed) return;
+function closeNewWeekModal() {
+    document.getElementById('new-week-modal').classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+}
+
+async function confirmNewWeek() {
+    if (!currentClientCard) return;
+    var autoProgress = document.getElementById('new-week-autoprogress').checked;
+    var btn = document.getElementById('new-week-create-btn');
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Создание...';
 
     try {
         var url = APPS_SCRIPT_URL + '?action=duplicateClientWeek' +
             '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
-            '&autoProgress=false';
+            '&autoProgress=' + (autoProgress ? 'true' : 'false');
         var resp = await fetch(url);
         var data = await resp.json();
+        btn.disabled = false;
+        btn.textContent = origText;
         if (!data.success) {
             tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
             return;
         }
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        closeNewWeekModal();
         if (data.newTitle) {
             currentClientCard.weekTitle = data.newTitle;
             document.getElementById('cc-meta').textContent = data.newTitle;
         }
         await loadClientProgram(currentClientCard.sheetName);
-        tg.showAlert('✅ Новая неделя создана: ' + (data.newTitle || ''));
+        tg.showAlert('✅ Новая неделя создана: ' + (data.newTitle || '') +
+            (autoProgress ? '\n\nВеса подобраны автоматически — проверь и поправь при желании.' : ''));
     } catch (error) {
         console.error('Duplicate week error:', error);
+        btn.disabled = false;
+        btn.textContent = origText;
         tg.showAlert('Ошибка соединения ❌');
     }
 }

@@ -438,6 +438,32 @@
         </div>
     </div>
 
+    <!-- Модалка: новая тренировочная неделя (с опцией автоподбора весов) -->
+    <div id="new-week-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeNewWeekModal()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title">📅 Новая неделя</div>
+                <button class="ex-editor-close" onclick="closeNewWeekModal()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <p id="new-week-client-line" style="margin:0 0 14px;color:#555;font-size:14px;"></p>
+                <label class="prof-radio" style="display:flex;align-items:center;gap:10px;padding:12px;cursor:pointer;">
+                    <input type="checkbox" id="new-week-autoprogress" checked style="width:18px;height:18px;flex-shrink:0;">
+                    <span style="text-align:left;font-weight:600;">🤖 Автоматически подобрать веса по факту прошлой недели</span>
+                </label>
+                <div class="nc-hint">
+                    Если клиент вытянул план или больше — вес чуть подрастёт сам (+2.5кг или +5%).
+                    Если не вытянул — новым планом станет тот вес, что реально сделал. Ты всё
+                    равно сможешь поправить любое упражнение вручную после создания недели.
+                </div>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-save" id="new-week-create-btn" onclick="confirmNewWeek()">📅 Создать неделю</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модалка: превью отчёта перед отправкой -->
     <div id="report-preview-modal" class="ex-editor-modal hidden">
         <div class="ex-editor-backdrop" onclick="closeReportPreview()"></div>
