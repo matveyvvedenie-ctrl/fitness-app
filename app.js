@@ -1664,6 +1664,11 @@ function initAdminSectionTabs() {
 var exerciseMediaData = []; // последний загруженный список из getExerciseMediaLibrary
 var exerciseMediaEditingName = ''; // название упражнения, которое сейчас редактируется ('' — новое)
 var exerciseMediaPending = {}; // { photo1Base64, photo1Mime, photo2Base64, photo2Mime, removePhoto1, removePhoto2 } — накапливается до сохранения
+var exerciseMediaSelectedGroup = ''; // выбранная группа мышц в редакторе (см. openExerciseMediaEditor/_renderExerciseMediaGroupTabs)
+// Тот же список, что и KNOWN_MUSCLES (см. ниже, для фильтра библиотеки при
+// подборе упражнения клиенту) — держим отдельной переменной здесь, чтобы не
+// зависеть от порядка объявления в файле.
+var EXERCISE_MEDIA_GROUPS = ['Грудь', 'Спина', 'Плечи', 'Бицепс', 'Трицепс', 'Ноги', 'Ягодицы', 'Пресс', 'Икры', 'Предплечья'];
 
 function initExerciseMediaLibrary() {
     var search = document.getElementById('ex-media-search');
@@ -1729,6 +1734,7 @@ function renderExerciseMediaList(filter) {
             '<div class="ex-media-info">' +
                 '<div class="ex-media-name">' + ex.name + '</div>' +
                 '<div class="ex-media-badges">' +
+                    (ex.group ? '<span class="ex-media-badge filled">' + ex.group + '</span>' : '') +
                     '<span class="ex-media-badge ' + (ex.photo1 && ex.photo2 ? 'filled' : '') + '">📷 фото</span>' +
                     '<span class="ex-media-badge ' + (hasVideo ? 'filled' : '') + '">🎬 видео</span>' +
                 '</div>' +
@@ -1736,6 +1742,27 @@ function renderExerciseMediaList(filter) {
             '<div class="ex-media-edit-icon">✏️</div>' +
         '</div>';
     }).join('');
+}
+
+// Рисует чипы групп мышц в редакторе упражнения — переключение как в
+// ex-lib-tab (одиночный выбор), см. exerciseMediaSelectedGroup.
+function _renderExerciseMediaGroupTabs(selected) {
+    exerciseMediaSelectedGroup = selected || '';
+    var box = document.getElementById('ex-media-group-tabs');
+    if (!box) return;
+    box.innerHTML = EXERCISE_MEDIA_GROUPS.map(function(g) {
+        var active = g === exerciseMediaSelectedGroup ? ' active' : '';
+        return '<button type="button" class="ex-lib-tab' + active + '" data-group="' + g + '">' + g + '</button>';
+    }).join('');
+    box.querySelectorAll('.ex-lib-tab').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            // Повторный клик по уже выбранной группе — снимает выбор (не обязательно).
+            exerciseMediaSelectedGroup = (btn.dataset.group === exerciseMediaSelectedGroup) ? '' : btn.dataset.group;
+            box.querySelectorAll('.ex-lib-tab').forEach(function(b) {
+                b.classList.toggle('active', b.dataset.group === exerciseMediaSelectedGroup);
+            });
+        });
+    });
 }
 
 function openExerciseMediaEditor(name) {
@@ -1747,6 +1774,8 @@ function openExerciseMediaEditor(name) {
     var nameInput = document.getElementById('ex-media-name');
     nameInput.value = ex ? ex.name : '';
     nameInput.disabled = !!ex; // у существующего упражнения название не трогаем (иначе потеряется связь со старой записью)
+
+    _renderExerciseMediaGroupTabs(ex ? (ex.group || '') : '');
 
     document.getElementById('ex-media-video').value = ex ? (ex.video || '') : '';
     document.getElementById('ex-media-video-vk').value = ex ? (ex.videoVk || '') : '';
@@ -1779,6 +1808,7 @@ async function saveExerciseMediaEntry() {
 
     var payload = Object.assign({
         name: name,
+        group: exerciseMediaSelectedGroup,
         video: document.getElementById('ex-media-video').value.trim(),
         videoVk: document.getElementById('ex-media-video-vk').value.trim()
     }, exerciseMediaPending);
