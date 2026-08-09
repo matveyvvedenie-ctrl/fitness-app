@@ -5545,9 +5545,13 @@ async function saveMeasurements() {
             payload.photoMime = measPhotoPending.mime;
         }
         var url = APPS_SCRIPT_URL + '?action=saveMeasurements&chatId=' + chatId;
+        // Без явного Content-Type: application/json — иначе браузер шлёт CORS
+        // preflight (OPTIONS), а Apps Script его не обрабатывает и запрос падает
+        // с "Failed to fetch". Без заголовка тело уходит как text/plain (что для
+        // CORS считается "простым" запросом), а doPost всё равно парсит его как
+        // JSON — тем же способом уже работает saveExerciseMedia.
         var response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         var data = await response.json();
