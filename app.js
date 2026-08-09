@@ -4009,7 +4009,8 @@ async function saveClientChatId() {
     var input = document.getElementById('prof-chatid');
     var newChatId = (input.value || '').trim();
     if (!newChatId || newChatId === currentClientCard.chatId) return;
-    tg.showConfirm(
+    var confirmFn = (tg && tg.showConfirm) ? tg.showConfirm.bind(tg) : function(msg, cb) { cb(confirm(msg)); };
+    confirmFn(
         'Поменять ID клиента с ' + currentClientCard.chatId + ' на ' + newChatId + '? ' +
         'Если ошибёшься — клиент потеряет доступ к боту/мини-аппу.',
         async function(ok) {
