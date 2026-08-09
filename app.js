@@ -2733,6 +2733,75 @@ var MEAL_PLAN_DEFAULT_MEALS = [
     { time: '',            name: 'Перекус' }
 ];
 
+// ── Авто-пересчёт КБЖУ в редакторе плана питания ──
+// Меняешь калории — белки/жиры/углеводы (и калории/белки в каждом приёме пищи)
+// пропорционально подтягиваются. Меняешь белки/жиры/углеводы — калории
+// пересчитываются по формуле (белки и углеводы по 4 ккал/г, жиры — 9 ккал/г),
+// а белок в приёмах пищи следует за белком (если менялся именно он).
+var mpTargetsPrev = null;
+var mpAutoCalcInitialized = false;
+
+function initMealPlanAutoCalc() {
+    if (mpAutoCalcInitialized) return;
+    mpAutoCalcInitialized = true;
+    ['calories', 'protein', 'fats', 'carbs'].forEach(function(field) {
+        document.getElementById('mp-' + field).addEventListener('change', function() {
+            handleMpTargetChange(field);
+        });
+    });
+}
+
+function handleMpTargetChange(field) {
+    var prev = mpTargetsPrev || { calories: 0, protein: 0, fats: 0, carbs: 0 };
+    var cur = {
+        calories: parseFloat(document.getElementById('mp-calories').value) || 0,
+        protein: parseFloat(document.getElementById('mp-protein').value) || 0,
+        fats: parseFloat(document.getElementById('mp-fats').value) || 0,
+        carbs: parseFloat(document.getElementById('mp-carbs').value) || 0
+    };
+
+    if (field === 'calories') {
+        var ratio = prev.calories > 0 ? cur.calories / prev.calories : null;
+        if (ratio) {
+            document.getElementById('mp-protein').value = Math.round(prev.protein * ratio) || '';
+            document.getElementById('mp-fats').value = Math.round(prev.fats * ratio) || '';
+            document.getElementById('mp-carbs').value = Math.round(prev.carbs * ratio) || '';
+            _scaleMealFields(ratio, ratio);
+        }
+    } else {
+        // Белки/жиры/углеводы → калории считаем по формуле, а не пропорцией
+        var newCalories = Math.round(cur.protein * 4 + cur.fats * 9 + cur.carbs * 4);
+        document.getElementById('mp-calories').value = newCalories || '';
+        var calRatio = prev.calories > 0 ? newCalories / prev.calories : null;
+        var proteinRatio = (field === 'protein' && prev.protein > 0) ? cur.protein / prev.protein : null;
+        _scaleMealFields(calRatio, proteinRatio);
+    }
+
+    // Перечитываем поля начисто — в обеих ветках выше значения могли поменяться
+    // (пропорционально или по формуле), снимок должен отражать то, что реально в форме.
+    mpTargetsPrev = {
+        calories: parseFloat(document.getElementById('mp-calories').value) || 0,
+        protein: parseFloat(document.getElementById('mp-protein').value) || 0,
+        fats: parseFloat(document.getElementById('mp-fats').value) || 0,
+        carbs: parseFloat(document.getElementById('mp-carbs').value) || 0
+    };
+}
+
+function _scaleMealFields(calRatio, proteinRatio) {
+    document.querySelectorAll('.mp-meal-block').forEach(function(block) {
+        if (calRatio) {
+            var calInput = block.querySelector('[data-mp="calories"]');
+            var calVal = parseFloat(calInput.value) || 0;
+            if (calVal) calInput.value = Math.round(calVal * calRatio);
+        }
+        if (proteinRatio) {
+            var protInput = block.querySelector('[data-mp="protein"]');
+            var protVal = parseFloat(protInput.value) || 0;
+            if (protVal) protInput.value = Math.round(protVal * proteinRatio);
+        }
+    });
+}
+
 // Собирает читаемое "Состав" из foods[] (для показа/редактирования одной строкой) —
 // AI присылает продукты по отдельности, а для ручного ввода это одна строка текста.
 function _mealFoodsToText(foods) {
@@ -2791,6 +2860,13 @@ function openMealPlanEditor() {
     document.getElementById('mp-fats').value = d ? d.target_fats : '';
     document.getElementById('mp-carbs').value = d ? d.target_carbs : '';
     document.getElementById('mp-notes').value = d ? (d.notes || '') : '';
+    mpTargetsPrev = {
+        calories: (d && d.target_calories) || 0,
+        protein: (d && d.target_protein) || 0,
+        fats: (d && d.target_fats) || 0,
+        carbs: (d && d.target_carbs) || 0
+    };
+    initMealPlanAutoCalc();
 
     var meals = (d && d.meals && d.meals.length) ? d.meals : MEAL_PLAN_DEFAULT_MEALS;
     var list = document.getElementById('mp-meals-list');
