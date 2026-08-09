@@ -750,6 +750,66 @@ body {
 .superadmin-status-badge.status-active { background: #E8F5E9; color: #2E7D32; }
 .superadmin-status-badge.status-demo { background: #FFF3E0; color: #E65100; }
 .superadmin-status-badge.status-disabled { background: #F5F5F5; color: #999; }
+.superadmin-status-badge.payment-active { background: #E8F5E9; color: #2E7D32; margin-left: 4px; }
+.superadmin-status-badge.payment-expiring_week { background: #FFF3E0; color: #E65100; margin-left: 4px; }
+.superadmin-status-badge.payment-expiring_soon { background: #FFEBEE; color: #C62828; margin-left: 4px; }
+.superadmin-status-badge.payment-expired { background: #FFEBEE; color: #C62828; margin-left: 4px; }
+
+.superadmin-trainer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+}
+
+.superadmin-pay-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #FFF3E0;
+    color: #E65100;
+    white-space: nowrap;
+}
+
+.superadmin-view-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    background: #FFF3E0;
+    color: #E65100;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+}
+.superadmin-view-banner button {
+    border: none;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    background: #E65100;
+    color: white;
+}
+
+.superadmin-openas-btn {
+    display: inline-block;
+    margin-top: 4px;
+    margin-left: 6px;
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-primary);
+    cursor: pointer;
+}
 
 .superadmin-sheet-link {
     display: inline-block;

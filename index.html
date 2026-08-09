@@ -19,6 +19,12 @@
 
     <!-- Main App -->
     <div id="main-screen" class="hidden">
+        <!-- Баннер супер-админ режима: виден, когда Матвей открыл мини-апп «от лица» другого тренера -->
+        <div id="superadmin-view-banner" class="superadmin-view-banner hidden">
+            👁 Режим супер-админа — смотришь тренера <b id="superadmin-view-id"></b>
+            <button onclick="exitTrainerView()">Вернуться в свой профиль</button>
+        </div>
+
         <!-- Tabs -->
         <div class="tabs" id="tabs-container">
             <button class="tab-btn active" data-tab="home">🏠 Главная</button>
@@ -510,6 +516,34 @@
             </div>
             <div class="ex-editor-actions">
                 <button class="ex-editor-btn ex-editor-btn-save" id="payment-save-btn" onclick="savePaymentFromModal()">💾 Записать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка: оплата тренера (супер-админка) -->
+    <div id="trainer-payment-modal" class="ex-editor-modal hidden">
+        <div class="ex-editor-backdrop" onclick="closeTrainerPaymentModal()"></div>
+        <div class="ex-editor-content">
+            <div class="ex-editor-header">
+                <div class="ex-editor-title" id="trainer-payment-modal-title">💰 Оплата тренера</div>
+                <button class="ex-editor-close" onclick="closeTrainerPaymentModal()">✕</button>
+            </div>
+            <div class="ex-editor-body">
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Сумма (₽)</label>
+                    <input type="number" inputmode="numeric" class="ex-editor-input" id="tp-amount" placeholder="5000">
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Месяцев</label>
+                    <input type="number" inputmode="numeric" class="ex-editor-input" id="tp-months" placeholder="1" value="1">
+                </div>
+                <div class="ex-editor-field">
+                    <label class="ex-editor-label">Комментарий (опционально)</label>
+                    <input type="text" class="ex-editor-input" id="tp-comment" placeholder="">
+                </div>
+            </div>
+            <div class="ex-editor-actions">
+                <button class="ex-editor-btn ex-editor-btn-save" id="tp-save-btn" onclick="saveTrainerPaymentFromModal()">💾 Записать</button>
             </div>
         </div>
     </div>

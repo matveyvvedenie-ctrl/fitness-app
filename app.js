@@ -1251,7 +1251,22 @@ function initSuperAdminTab() {
     tabsContainer.classList.remove('tabs-5');
     tabsContainer.classList.add('tabs-6');
     loadSuperAdminTrainers();
+
+    // Открыт чужой тенант (?vk_group_id=...) — показываем баннер, чтобы не
+    // перепутать, чью админку сейчас видно.
+    if (CURRENT_TRAINER_ID) {
+        document.getElementById('superadmin-view-id').textContent = CURRENT_TRAINER_ID;
+        document.getElementById('superadmin-view-banner').classList.remove('hidden');
+    }
 }
+
+function exitTrainerView() {
+    window.location.search = '';
+}
+
+var SUPERADMIN_PAYMENT_LABELS = {
+    active: 'Оплачено', expiring_week: 'Истекает <7д', expiring_soon: 'Истекает <3д', expired: 'Не оплачено'
+};
 
 async function loadSuperAdminTrainers() {
     var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
@@ -1263,7 +1278,15 @@ async function loadSuperAdminTrainers() {
             container.innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
             return;
         }
-        renderSuperAdminTrainers(data.trainers || []);
+        var trainers = data.trainers || [];
+        try {
+            var payResp = await fetch(APPS_SCRIPT_URL + '?action=getTrainerPayments&chatId=' + encodeURIComponent(chatId));
+            var payData = await payResp.json();
+            var payMap = {};
+            (payData.payments || []).forEach(function(p) { payMap[p.trainerId] = p; });
+            trainers.forEach(function(t) { t.payment = payMap[t.trainerId] || null; });
+        } catch (_) {} // статус оплаты необязателен — список тренеров важнее
+        renderSuperAdminTrainers(trainers);
     } catch (e) {
         container.innerHTML = '<div class="no-data">Не удалось загрузить</div>';
     }
@@ -1285,6 +1308,13 @@ function renderSuperAdminTrainers(trainers) {
         var sheetLink = t.spreadsheetId
             ? ('<a class="superadmin-sheet-link" href="https://docs.google.com/spreadsheets/d/' + t.spreadsheetId + '" target="_blank" onclick="event.stopPropagation()">📊 Таблица</a>')
             : '';
+        var openAsBtn = t.vkGroupId
+            ? ('<button class="superadmin-openas-btn" onclick="openAsTrainer(\'' + t.vkGroupId + '\')">🔎 Открыть как тренер</button>')
+            : '';
+        var p = t.payment;
+        var paymentLabel = p ? (SUPERADMIN_PAYMENT_LABELS[p.status] || p.status) : 'Нет оплат';
+        var paymentClass = p ? p.status : 'expired';
+        var paymentMeta = p ? (' · до ' + p.endDate + ' (' + p.daysLeft + ' дн.)') : '';
         return (
             '<div class="superadmin-trainer-row">' +
                 '<div class="superadmin-trainer-info">' +
@@ -1293,15 +1323,81 @@ function renderSuperAdminTrainers(trainers) {
                         (t.vkGroupId ? (' · группа ' + t.vkGroupId) : '') + '</div>' +
                     expiresLine +
                     '<span class="superadmin-status-badge status-' + (t.status || '') + '">' + statusLabel + '</span>' +
-                    sheetLink +
+                    '<span class="superadmin-status-badge payment-' + paymentClass + '">💰 ' + paymentLabel + paymentMeta + '</span>' +
+                    sheetLink + openAsBtn +
                 '</div>' +
-                '<button class="superadmin-toggle-btn' + (isDisabled ? ' is-disabled' : '') +
-                    '" onclick="toggleTrainerStatus(\'' + t.trainerId + '\', \'' + (isDisabled ? 'active' : 'disabled') + '\')">' +
-                    (isDisabled ? 'Включить' : 'Отключить') +
-                '</button>' +
+                '<div class="superadmin-trainer-actions">' +
+                    '<button class="superadmin-pay-btn" onclick="openTrainerPaymentModal(\'' + t.trainerId + '\', \'' + name.replace(/'/g, "\\'") + '\')">💰 Оплата</button>' +
+                    '<button class="superadmin-toggle-btn' + (isDisabled ? ' is-disabled' : '') +
+                        '" onclick="toggleTrainerStatus(\'' + t.trainerId + '\', \'' + (isDisabled ? 'active' : 'disabled') + '\')">' +
+                        (isDisabled ? 'Включить' : 'Отключить') +
+                    '</button>' +
+                '</div>' +
             '</div>'
         );
     }).join('');
+}
+
+var currentPaymentTrainer = null;
+
+function openTrainerPaymentModal(trainerId, displayName) {
+    currentPaymentTrainer = { trainerId: trainerId, name: displayName };
+    document.getElementById('trainer-payment-modal-title').textContent = '💰 Оплата — ' + displayName;
+    document.getElementById('tp-amount').value = '';
+    document.getElementById('tp-months').value = '1';
+    document.getElementById('tp-comment').value = '';
+    var btn = document.getElementById('tp-save-btn');
+    btn.disabled = false;
+    btn.textContent = '💾 Записать';
+    document.getElementById('trainer-payment-modal').classList.remove('hidden');
+}
+
+function closeTrainerPaymentModal() {
+    document.getElementById('trainer-payment-modal').classList.add('hidden');
+    currentPaymentTrainer = null;
+}
+
+async function saveTrainerPaymentFromModal() {
+    if (!currentPaymentTrainer) return;
+    var amount = parseFloat(document.getElementById('tp-amount').value);
+    var months = parseInt(document.getElementById('tp-months').value);
+    var comment = document.getElementById('tp-comment').value.trim();
+    if (!amount || amount <= 0) { tg.showAlert('Укажи сумму больше 0'); return; }
+    if (!months || months <= 0) { tg.showAlert('Укажи кол-во месяцев больше 0'); return; }
+    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    var btn = document.getElementById('tp-save-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+    try {
+        var url = APPS_SCRIPT_URL + '?action=saveTrainerPayment' +
+            '&chatId=' + encodeURIComponent(chatId) +
+            '&targetTrainerId=' + encodeURIComponent(currentPaymentTrainer.trainerId) +
+            '&amount=' + encodeURIComponent(amount) +
+            '&months=' + encodeURIComponent(months) +
+            '&comment=' + encodeURIComponent(comment);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            btn.disabled = false;
+            btn.textContent = '💾 Записать';
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        closeTrainerPaymentModal();
+        loadSuperAdminTrainers();
+    } catch (e) {
+        tg.showAlert('Ошибка соединения ❌');
+        btn.disabled = false;
+        btn.textContent = '💾 Записать';
+    }
+}
+
+// Открыть мини-апп «от лица» тренера — vk_group_id уже подхватывается всей
+// остальной логикой мульти-тенантности сам по себе (см. CURRENT_TRAINER_ID,
+// isTrainer() в начале файла), отдельный бэкенд-эндпоинт не нужен.
+function openAsTrainer(vkGroupId) {
+    window.location.search = '?vk_group_id=' + encodeURIComponent(vkGroupId);
 }
 
 function openNewTrainerForm() {
