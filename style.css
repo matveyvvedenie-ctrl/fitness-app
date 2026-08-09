@@ -2869,6 +2869,21 @@ body {
     font-style: italic;
 }
 
+.stats-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.stats-photo-item { cursor: pointer; text-align: center; }
+.stats-photo-item img {
+    width: 100%;
+    aspect-ratio: 3/4;
+    object-fit: cover;
+    border-radius: 10px;
+    display: block;
+}
+.stats-photo-date { font-size: 11px; color: #999; margin-top: 4px; }
+
 .stats-progress-list {
     display: flex;
     flex-direction: column;
@@ -3952,6 +3967,18 @@ body {
     color: #2E7D32;
 }
 
+.meas-photo-field { margin-bottom: 14px; }
+.meas-photo-preview {
+    width: 100%;
+    max-height: 220px;
+    border-radius: 12px;
+    background: #f5f5f7;
+    overflow: hidden;
+    margin: 6px 0;
+}
+.meas-photo-preview img { width: 100%; max-height: 220px; object-fit: cover; display: block; }
+.meas-photo-file-input { width: 100%; font-size: 13px; }
+
 .meas-save-btn {
     background: linear-gradient(135deg, #E53935, #C62828);
     color: white;
@@ -4017,6 +4044,16 @@ body {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 6px;
+}
+
+.measurement-row-photo {
+    display: block;
+    max-width: 120px;
+    max-height: 120px;
+    border-radius: 10px;
+    object-fit: cover;
+    margin-bottom: 8px;
+    cursor: pointer;
 }
 
 .measurement-row-item {

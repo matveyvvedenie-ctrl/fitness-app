@@ -182,6 +182,11 @@
                         <input type="number" inputmode="decimal" class="meas-input" id="meas-thigh" placeholder="55">
                     </div>
                 </div>
+                <div class="meas-photo-field">
+                    <label class="meas-input-label">📸 Фото прогресса (раз в месяц)</label>
+                    <div class="meas-photo-preview hidden" id="meas-photo-preview"></div>
+                    <input type="file" accept="image/*" id="meas-photo-file" class="meas-photo-file-input">
+                </div>
                 <button class="meas-save-btn" id="meas-save-btn">💾 Сохранить замеры</button>
             </div>
 
@@ -831,6 +836,15 @@
                     </div>
                 </div>
 
+                <!-- 3b. Фото прогресса из замеров -->
+                <div class="stats-card stats-card-photos">
+                    <div class="stats-card-title">📸 Фото прогресса</div>
+                    <div class="stats-photos-grid" id="stats-photos-grid"></div>
+                    <div class="stats-empty hidden" id="stats-photos-empty">
+                        Клиент ещё не прикреплял фото к замерам
+                    </div>
+                </div>
+
                 <!-- 4. Объём тренировок по неделям -->
                 <div class="stats-card stats-card-volume">
                     <div class="stats-card-title">📊 Объём по неделям</div>
@@ -957,6 +971,15 @@
                     <button class="notes-save-btn" onclick="saveClientProfile()">💾 Сохранить анкету</button>
                 </div>
             </details>
+
+            <!-- ID клиента (Telegram или VK) — на случай опечатки в /allow или переезда клиента на другую платформу -->
+            <div class="notes-new-card">
+                <div class="notes-card-title">🆔 ID клиента</div>
+                <input type="text" id="prof-chatid" class="prof-input" placeholder="123456789 или vk_123456789">
+                <div class="notes-new-controls">
+                    <button class="notes-save-btn" onclick="saveClientChatId()">💾 Сохранить ID</button>
+                </div>
+            </div>
         </div>
 
         <!-- Вкладка: План питания -->

@@ -3482,6 +3482,7 @@ var statsLoadedFor = '';
 var statsWeightChart = null;
 var statsVolumeChart = null;
 var statsBodyWeights = []; // [{date, weight}]
+var statsProgressPhotos = []; // [{date, url}]
 
 async function loadClientStats(clientName, chatId) {
     if (!clientName) return;
@@ -3491,8 +3492,9 @@ async function loadClientStats(clientName, chatId) {
     if (clientHistoryLoadedFor !== clientName) {
         await loadClientHistory(clientName);
     }
-    // Также подгружаем замеры (для графика веса тела)
+    // Также подгружаем замеры (для графика веса тела и фото прогресса)
     statsBodyWeights = [];
+    statsProgressPhotos = [];
     if (chatId) {
         try {
             var url = APPS_SCRIPT_URL + '?action=getMeasurements&chatId=' + encodeURIComponent(chatId);
@@ -3508,6 +3510,10 @@ async function loadClientStats(clientName, chatId) {
                     })
                     .filter(function(x) { return x.dateObj > 0; })
                     .sort(function(a, b) { return a.dateObj - b.dateObj; });
+                statsProgressPhotos = (data.measurements || [])
+                    .filter(function(m) { return m && m.photoUrl; })
+                    .map(function(m) { return { date: m.date, url: m.photoUrl }; })
+                    .reverse(); // свежие сверху
             }
         } catch (_) {}
     }
@@ -3675,6 +3681,22 @@ function renderClientStats() {
                 }
             }
         });
+    }
+
+    // ── 3b. Фото прогресса ──
+    var pGrid = document.getElementById('stats-photos-grid');
+    var pEmpty = document.getElementById('stats-photos-empty');
+    if (statsProgressPhotos.length === 0) {
+        pGrid.innerHTML = '';
+        pEmpty.classList.remove('hidden');
+    } else {
+        pEmpty.classList.add('hidden');
+        pGrid.innerHTML = statsProgressPhotos.map(function(p) {
+            return '<div class="stats-photo-item" onclick="tg.openLink(\'' + p.url + '\')">' +
+                '<img src="' + p.url + '">' +
+                '<div class="stats-photo-date">' + p.date + '</div>' +
+            '</div>';
+        }).join('');
     }
 
     // ── 4. Объём по неделям ──
@@ -3895,6 +3917,8 @@ async function deleteClientNoteFlow(ts) {
 
 async function loadClientProfile(chatId) {
     if (!chatId) return;
+    var chatIdField = document.getElementById('prof-chatid');
+    if (chatIdField) chatIdField.value = chatId;
     if (profileLoadedFor === chatId) return;
     try {
         var url = APPS_SCRIPT_URL + '?action=getClientProfile&targetChatId=' + encodeURIComponent(chatId);
@@ -3978,6 +4002,37 @@ async function saveClientProfile() {
     } catch (e) {
         tg.showAlert('Ошибка соединения ❌');
     }
+}
+
+async function saveClientChatId() {
+    if (!currentClientCard) return;
+    var input = document.getElementById('prof-chatid');
+    var newChatId = (input.value || '').trim();
+    if (!newChatId || newChatId === currentClientCard.chatId) return;
+    tg.showConfirm(
+        'Поменять ID клиента с ' + currentClientCard.chatId + ' на ' + newChatId + '? ' +
+        'Если ошибёшься — клиент потеряет доступ к боту/мини-аппу.',
+        async function(ok) {
+            if (!ok) { input.value = currentClientCard.chatId; return; }
+            try {
+                var url = APPS_SCRIPT_URL + '?action=renameClientChatId&oldChatId=' +
+                    encodeURIComponent(currentClientCard.chatId) + '&newChatId=' + encodeURIComponent(newChatId);
+                var resp = await fetch(url);
+                var data = await resp.json();
+                if (!data.success) {
+                    tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+                    return;
+                }
+                currentClientCard.chatId = newChatId;
+                profileLoadedFor = null; // чтобы следующий заход в анкету перечитал данные по новому id
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                tg.showAlert('✅ ID обновлён');
+                loadAdminClients();
+            } catch (e) {
+                tg.showAlert('Ошибка соединения ❌');
+            }
+        }
+    );
 }
 
 // ========== ИСТОРИЯ ПО КОНКРЕТНОМУ УПРАЖНЕНИЮ ==========
@@ -5442,7 +5497,21 @@ function initMeasForm() {
 
     // Save button
     document.getElementById('meas-save-btn').addEventListener('click', saveMeasurements);
+
+    // Фото прогресса — сжимаем в браузере и показываем превью, как в редакторе упражнений
+    document.getElementById('meas-photo-file').addEventListener('change', function(e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+        _compressImageFile(file, 1280, 0.82, function(result) {
+            measPhotoPending = result;
+            var preview = document.getElementById('meas-photo-preview');
+            preview.innerHTML = '<img src="data:' + result.mime + ';base64,' + result.base64 + '">';
+            preview.classList.remove('hidden');
+        });
+    });
 }
+
+var measPhotoPending = null;
 
 async function saveMeasurements() {
     var btn = document.getElementById('meas-save-btn');
@@ -5456,10 +5525,10 @@ async function saveMeasurements() {
         thigh: document.getElementById('meas-thigh').value
     };
 
-    // Check at least one field filled
-    var hasAny = Object.values(fields).some(function(v) { return v && v.trim() !== ''; });
+    // Check at least one field filled (фото само по себе тоже считается записью)
+    var hasAny = Object.values(fields).some(function(v) { return v && v.trim() !== ''; }) || !!measPhotoPending;
     if (!hasAny) {
-        tg.showAlert('Заполни хотя бы одно поле! 📏');
+        tg.showAlert('Заполни хотя бы одно поле или прикрепи фото! 📏');
         return;
     }
 
@@ -5469,12 +5538,17 @@ async function saveMeasurements() {
 
     try {
         var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
-        var params = 'action=saveMeasurements&chatId=' + chatId;
-        Object.keys(fields).forEach(function(key) {
-            if (fields[key]) params += '&' + key + '=' + encodeURIComponent(fields[key]);
+        var payload = Object.assign({}, fields);
+        if (measPhotoPending) {
+            payload.photoBase64 = measPhotoPending.base64;
+            payload.photoMime = measPhotoPending.mime;
+        }
+        var url = APPS_SCRIPT_URL + '?action=saveMeasurements&chatId=' + chatId;
+        var response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
-        var url = APPS_SCRIPT_URL + '?' + params;
-        var response = await fetch(url);
         var data = await response.json();
 
         if (data.success) {
@@ -5487,6 +5561,11 @@ async function saveMeasurements() {
                 input.value = '';
                 input.classList.remove('filled');
             });
+            measPhotoPending = null;
+            document.getElementById('meas-photo-file').value = '';
+            var preview = document.getElementById('meas-photo-preview');
+            preview.innerHTML = '';
+            preview.classList.add('hidden');
             // Reload data
             setTimeout(function() {
                 btn.classList.remove('success');
@@ -5575,8 +5654,12 @@ function renderMeasurementsHistory() {
                 '<div class="measurement-row-value">' + (m[key] != null ? m[key] + ' ' + MEAS_UNITS[key] : '—') + '</div>' +
             '</div>';
         }).join('');
+        var photoHtml = m.photoUrl
+            ? '<img class="measurement-row-photo" src="' + m.photoUrl + '" onclick="tg.openLink(\'' + m.photoUrl + '\')">'
+            : '';
         return '<div class="measurement-row" style="animation-delay:' + (i * 0.05) + 's">' +
             '<div class="measurement-row-date">📅 ' + m.date + '</div>' +
+            photoHtml +
             '<div class="measurement-row-values">' + values + '</div>' +
         '</div>';
     }).join('');
