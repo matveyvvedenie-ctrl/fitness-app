@@ -193,9 +193,30 @@ try {
     };
 }
 }
- 
+
+// Единая безопасная обёртка над tg.showConfirm — раньше в 9 местах файла
+// каждое место само проверяло tg.showConfirm && ..., но БЕЗ try/catch вокруг
+// самого вызова. Если showConfirm бросает исключение (бывает на части
+// Telegram-клиентов) или просто не вызывает колбэк — весь await зависал без
+// единого сообщения об ошибке ("нажимаю кнопку — ноль реакции"). Теперь везде
+// только через эту функцию, с откатом на нативный confirm() при любой проблеме.
+function tgConfirm(message) {
+    return new Promise(function(resolve) {
+        try {
+            if (tg && tg.showConfirm) {
+                tg.showConfirm(message, function(ok) { resolve(!!ok); });
+            } else {
+                resolve(confirm(message));
+            }
+        } catch (e) {
+            console.error('tgConfirm: showConfirm failed, falling back to native confirm', e);
+            resolve(confirm(message));
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', init);
- 
+
 var clientName = '';
 var weekTitle = '';
 
@@ -328,9 +349,29 @@ function renderWorkout() {
         var dayBody = document.createElement('div');
         dayBody.className = 'day-body';
         dayBody.id = 'day-body-' + dayIndex;
-        day.exercises.forEach(function(exercise, exIndex) {
-            var card = createExerciseCard(exercise, dayIndex, exIndex);
-            dayBody.appendChild(card);
+
+        // Суперсеты/трисеты (см. groupExercises ниже — та же группировка, что
+        // и в редакторе тренера) показываем клиенту сгруппированными, с общей
+        // подписью, а не отдельными карточками с "Сет:"/"Трисет:" в названии.
+        var groups = groupExercises(day.exercises || []);
+        var flatIndex = 0;
+        groups.forEach(function(group) {
+            if (group.type === 'superset' || group.type === 'triset') {
+                var wrap = document.createElement('div');
+                wrap.className = 'exercise-group-block';
+                var label = document.createElement('div');
+                label.className = 'exercise-group-label';
+                label.textContent = group.type === 'triset' ? '🔗 Трисет' : '🔗 Суперсет';
+                wrap.appendChild(label);
+                group.exercises.forEach(function(exercise) {
+                    wrap.appendChild(createExerciseCard(exercise, dayIndex, flatIndex));
+                    flatIndex++;
+                });
+                dayBody.appendChild(wrap);
+            } else {
+                dayBody.appendChild(createExerciseCard(group.exercises[0], dayIndex, flatIndex));
+                flatIndex++;
+            }
         });
         container.appendChild(dayBody);
 
@@ -403,7 +444,7 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
             '<div class="exercise-photo">' + photoHtml2 + '</div>' +
         '</div>' +
         '<div class="exercise-body">' +
-            '<div class="exercise-name">' + exercise.exercise + '</div>' +
+            '<div class="exercise-name">' + cleanExerciseName(exercise.exercise) + '</div>' +
             noteHtml +
             lastSessionHtml +
             '<div class="exercise-params">' +
@@ -2277,11 +2318,7 @@ async function confirmSendReport() {
 async function quickSendReport(idx) {
     var r = monthlyReports[idx];
     if (!r || !r.hasData) return;
-    var confirmed = await new Promise(function(resolve) {
-        var msg = 'Отправить месячный отчёт клиенту «' + r.name + '»?';
-        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
-        else resolve(confirm(msg));
-    });
+    var confirmed = await tgConfirm('Отправить месячный отчёт клиенту «' + r.name + '»?');
     if (!confirmed) return;
     await _doSendReport(r.chatId, r.name);
 }
@@ -2307,10 +2344,7 @@ async function _doSendReport(chatId, clientName) {
 
 async function deleteClientCompletely(chatId, clientName) {
     var msg = 'Удалить клиента «' + clientName + '» из системы?\n\nЛисты с программой и данными остаются (на случай восстановления), но клиент потеряет доступ к боту.';
-    var confirmed = await new Promise(function(resolve) {
-        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
-        else resolve(confirm(msg));
-    });
+    var confirmed = await tgConfirm(msg);
     if (!confirmed) return;
     try {
         var url = APPS_SCRIPT_URL + '?action=deleteClient&targetChatId=' + encodeURIComponent(chatId);
@@ -2698,10 +2732,7 @@ async function toggleArchiveClient(chatId, archived) {
     var client = adminClients.find(function(c) { return c.chatId === chatId; });
     var name = client ? client.name : 'клиента';
     var action = archived ? ('Убрать ' + name + ' в архив?') : ('Вернуть ' + name + ' из архива?');
-    var confirmed = await new Promise(function(resolve) {
-        if (tg && tg.showConfirm) tg.showConfirm(action, function(ok) { resolve(ok); });
-        else resolve(confirm(action));
-    });
+    var confirmed = await tgConfirm(action);
     if (!confirmed) return;
 
     try {
@@ -2760,19 +2791,12 @@ function openClientCard(chatId) {
     loadClientProgram(client.sheetName);
 }
 
-function closeClientCard() {
+async function closeClientCard() {
     var pendingCount = Object.keys(pendingExerciseEdits).length;
     if (pendingCount > 0) {
         var msg = 'Есть несохранённые изменения упражнений: ' + pendingCount + '.\n\nЗакрыть карточку без сохранения?';
-        if (tg && tg.showConfirm) {
-            tg.showConfirm(msg, function(ok) {
-                if (!ok) return;
-                discardPendingExerciseEdits();
-                _doCloseClientCard();
-            });
-            return;
-        }
-        if (!confirm(msg)) return;
+        var ok = await tgConfirm(msg);
+        if (!ok) return;
         discardPendingExerciseEdits();
     }
     _doCloseClientCard();
@@ -3312,11 +3336,7 @@ async function confirmNewWeek() {
 async function notifyClientFlow() {
     if (!currentClientCard || !currentClientCard.chatId) return;
     var name = currentClientCard.name || 'клиенту';
-    var confirmed = await new Promise(function(resolve) {
-        var msg = 'Отправить ' + name + ' уведомление о том, что программа обновлена?';
-        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
-        else resolve(confirm(msg));
-    });
+    var confirmed = await tgConfirm('Отправить ' + name + ' уведомление о том, что программа обновлена?');
     if (!confirmed) return;
 
     try {
@@ -3332,6 +3352,64 @@ async function notifyClientFlow() {
         tg.showAlert('✅ Уведомление отправлено');
     } catch (error) {
         console.error('Notify error:', error);
+        tg.showAlert('Ошибка соединения ❌');
+    }
+}
+
+// Объединить упражнение с идущим сразу за ним в сет/трисет — задним числом,
+// без специальной формы добавления. Суперсет/трисет в этом коде — это просто
+// префикс "Сет:"/"Трисет:" у ПЕРВОГО упражнения группы + соседние строки
+// (см. isSupersetStart/isTrisetStart/groupExercises выше), так что достаточно
+// переписать название через уже существующее updateClientExercise.
+async function mergeExercises(rowIndex, isUpgradeToTriset) {
+    var ex = currentProgramExercisesByRow[rowIndex];
+    if (!ex || !currentClientCard) return;
+    var currentName = cleanExerciseName(ex.exercise);
+    var newPrefix = isUpgradeToTriset ? 'Трисет: ' : 'Сет: ';
+    var msg = isUpgradeToTriset
+        ? 'Сделать трисет из «' + currentName + '» и следующего упражнения?'
+        : 'Объединить «' + currentName + '» со следующим упражнением в сет?';
+    var confirmed = await tgConfirm(msg);
+    if (!confirmed) return;
+    try {
+        var url = APPS_SCRIPT_URL + '?action=updateClientExercise' +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&rowIndex=' + rowIndex +
+            '&exercise=' + encodeURIComponent(newPrefix + currentName);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadClientProgram(currentClientCard.sheetName);
+    } catch (e) {
+        tg.showAlert('Ошибка соединения ❌');
+    }
+}
+
+// Разъединить сет/трисет обратно на отдельные упражнения — убираем префикс у
+// первого упражнения группы, остальные строки не трогаем (они и так обычные).
+async function splitGroup(firstRowIndex) {
+    var ex = currentProgramExercisesByRow[firstRowIndex];
+    if (!ex || !currentClientCard) return;
+    var confirmed = await tgConfirm('Разъединить группу обратно на отдельные упражнения?');
+    if (!confirmed) return;
+    try {
+        var url = APPS_SCRIPT_URL + '?action=updateClientExercise' +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&rowIndex=' + firstRowIndex +
+            '&exercise=' + encodeURIComponent(cleanExerciseName(ex.exercise));
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadClientProgram(currentClientCard.sheetName);
+    } catch (e) {
         tg.showAlert('Ошибка соединения ❌');
     }
 }
@@ -3363,7 +3441,19 @@ function renderClientProgram(data) {
 
     container.innerHTML = days.map(function(day, dayIdx) {
         var groups = groupExercises(day.exercises || []);
-        var groupsHtml = groups.map(function(group) {
+        var groupsHtml = groups.map(function(group, gi) {
+            var nextGroup = groups[gi + 1];
+            var firstRowIdx = group.exercises[0].rowIndex;
+            // Объединять/разъединять можно только соседние группы — суперсет/трисет и так
+            // определяются исключительно соседством строк, ничего другого не нужно.
+            var actionsHtml = '';
+            if (group.type === 'single' && nextGroup && nextGroup.type === 'single' && firstRowIdx) {
+                actionsHtml = '<button class="cc-group-action-btn" onclick="mergeExercises(' + firstRowIdx + ', false)">🔗 Объединить со следующим</button>';
+            } else if (group.type === 'superset' && nextGroup && nextGroup.type === 'single' && firstRowIdx) {
+                actionsHtml = '<button class="cc-group-action-btn" onclick="mergeExercises(' + firstRowIdx + ', true)">🔗+ Сделать трисет</button>';
+            } else if ((group.type === 'superset' || group.type === 'triset') && firstRowIdx) {
+                actionsHtml = '<button class="cc-group-action-btn cc-group-action-split" onclick="splitGroup(' + firstRowIdx + ')">✂️ Разъединить</button>';
+            }
             if (group.type === 'triset') {
                 var rowIdxs = group.exercises.map(function(ex) { return ex.rowIndex; }).filter(function(r) { return r; }).join(',');
                 return '<div class="cc-exercise cc-superset cc-triset" data-row-indexes="' + rowIdxs + '">' +
@@ -3378,6 +3468,7 @@ function renderClientProgram(data) {
                             '<div class="cc-superset-divider"></div>' +
                             renderExerciseRow(group.exercises[2], 'C') +
                         '</div>' +
+                        actionsHtml +
                     '</div>' +
                 '</div>';
             }
@@ -3393,6 +3484,7 @@ function renderClientProgram(data) {
                             '<div class="cc-superset-divider"></div>' +
                             renderExerciseRow(group.exercises[1], 'B') +
                         '</div>' +
+                        actionsHtml +
                     '</div>' +
                 '</div>';
             }
@@ -3403,6 +3495,7 @@ function renderClientProgram(data) {
                 '<div class="cc-ex-num">' + group.number + '</div>' +
                 '<div class="cc-ex-info">' +
                     renderExerciseRow(group.exercises[0], '') +
+                    actionsHtml +
                 '</div>' +
             '</div>';
         }).join('');
@@ -4061,11 +4154,7 @@ async function saveNewNote() {
 
 async function deleteClientNoteFlow(ts) {
     if (!currentClientCard || !ts) return;
-    var confirmed = await new Promise(function(resolve) {
-        var msg = 'Удалить заметку?';
-        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
-        else resolve(confirm(msg));
-    });
+    var confirmed = await tgConfirm('Удалить заметку?');
     if (!confirmed) return;
     try {
         var url = APPS_SCRIPT_URL + '?action=deleteClientNote' +
@@ -4181,31 +4270,28 @@ async function saveClientChatId() {
     var input = document.getElementById('prof-chatid');
     var newChatId = (input.value || '').trim();
     if (!newChatId || newChatId === currentClientCard.chatId) return;
-    var confirmFn = (tg && tg.showConfirm) ? tg.showConfirm.bind(tg) : function(msg, cb) { cb(confirm(msg)); };
-    confirmFn(
+    var ok = await tgConfirm(
         'Поменять ID клиента с ' + currentClientCard.chatId + ' на ' + newChatId + '? ' +
-        'Если ошибёшься — клиент потеряет доступ к боту/мини-аппу.',
-        async function(ok) {
-            if (!ok) { input.value = currentClientCard.chatId; return; }
-            try {
-                var url = APPS_SCRIPT_URL + '?action=renameClientChatId&oldChatId=' +
-                    encodeURIComponent(currentClientCard.chatId) + '&newChatId=' + encodeURIComponent(newChatId);
-                var resp = await fetch(url);
-                var data = await resp.json();
-                if (!data.success) {
-                    tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
-                    return;
-                }
-                currentClientCard.chatId = newChatId;
-                profileLoadedFor = null; // чтобы следующий заход в анкету перечитал данные по новому id
-                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                tg.showAlert('✅ ID обновлён');
-                loadAdminClients();
-            } catch (e) {
-                tg.showAlert('Ошибка соединения ❌');
-            }
-        }
+        'Если ошибёшься — клиент потеряет доступ к боту/мини-аппу.'
     );
+    if (!ok) { input.value = currentClientCard.chatId; return; }
+    try {
+        var url = APPS_SCRIPT_URL + '?action=renameClientChatId&oldChatId=' +
+            encodeURIComponent(currentClientCard.chatId) + '&newChatId=' + encodeURIComponent(newChatId);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        currentClientCard.chatId = newChatId;
+        profileLoadedFor = null; // чтобы следующий заход в анкету перечитал данные по новому id
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        tg.showAlert('✅ ID обновлён');
+        loadAdminClients();
+    } catch (e) {
+        tg.showAlert('Ошибка соединения ❌');
+    }
 }
 
 // ========== ИСТОРИЯ ПО КОНКРЕТНОМУ УПРАЖНЕНИЮ ==========
@@ -4910,10 +4996,7 @@ async function deleteExerciseEdit() {
     if (!currentEditingRow || !currentClientCard) return;
     var ex = currentProgramExercisesByRow[currentEditingRow];
     var name = ex ? cleanExerciseName(ex.exercise) : 'упражнение';
-    var confirmed = await new Promise(function(resolve) {
-        if (tg && tg.showConfirm) tg.showConfirm('Удалить «' + name + '» из программы?', function(ok) { resolve(ok); });
-        else resolve(confirm('Удалить «' + name + '» из программы?'));
-    });
+    var confirmed = await tgConfirm('Удалить «' + name + '» из программы?');
     if (!confirmed) return;
 
     var delBtn = document.getElementById('ex-edit-delete-btn');
@@ -5306,11 +5389,7 @@ async function deleteCurrentDay() {
     closeDayActionsDialog();
     if (!dayName || !currentClientCard) return;
 
-    var confirmed = await new Promise(function(resolve) {
-        var msg = 'Удалить день «' + dayName + '» вместе со всеми упражнениями внутри?';
-        if (tg && tg.showConfirm) tg.showConfirm(msg, function(ok) { resolve(ok); });
-        else resolve(confirm(msg));
-    });
+    var confirmed = await tgConfirm('Удалить день «' + dayName + '» вместе со всеми упражнениями внутри?');
     if (!confirmed) return;
 
     try {

@@ -202,6 +202,31 @@ body {
     }
 }
 
+/* Суперсет/трисет в тренировке клиента — обёртка вокруг 2-3 exercise-card,
+   с общей подписью, чтобы было видно что это один блок, а не разные упражнения */
+.exercise-group-block {
+    margin: 8px;
+    padding: 10px 0 2px;
+    border-radius: 14px;
+    background: rgba(63, 81, 181, 0.06);
+    border: 1px solid rgba(63, 81, 181, 0.15);
+}
+.exercise-group-block .exercise-card {
+    margin: 6px 10px;
+}
+.exercise-group-label {
+    margin: 0 18px 4px;
+    display: inline-block;
+    background: #3F51B5;
+    color: white;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 /* Exercise Card */
 .exercise-card {
     background: white;
@@ -2442,6 +2467,25 @@ body {
     height: 1px;
     background: linear-gradient(90deg, transparent, #c9d2f0, transparent);
     margin: 12px 0;
+}
+
+.cc-group-action-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    background: #EEF0FB;
+    color: #3F51B5;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cc-group-action-btn.cc-group-action-split {
+    background: #FFF3E0;
+    color: #E65100;
 }
 
 /* Шапка строки с названием + кнопка ✏️ справа */
