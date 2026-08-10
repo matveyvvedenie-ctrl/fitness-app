@@ -261,7 +261,11 @@ async function init() {
         }
     } catch (error) {
         console.error('ERROR:', error);
-        var currentChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '';
+        // Тот же дефолт '739299264' (Matvey), что и в loadWorkoutData() ниже —
+        // без него в обычном браузере (реальный tg есть, но initDataUnsafe.user
+        // пуст вне настоящего Telegram) currentChatId получался '' и isTrainer()
+        // не срабатывал, хотя запрос к бэкенду ушёл именно с '739299264'.
+        var currentChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '739299264';
         if (/Client not found/.test(error.message) && isTrainer(currentChatId)) {
             // Тренер открыл свою же панель, но у него нет "своей" карточки клиента
             // (в отличие от Matvey, у которого в таблице есть тестовая запись о
