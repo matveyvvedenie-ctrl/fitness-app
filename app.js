@@ -37,8 +37,23 @@ function isTrainer(chatId) {
 // всякой связи с нашим кодом ("раз через раз грузит"). НЕ ретраим по статусу
 // ответа (200 с {error:...} внутри — это уже настоящая ошибка, не сетевая) —
 // только когда fetch вообще не смог достучаться до сервера.
+//
+// _withTimeout: у fetch() нет таймаута по умолчанию — если соединение просто
+// зависает (не рвётся с ошибкой, а молча не отвечает — бывает во встроенных
+// браузерах вроде VK-приложения на телефоне, где сеть строже), await fetch()
+// висит вечно и вообще не доходит ни до catch выше, ни до отображения ошибки
+// — человек видит бесконечный спиннер (см. жалобу "во VK на телефоне крутит
+// загрузку бесконечно", 2026-08-12). Promise.race не отменяет сам запрос, но
+// перестаёт его ждать и даёт остальному коду (ретраю/экрану ошибки) сработать.
+function _withTimeout(promise, ms) {
+    return new Promise(function(resolve, reject) {
+        var timer = setTimeout(function() { reject(new Error('Таймаут запроса (' + (ms / 1000) + ' с)')); }, ms);
+        promise.then(function(v) { clearTimeout(timer); resolve(v); },
+                     function(e) { clearTimeout(timer); reject(e); });
+    });
+}
 function _fetchWithRetry(nativeFetch, input, init, retriesLeft) {
-    return nativeFetch(input, init).catch(function(err) {
+    return _withTimeout(nativeFetch(input, init), 15000).catch(function(err) {
         if (retriesLeft <= 0) throw err;
         return new Promise(function(resolve) { setTimeout(resolve, 700); })
             .then(function() { return _fetchWithRetry(nativeFetch, input, init, retriesLeft - 1); });
