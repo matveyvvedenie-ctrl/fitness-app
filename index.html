@@ -17,6 +17,30 @@
         <p>Загрузка тренировки...</p>
     </div>
 
+    <!-- Сторожевой таймер на случай, если приложение вообще не поднимется (например,
+         из-за проблем с сетью внутри встроенного браузера VK-приложения) — без него
+         человек видит "белый экран" вечно, без единой подсказки, что делать. Намеренно
+         инлайновый и в самом верху body — не зависит от того, доехали ли до конца
+         остальные скрипты (app.js, CDN-библиотеки) и не упали ли они с ошибкой. -->
+    <script>
+        setTimeout(function() {
+            var loading = document.getElementById('loading');
+            var main = document.getElementById('main-screen');
+            var stuck = loading && !loading.classList.contains('hidden') &&
+                (!main || main.classList.contains('hidden'));
+            if (stuck) {
+                loading.innerHTML =
+                    '<div style="padding:24px;text-align:center;color:#666;max-width:320px;">' +
+                    '<p style="font-size:16px;font-weight:600;color:#333;">Не получилось загрузить приложение</p>' +
+                    '<p style="font-size:13px;margin-top:8px;">Проверь интернет-соединение и попробуй ещё раз. ' +
+                    'Если не поможет — открой ссылку в обычном браузере телефона (не внутри VK).</p>' +
+                    '<button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;border:none;' +
+                    'border-radius:8px;background:#1a1a2e;color:white;font-size:14px;font-weight:600;">Обновить</button>' +
+                    '</div>';
+            }
+        }, 10000);
+    </script>
+
     <!-- Main App -->
     <div id="main-screen" class="hidden">
         <!-- Баннер супер-админ режима: виден, когда Матвей открыл мини-апп «от лица» другого тренера -->
