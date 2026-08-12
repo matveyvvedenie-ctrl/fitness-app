@@ -29,13 +29,30 @@ function isTrainer(chatId) {
 // каждый из ~40 существующих fetch(...) по всему файлу. Без CURRENT_TRAINER_ID
 // (обычный Telegram-запуск или VK без группы) ничего не добавляется —
 // поведение как раньше.
+//
+// Заодно ретраим запросы к Apps Script при СЕТЕВОМ сбое (fetch кидает
+// исключение, например Safari "Load failed" / "Failed to fetch") — это
+// известная особенность хостинга на script.google.com: он отдаёт 302-редирект
+// на одноразовый googleusercontent.com URL, и этот "хвост" иногда рвётся без
+// всякой связи с нашим кодом ("раз через раз грузит"). НЕ ретраим по статусу
+// ответа (200 с {error:...} внутри — это уже настоящая ошибка, не сетевая) —
+// только когда fetch вообще не смог достучаться до сервера.
+function _fetchWithRetry(nativeFetch, input, init, retriesLeft) {
+    return nativeFetch(input, init).catch(function(err) {
+        if (retriesLeft <= 0) throw err;
+        return new Promise(function(resolve) { setTimeout(resolve, 700); })
+            .then(function() { return _fetchWithRetry(nativeFetch, input, init, retriesLeft - 1); });
+    });
+}
 (function() {
     var nativeFetch = window.fetch.bind(window);
     window.fetch = function(input, init) {
-        if (CURRENT_TRAINER_ID && typeof input === 'string' && input.indexOf(APPS_SCRIPT_URL) === 0) {
+        var isAppsScript = typeof input === 'string' && input.indexOf(APPS_SCRIPT_URL) === 0;
+        if (CURRENT_TRAINER_ID && isAppsScript) {
             var sep = input.indexOf('?') === -1 ? '?' : '&';
             input = input + sep + 'trainerId=' + encodeURIComponent(CURRENT_TRAINER_ID);
         }
+        if (isAppsScript) return _fetchWithRetry(nativeFetch, input, init, 2);
         return nativeFetch(input, init);
     };
 })();
@@ -248,6 +265,7 @@ async function init() {
         renderHome();
         // Подгружаем рекорды и вес в фоне (для карточек на главной)
         loadHomeExtras();
+        window.__appInitSettled = true; // см. сторожевой таймер в index.html — не перекрывать успешный экран
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('main-screen').classList.remove('hidden');
         initializeTabs();
@@ -261,6 +279,11 @@ async function init() {
         }
     } catch (error) {
         console.error('ERROR:', error);
+        // Любая ветка catch дальше сама покажет какой-то финальный экран
+        // (админку, запрос доступа или текст ошибки) — сторожевой таймер в
+        // index.html не должен затирать это своим общим "грузится долго",
+        // если он сработает уже ПОСЛЕ того, как мы сами разобрались с ошибкой.
+        window.__appInitSettled = true;
         // Тот же дефолт '739299264' (Matvey), что и в loadWorkoutData() ниже —
         // без него в обычном браузере (реальный tg есть, но initDataUnsafe.user
         // пуст вне настоящего Telegram) currentChatId получался '' и isTrainer()
@@ -318,11 +341,28 @@ function renderVkAccessRequest() {
 async function loadWorkoutData() {
     var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
     var url = APPS_SCRIPT_URL + '?action=read&chatId=' + chatId;
-    var response = await fetch(url);
-    if (!response.ok) throw new Error('HTTP error ' + response.status);
-    var data = await response.json();
-    if (data.error) throw new Error(data.error);
-    return data;
+    // Google Apps Script изредка отвечает разовым сбоем (HTTP 404/500 на
+    // редиректе к googleusercontent.com) без видимой причины — само по себе
+    // проходит при повторном запросе. Ретраим только СЕТЕВЫЕ/HTTP-сбои — не
+    // трогаем осмысленные ответы бэкенда вида {error: "Client not found"},
+    // их повтор не исправит, а только зря отложит нужный экран (админка/
+    // запрос доступа).
+    var lastErr;
+    var maxAttempts = 4; // на практике наблюдали до 3 сбоев подряд — берём запас
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            var response = await fetch(url);
+            if (!response.ok) throw new Error('HTTP error ' + response.status);
+            var data = await response.json();
+            if (data.error) throw new Error(data.error);
+            return data;
+        } catch (e) {
+            lastErr = e;
+            if (!/^HTTP error/.test(e.message)) throw e;
+            if (attempt < maxAttempts - 1) await new Promise(function(r) { setTimeout(r, 700); });
+        }
+    }
+    throw lastErr;
 }
  
 function renderWorkout() {

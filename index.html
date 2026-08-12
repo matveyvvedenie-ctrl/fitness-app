@@ -5,10 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
+         строго по очереди (следующий запрос уходил только после того как предыдущий
+         и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
+         мобильной сети такая цепочка могла легко упереться в таймаут VK на инициализацию
+         мини-аппа ("Приложение не инициализировано"). С defer все 4 качаются параллельно,
+         не блокируя отрисовку страницы, и выполняются по порядку сразу после парсинга —
+         то же самое поведение, но быстрее. app.js ниже по той же причине тоже defer,
+         чтобы гарантированно выполниться ПОСЛЕ этих четырёх (порядок defer-скриптов
+         сохраняется), а не раньше, как могло бы получиться без этого. -->
+    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer></script>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -29,6 +38,9 @@
          сообщения — она просто скроет loading целиком поверх него, как обычно. -->
     <script>
         setTimeout(function() {
+            // Если app.js уже сам разобрался (успех, свой текст ошибки, экран
+            // "нет доступа") — не лезем поверх со своим менее точным сообщением.
+            if (window.__appInitSettled) return;
             var loading = document.getElementById('loading');
             var main = document.getElementById('main-screen');
             var stuck = loading && !loading.classList.contains('hidden') &&
@@ -1541,6 +1553,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js" defer></script>
 </body>
 </html>
