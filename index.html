@@ -15,7 +15,17 @@
          чтобы гарантированно выполниться ПОСЛЕ этих четырёх (порядок defer-скриптов
          сохраняется), а не раньше, как могло бы получиться без этого. -->
     <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
-    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js" defer></script>
+    <!-- Раньше грузили с unpkg.com — предположительно именно это глушило
+         открытие мини-аппа во VK НА ТЕЛЕФОНЕ (крутится "VK mini apps" загрузка
+         вечно, дальше нашей страницы вообще не доходит): VK показывает свой
+         сплэш, пока не получит от нас событие VKWebAppInit, а его шлёт именно
+         vk-bridge — если он не догрузился (unpkg лишний редирект + сторонний
+         CDN, во встроенном браузере VK на мобильной сети менее надёжно, чем на
+         десктопе), VKWebAppInit не уходит НИКОГДА и сплэш VK не убирается,
+         даже если наша страница под ним отработала бы нормально. Self-host
+         убирает этот сторонний CDN из цепочки (см. vendor/vk-bridge.min.js,
+         версия 3.0.2 — 2026-08-12). -->
+    <script src="vendor/vk-bridge.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer></script>
 </head>
