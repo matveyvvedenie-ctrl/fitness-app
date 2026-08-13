@@ -59,6 +59,65 @@ function _fetchWithRetry(nativeFetch, input, init, retriesLeft) {
             .then(function() { return _fetchWithRetry(nativeFetch, input, init, retriesLeft - 1); });
     });
 }
+
+// ── Фаза 4 пилот (см. MIGRATION_PLAN.md, 2026-08-13) ────────────────────────
+// Для ОДНОГО trainerId (сейчас — Роман) НЕКОТОРЫЕ read-запросы уходят не в
+// Apps Script, а в новый Python API (Postgres) на Railway. Намеренно узкий
+// срез — только getClients и getClientProfile, самые простые и безопасные
+// read-экшены. Всё остальное (включая запись) продолжает идти в Apps Script
+// как раньше — НИКАКИХ изменений для любого другого trainerId, в том числе
+// для Matvey по умолчанию (без trainerId вообще): action просто не найдётся
+// в NEW_API_ACTIONS, код пойдёт по старому пути ниже, 1-в-1 как было.
+// Откат — убрать id из NEW_API_PILOT_TRAINERS, без передеплоя бэкенда.
+//
+// NEW_API_KEY виден любому, кто откроет исходник страницы — это браузер, не
+// сервер, спрятать его тут физически нельзя. Не настоящий секрет, а тот же
+// уровень защиты, что был у APPS_SCRIPT_URL раньше (публичный адрес плюс
+// нужно знать trainerId/chatId). Обсуждали с Matvey — приемлемо для пилота
+// на пустом тенанте; для реальных данных понадобится другой механизм
+// (проверка подписи VK/Telegram initData на сервере, а не общий ключ).
+var NEW_API_BASE = 'https://fitness-api-fitness-bot-v2.up.railway.app';
+var NEW_API_KEY = '72bdc5e9073da1309592590508c0098bcaad8139c82aeafa77438c2ed46f7e61';
+var NEW_API_PILOT_TRAINERS = { '240703996': true }; // Роман
+
+function _fakeJsonResponse(obj, status) {
+    return new Response(JSON.stringify(obj), { status: status, headers: { 'Content-Type': 'application/json' } });
+}
+
+function _newApiCall(nativeFetch, path) {
+    return nativeFetch(NEW_API_BASE + path, { headers: { 'X-Api-Key': NEW_API_KEY } })
+        .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); });
+}
+
+var NEW_API_ACTIONS = {
+    // Аналог action=getClients — форма ответа та же ({clients:[...]}), плюс
+    // синтетический sheetName (реальных "листов" в новой БД нет; часть
+    // старого кода его ожидает — например открытие программы клиента, что
+    // пилотом пока не покрыто и честно упадёт "Sheet not found" на старом
+    // бэкенде, если попробовать — это ожидаемый пробел, не баг).
+    getClients: function(nativeFetch) {
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            var clients = (res.data.clients || []).map(function(c) {
+                return { chatId: c.chatId, name: c.name, archived: c.archived, sheetName: c.name };
+            });
+            return _fakeJsonResponse({ clients: clients }, 200);
+        });
+    },
+    // Аналог action=getClientProfile (targetChatId/clientChatId) — добавляем
+    // success:true, старый код это проверяет.
+    getClientProfile: function(nativeFetch, params) {
+        var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/profile';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
+            res.data.success = true;
+            return _fakeJsonResponse(res.data, 200);
+        });
+    }
+};
+
 (function() {
     var nativeFetch = window.fetch.bind(window);
     window.fetch = function(input, init) {
@@ -67,7 +126,15 @@ function _fetchWithRetry(nativeFetch, input, init, retriesLeft) {
             var sep = input.indexOf('?') === -1 ? '?' : '&';
             input = input + sep + 'trainerId=' + encodeURIComponent(CURRENT_TRAINER_ID);
         }
-        if (isAppsScript) return _fetchWithRetry(nativeFetch, input, init, 2);
+        if (isAppsScript) {
+            if (NEW_API_PILOT_TRAINERS[CURRENT_TRAINER_ID]) {
+                var qIndex = input.indexOf('?');
+                var params = new URLSearchParams(qIndex === -1 ? '' : input.slice(qIndex + 1));
+                var handler = NEW_API_ACTIONS[params.get('action')];
+                if (handler) return _withTimeout(handler(nativeFetch, params), 15000);
+            }
+            return _fetchWithRetry(nativeFetch, input, init, 2);
+        }
         return nativeFetch(input, init);
     };
 })();
