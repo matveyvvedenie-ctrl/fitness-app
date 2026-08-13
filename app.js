@@ -90,6 +90,34 @@ function _newApiCall(nativeFetch, path) {
         .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); });
 }
 
+// getClientHistory/getLastExerciseResult в старой системе ключуются по имени
+// клиента (общий лист "Заметки"/"История" на тренера), не по chatId — новый
+// API ключует по chatId. Резолвим через уже готовый список клиентов (лишний
+// запрос, но эти экшены и так не самые частые). Кэш на время жизни вкладки —
+// список клиентов Романа меняется редко, а если что — просто обновит страницу.
+var _nameToChatIdCache = null;
+function _resolveChatIdByName(nativeFetch, name) {
+    if (_nameToChatIdCache) return Promise.resolve(_nameToChatIdCache[name] || null);
+    var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients';
+    return _newApiCall(nativeFetch, path).then(function(res) {
+        _nameToChatIdCache = {};
+        (res.ok ? (res.data.clients || []) : []).forEach(function(c) { _nameToChatIdCache[c.name] = c.chatId; });
+        return _nameToChatIdCache[name] || null;
+    });
+}
+
+// Портировано 1-в-1 из _rpeToFeedback в apps_script.js — новый API отдаёт
+// голый rpe, бейдж "Легко/Норм/Тяжело/Не вытянул" собираем на лету.
+function _rpeToFeedback(rpe) {
+    if (rpe === '' || rpe == null) return null;
+    var n = parseFloat(rpe);
+    if (isNaN(n)) return null;
+    if (n <= 6.5) return { code: 'easy', label: 'Легко', emoji: '😌' };
+    if (n <= 8.5) return { code: 'normal', label: 'Норм', emoji: '💪' };
+    if (n <= 9.5) return { code: 'hard', label: 'Тяжело', emoji: '🔥' };
+    return { code: 'failed', label: 'Не вытянул', emoji: '❌' };
+}
+
 var NEW_API_ACTIONS = {
     // Аналог action=getClients — форма ответа та же ({clients:[...]}), плюс
     // синтетический sheetName (реальных "листов" в новой БД нет; часть
@@ -154,6 +182,51 @@ var NEW_API_ACTIONS = {
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
             return _fakeJsonResponse(res.data, 200);
+        });
+    },
+    // Ключуются по имени клиента (см. _resolveChatIdByName выше) — единственная
+    // причина, почему их не добавили в прошлый раз вместе с остальным read.
+    getClientHistory: function(nativeFetch, params) {
+        var clientName = params.get('clientName') || '';
+        var limit = params.get('limit') || '30';
+        return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ history: [] }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+                '/history?limit=' + encodeURIComponent(limit);
+            return _newApiCall(nativeFetch, path).then(function(res) {
+                if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+                // Реформатируем под то, что ждёт renderClientHistory: dateObj
+                // (эпоха мс, дефолта нет — формула в formatHistoryDate/daysAgoLabel
+                // упадёт в NaN без него), date как "dd.MM.yyyy", feedback по RPE.
+                var history = (res.data.history || []).map(function(day) {
+                    var parts = (day.date || '').split('-'); // yyyy-MM-dd
+                    var displayDate = parts.length === 3 ? (parts[2] + '.' + parts[1] + '.' + parts[0]) : day.date;
+                    return {
+                        date: displayDate, dateObj: Date.parse(day.date + 'T00:00:00'), key: day.date,
+                        exercises: (day.exercises || []).map(function(ex) {
+                            var out = {};
+                            for (var k in ex) out[k] = ex[k];
+                            out.feedback = _rpeToFeedback(ex.rpe);
+                            return out;
+                        })
+                    };
+                });
+                return _fakeJsonResponse({ history: history }, 200);
+            });
+        });
+    },
+    getLastExerciseResult: function(nativeFetch, params) {
+        var clientName = params.get('clientName') || '';
+        var exerciseName = params.get('exerciseName') || '';
+        return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ empty: true }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+                '/exercises/' + encodeURIComponent(exerciseName) + '/last-result';
+            return _newApiCall(nativeFetch, path).then(function(res) {
+                if (!res.ok || res.data.empty) return _fakeJsonResponse({ empty: true }, 200);
+                res.data.feedback = _rpeToFeedback(res.data.rpe);
+                return _fakeJsonResponse(res.data, 200);
+            });
         });
     }
 };
