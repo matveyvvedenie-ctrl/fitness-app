@@ -63,8 +63,9 @@ function _fetchWithRetry(nativeFetch, input, init, retriesLeft) {
 // ── Фаза 4 пилот (см. MIGRATION_PLAN.md, 2026-08-13) ────────────────────────
 // Для ОДНОГО trainerId (сейчас — Роман) НЕКОТОРЫЕ read-запросы уходят не в
 // Apps Script, а в новый Python API (Postgres) на Railway. Намеренно узкий
-// срез — только getClients и getClientProfile, самые простые и безопасные
-// read-экшены. Всё остальное (включая запись) продолжает идти в Apps Script
+// срез — только чтение (getClients/getClientProfile/getMeasurements/
+// getClientFoodEntries/getExerciseLibrary/getExerciseMediaLibrary/
+// getMealPlanForClient), никакой записи. Всё остальное продолжает идти в Apps Script
 // как раньше — НИКАКИХ изменений для любого другого trainerId, в том числе
 // для Matvey по умолчанию (без trainerId вообще): action просто не найдётся
 // в NEW_API_ACTIONS, код пойдёт по старому пути ниже, 1-в-1 как было.
@@ -115,8 +116,48 @@ var NEW_API_ACTIONS = {
             res.data.success = true;
             return _fakeJsonResponse(res.data, 200);
         });
+    },
+    // Дальше — ещё 4 read-экшена (2026-08-13), формы ответа у нового API уже
+    // совпадают со старыми 1-в-1 (.measurements/.days/.exercises/.exists),
+    // реформатировать почти нечего — только 404 клиента в {error:...}.
+    getMeasurements: function(nativeFetch, params) {
+        var chatId = params.get('chatId') || '';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/measurements';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
+    },
+    getClientFoodEntries: function(nativeFetch, params) {
+        var chatId = params.get('clientChatId') || params.get('chatId') || '';
+        var days = params.get('days') || '14';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+            '/food-entries?days=' + encodeURIComponent(days);
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
+    },
+    // getExerciseLibrary и getExerciseMediaLibrary — один и тот же новый
+    // эндпоинт (там уже расширенная форма с фото/видео, старому "простому"
+    // getExerciseLibrary лишние поля не мешают).
+    getExerciseLibrary: function(nativeFetch) {
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/exercises';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
+    },
+    getMealPlanForClient: function(nativeFetch, params) {
+        var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
     }
 };
+NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
 
 (function() {
     var nativeFetch = window.fetch.bind(window);
