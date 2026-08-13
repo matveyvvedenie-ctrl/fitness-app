@@ -118,6 +118,18 @@ function _rpeToFeedback(rpe) {
     return { code: 'failed', label: 'Не вытянул', emoji: '❌' };
 }
 
+// ISO-datetime ("2026-08-13T09:32:16...") -> "dd.MM.yyyy HH:mm", как раньше
+// писал apps_script.js. Локальное время браузера — старая система брала
+// таймзону скрипта (Europe/Moscow), тут для заметки-другой разница в часовом
+// поясе не критична, а усложнять ради этого не стоит.
+function _fmtDateTime(iso) {
+    try {
+        var d = new Date(iso);
+        var p2 = function(n) { return (n < 10 ? '0' : '') + n; };
+        return p2(d.getDate()) + '.' + p2(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+    } catch (_) { return iso; }
+}
+
 var NEW_API_ACTIONS = {
     // Аналог action=getClients — форма ответа та же ({clients:[...]}), плюс
     // синтетический sheetName (реальных "листов" в новой БД нет; часть
@@ -227,6 +239,57 @@ var NEW_API_ACTIONS = {
                 res.data.feedback = _rpeToFeedback(res.data.rpe);
                 return _fakeJsonResponse(res.data, 200);
             });
+        });
+    },
+    // Заметки — читаем И пишем вместе (не по одной, как остальное): удаление
+    // ссылается на идентификатор заметки (`ts` в старой системе), и если бы
+    // читали через новый API, а удаляли через старый (или наоборот), номера
+    // разъехались бы. Тут `ts`, который видит фронтенд — это просто integer
+    // `id` из новой БД, переданный под старым именем поля (фронт с ним не
+    // делает ничего, кроме как отдаёт обратно при удалении — см. deleteClientNoteFlow).
+    getClientNotes: function(nativeFetch, params) {
+        var clientName = params.get('clientName') || '';
+        return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ notes: [] }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/notes';
+            return _newApiCall(nativeFetch, path).then(function(res) {
+                if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+                var notes = (res.data.notes || []).map(function(n) {
+                    return { date: _fmtDateTime(n.date), text: n.text, important: n.important, ts: n.id };
+                });
+                return _fakeJsonResponse({ notes: notes }, 200);
+            });
+        });
+    },
+    addClientNote: function(nativeFetch, params) {
+        var clientName = params.get('clientName') || '';
+        var text = params.get('text') || '';
+        var important = params.get('important') === 'true';
+        return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден' }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/notes';
+            return nativeFetch(NEW_API_BASE + path, {
+                method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text, important: important })
+            }).then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                return _fakeJsonResponse({ success: true, ts: data.id, date: _fmtDateTime(data.date) }, 200);
+            }); });
+        });
+    },
+    deleteClientNote: function(nativeFetch, params) {
+        var clientName = params.get('clientName') || '';
+        var ts = params.get('ts') || ''; // на самом деле id из новой БД, см. комментарий выше
+        return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден' }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/notes/' + encodeURIComponent(ts);
+            return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
+                .then(function(r) {
+                    if (r.status === 204 || r.ok) return _fakeJsonResponse({ success: true }, 200);
+                    return r.json().then(function(data) {
+                        return _fakeJsonResponse({ success: false, error: (data && data.detail) || 'Заметка не найдена' }, 200);
+                    });
+                });
         });
     }
 };
