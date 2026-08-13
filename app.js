@@ -130,6 +130,14 @@ function _fmtDateTime(iso) {
     } catch (_) { return iso; }
 }
 
+// ISO-дата ("yyyy-MM-dd", без времени) -> "dd.MM.yyyy". Вынесено сюда, было
+// продублировано в getClientHistory и getFinances.
+function _isoDateToRu(iso) {
+    if (!iso) return '';
+    var parts = iso.split('-');
+    return parts.length === 3 ? (parts[2] + '.' + parts[1] + '.' + parts[0]) : iso;
+}
+
 var NEW_API_ACTIONS = {
     // Аналог action=getClients — форма ответа та же ({clients:[...]}), плюс
     // синтетический sheetName (реальных "листов" в новой БД нет; часть
@@ -211,10 +219,8 @@ var NEW_API_ACTIONS = {
                 // (эпоха мс, дефолта нет — формула в formatHistoryDate/daysAgoLabel
                 // упадёт в NaN без него), date как "dd.MM.yyyy", feedback по RPE.
                 var history = (res.data.history || []).map(function(day) {
-                    var parts = (day.date || '').split('-'); // yyyy-MM-dd
-                    var displayDate = parts.length === 3 ? (parts[2] + '.' + parts[1] + '.' + parts[0]) : day.date;
                     return {
-                        date: displayDate, dateObj: Date.parse(day.date + 'T00:00:00'), key: day.date,
+                        date: _isoDateToRu(day.date), dateObj: Date.parse(day.date + 'T00:00:00'), key: day.date,
                         exercises: (day.exercises || []).map(function(ex) {
                             var out = {};
                             for (var k in ex) out[k] = ex[k];
@@ -374,15 +380,43 @@ var NEW_API_ACTIONS = {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             var clients = (res.data.clients || []).map(function(c) {
                 var p = c.lastPayment || {};
-                var endDate = '';
-                if (p.endDate) {
-                    var parts = p.endDate.split('-'); // yyyy-MM-dd
-                    endDate = parts.length === 3 ? (parts[2] + '.' + parts[1] + '.' + parts[0]) : p.endDate;
-                }
-                return { chatId: c.chatId, name: c.name, status: c.status, daysLeft: c.daysLeft, endDate: endDate, amount: p.amount };
+                return { chatId: c.chatId, name: c.name, status: c.status, daysLeft: c.daysLeft, endDate: _isoDateToRu(p.endDate), amount: p.amount };
             });
             return _fakeJsonResponse({ clients: clients }, 200);
         });
+    },
+    // savePaymentDirect в apps_script.js — тонкая обёртка над той же
+    // savePayment(), на которую уже равнялся POST .../payments при разработке
+    // бэкенда — семантика (продление от конца активного периода) совпадает.
+    savePaymentDirect: function(nativeFetch, params) {
+        var chatId = params.get('clientChatId') || params.get('chatId') || '';
+        var payload = {
+            amount: parseFloat(params.get('amount') || '0'), months: parseInt(params.get('months') || '1', 10),
+            comment: params.get('comment') || ''
+        };
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/payments';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({
+                success: true, clientName: params.get('clientName') || '', amount: data.amount,
+                months: data.months, endDate: _isoDateToRu(data.endDate), paymentDate: _isoDateToRu(data.date)
+            }, 200);
+        }); });
+    },
+    adjustSubscriptionEnd: function(nativeFetch, params) {
+        var chatId = params.get('clientChatId') || params.get('chatId') || '';
+        var payload = { days: parseInt(params.get('days') || '0', 10), comment: params.get('comment') || '' };
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/payments/adjust';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({ success: true, newEndDate: _isoDateToRu(data.endDate) }, 200);
+        }); });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
