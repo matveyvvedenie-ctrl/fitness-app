@@ -417,6 +417,114 @@ var NEW_API_ACTIONS = {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
             return _fakeJsonResponse({ success: true, newEndDate: _isoDateToRu(data.endDate) }, 200);
         }); });
+    },
+    // Программа тренировок — ключуется по sheetName (не chatId), но у нас
+    // sheetName === name синтетически (см. getClients выше), так что
+    // подходит тот же резолвер _resolveChatIdByName. rowIndex, который видит
+    // фронтенд — это integer `id` из новой БД под старым именем поля (тот же
+    // приём, что и с `ts` у заметок). Читаем И пишем вместе — если бы читали
+    // из новой системы, а писали в старую (или наоборот), id/rowIndex
+    // разъехались бы мгновенно.
+    //
+    // НЕ переносим тут: photo1/photo2/videoVk (фото/VK-видео техники — совпадение
+    // по названию с библиотекой упражнений, у Романа она пуста, деградация
+    // не критична), completed/timestamp (были всегда пустышками и в
+    // apps_script.js), action=write (клиент сам завершает тренировку — там
+    // ещё и опрос самочувствия/причина провала, которых на бэкенде пока нет,
+    // а настоящих клиентов у Романа всё равно нет — не горит).
+    readClientProgram: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ error: 'Sheet not found: ' + sheetName }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program';
+            return _newApiCall(nativeFetch, path).then(function(res) {
+                if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+                var days = (res.data.days || []).map(function(day) {
+                    return {
+                        day: day.day,
+                        exercises: (day.exercises || []).map(function(ex) {
+                            return {
+                                rowIndex: ex.id, exercise: ex.exercise, sets: ex.sets, reps: ex.reps,
+                                weightPlan: ex.weightPlan, rpe: ex.rpe, video: ex.video || '', videoVk: '',
+                                note: ex.note, weightFact: ex.weightFact, repsFact: ex.repsFact,
+                                completed: false, timestamp: '', comment: ex.comment, photo1: '', photo2: ''
+                            };
+                        })
+                    };
+                });
+                return _fakeJsonResponse({ weekTitle: res.data.weekTitle, days: days }, 200);
+            });
+        });
+    },
+    updateClientExercise: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        var rowIndex = params.get('rowIndex') || ''; // на самом деле id, см. коммент выше
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
+            var fields = {};
+            ['exercise', 'sets', 'reps', 'weightPlan', 'rpe', 'note'].forEach(function(k) {
+                if (params.has(k)) fields[k] = params.get(k);
+            });
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+                '/program/exercises/' + encodeURIComponent(rowIndex);
+            return nativeFetch(NEW_API_BASE + path, {
+                method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify(fields)
+            }).then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                return _fakeJsonResponse({ success: true }, 200);
+            }); });
+        });
+    },
+    deleteClientExercise: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        var rowIndex = params.get('rowIndex') || '';
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+                '/program/exercises/' + encodeURIComponent(rowIndex);
+            return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
+                .then(function(r) {
+                    if (r.status === 204 || r.ok) return _fakeJsonResponse({ success: true }, 200);
+                    return r.json().then(function(data) {
+                        return _fakeJsonResponse({ success: false, error: (data && data.detail) || 'Не удалось' }, 200);
+                    });
+                });
+        });
+    },
+    // Bulk (сет/трисет/несколько упражнений разом) — новый API умеет только
+    // по одному, поэтому шлём N последовательных POST вместо одного bulk-запроса.
+    addClientExercises: function(nativeFetch, params, init) {
+        var sheetName = params.get('sheetName') || '';
+        var dayName = params.get('dayName') || '';
+        var body;
+        try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
+        var exercises = body.exercises || [];
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program/exercises';
+            var chain = Promise.resolve();
+            var savedCount = 0;
+            var firstError = null;
+            exercises.forEach(function(ex) {
+                chain = chain.then(function() {
+                    return nativeFetch(NEW_API_BASE + path, {
+                        method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            day: dayName, exercise: ex.exercise || '', sets: ex.sets || '', reps: ex.reps || '',
+                            weightPlan: ex.weightPlan || '', rpe: ex.rpe || '', note: ex.note || ''
+                        })
+                    }).then(function(r) { return r.json().then(function(data) {
+                        if (r.ok) savedCount++;
+                        else if (!firstError) firstError = data.detail || 'Не удалось';
+                    }); });
+                });
+            });
+            return chain.then(function() {
+                if (firstError && savedCount === 0) return _fakeJsonResponse({ success: false, error: firstError }, 200);
+                return _fakeJsonResponse({ success: true, saved: savedCount }, 200);
+            });
+        });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
