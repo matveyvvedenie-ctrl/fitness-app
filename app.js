@@ -1573,7 +1573,8 @@ function openNewTrainerForm() {
     document.getElementById('nt-chatid').value = '';
     document.getElementById('nt-color').value = '';
     document.getElementById('nt-vktoken').value = '';
-    document.getElementById('nt-status').value = 'active';
+    document.getElementById('nt-status').value = 'demo';
+    updateNewTrainerFormMode();
     document.getElementById('new-trainer-modal').classList.remove('hidden');
     document.body.classList.add('no-scroll');
 }
@@ -1583,16 +1584,21 @@ function closeNewTrainerForm() {
     document.body.classList.remove('no-scroll');
 }
 
+// Демо — только имя, остальное необязательно (см. submitNewTrainer: демо
+// уходит через action=createDemoTrainer, не createTrainer — там VK-группа/
+// токен не нужны вообще, готовая ссылка появляется в списке тренеров сразу
+// после создания). Боевой — как раньше, все поля.
+function updateNewTrainerFormMode() {
+    var isDemo = document.getElementById('nt-status').value === 'demo';
+    document.getElementById('nt-active-fields').classList.toggle('hidden', isDemo);
+    document.getElementById('nt-mode-hint').textContent = isDemo
+        ? 'Таблица под тренера создастся автоматически (копия шаблона с демо-клиентами), доступ сгорит через 48 часов сам. Ссылку — из списка тренеров, кнопка «Открыть как тренер».'
+        : 'Таблица под тренера создастся автоматически, пустая — без твоих клиентов и упражнений. Тренер заведёт всё своё сам.';
+}
+
 async function submitNewTrainer() {
     var name = document.getElementById('nt-name').value.trim();
-    var vkGroupId = document.getElementById('nt-vkgroup').value.trim();
     if (!name) { tg.showAlert('Укажи имя тренера'); return; }
-    if (!vkGroupId || !/^\d+$/.test(vkGroupId)) { tg.showAlert('Укажи ID VK-группы (число)'); return; }
-
-    var chatIdRaw = document.getElementById('nt-chatid').value.trim();
-    var trainerChatId = chatIdRaw ? ('vk_' + chatIdRaw.replace(/\D/g, '')) : '';
-    var color = document.getElementById('nt-color').value.trim();
-    var vkToken = document.getElementById('nt-vktoken').value.trim();
     var status = document.getElementById('nt-status').value;
     var myChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
 
@@ -1602,27 +1608,65 @@ async function submitNewTrainer() {
     btn.textContent = '⏳ Создание...';
 
     try {
-        var qs = 'action=createTrainer&chatId=' + encodeURIComponent(myChatId) +
-            '&displayName=' + encodeURIComponent(name) +
-            '&vkGroupId=' + encodeURIComponent(vkGroupId) +
-            '&trainerChatId=' + encodeURIComponent(trainerChatId) +
-            '&themePrimary=' + encodeURIComponent(color) +
-            '&vkToken=' + encodeURIComponent(vkToken) +
-            '&status=' + encodeURIComponent(status);
-        var resp = await fetch(APPS_SCRIPT_URL + '?' + qs);
-        var data = await resp.json();
-        if (!data.success) {
-            tg.showAlert('Ошибка: ' + (data.error || 'не удалось создать'));
+        var data;
+        if (status === 'demo') {
+            // Демо: только имя, ссылку показываем сразу — не нужно ждать,
+            // пока тренер сам её найдёт в списке. trainerChatId нарочно не
+            // передаём — Matvey и так видит админку ЛЮБОГО тенанта (isTrainer()
+            // в начале файла хардкодит его id независимо от тенанта), а угадывать
+            // chatId прицела ещё не выбранного демо-зрителя смысла нет.
+            var demoQs = 'action=createDemoTrainer&chatId=' + encodeURIComponent(myChatId) +
+                '&displayName=' + encodeURIComponent(name) +
+                '&demoHours=48';
+            var demoResp = await fetch(APPS_SCRIPT_URL + '?' + demoQs);
+            data = await demoResp.json();
+            if (!data.success) {
+                tg.showAlert('Ошибка: ' + (data.error || 'не удалось создать демо'));
+                btn.disabled = false;
+                btn.textContent = origText;
+                return;
+            }
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            closeNewTrainerForm();
             btn.disabled = false;
             btn.textContent = origText;
-            return;
+            await loadSuperAdminTrainers();
+            var link = window.location.origin + window.location.pathname + '?vk_group_id=' + encodeURIComponent(data.trainerId);
+            tg.showAlert('✅ Демо готово на 48 часов.\n\nСсылка:\n' + link);
+        } else {
+            var vkGroupId = document.getElementById('nt-vkgroup').value.trim();
+            if (!vkGroupId || !/^\d+$/.test(vkGroupId)) {
+                tg.showAlert('Укажи ID VK-группы (число)');
+                btn.disabled = false;
+                btn.textContent = origText;
+                return;
+            }
+            var chatIdRaw = document.getElementById('nt-chatid').value.trim();
+            var trainerChatId = chatIdRaw ? ('vk_' + chatIdRaw.replace(/\D/g, '')) : '';
+            var color = document.getElementById('nt-color').value.trim();
+            var vkToken = document.getElementById('nt-vktoken').value.trim();
+            var qs = 'action=createTrainer&chatId=' + encodeURIComponent(myChatId) +
+                '&displayName=' + encodeURIComponent(name) +
+                '&vkGroupId=' + encodeURIComponent(vkGroupId) +
+                '&trainerChatId=' + encodeURIComponent(trainerChatId) +
+                '&themePrimary=' + encodeURIComponent(color) +
+                '&vkToken=' + encodeURIComponent(vkToken) +
+                '&status=active';
+            var resp = await fetch(APPS_SCRIPT_URL + '?' + qs);
+            data = await resp.json();
+            if (!data.success) {
+                tg.showAlert('Ошибка: ' + (data.error || 'не удалось создать'));
+                btn.disabled = false;
+                btn.textContent = origText;
+                return;
+            }
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            closeNewTrainerForm();
+            btn.disabled = false;
+            btn.textContent = origText;
+            await loadSuperAdminTrainers();
+            tg.showAlert('✅ Тренер создан. Пустая таблица тоже готова — ссылка есть в списке.');
         }
-        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        closeNewTrainerForm();
-        btn.disabled = false;
-        btn.textContent = origText;
-        await loadSuperAdminTrainers();
-        tg.showAlert('✅ Тренер создан. Пустая таблица тоже готова — ссылка есть в списке.');
     } catch (e) {
         console.error('submitNewTrainer error:', e);
         tg.showAlert('Ошибка соединения ❌');

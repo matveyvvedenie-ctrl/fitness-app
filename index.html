@@ -461,37 +461,39 @@
                 </div>
                 <div class="ex-editor-body">
                     <div class="ex-editor-field">
+                        <label class="ex-editor-label">Статус</label>
+                        <select class="prof-input" id="nt-status" onchange="updateNewTrainerFormMode()">
+                            <option value="demo">Демо на 48 часов — только имя, дать ссылку</option>
+                            <option value="active">Боевой (active) — все данные сразу</option>
+                        </select>
+                    </div>
+                    <div class="ex-editor-field">
                         <label class="ex-editor-label">Имя тренера *</label>
                         <input type="text" class="ex-editor-input" id="nt-name" placeholder="Например: Роман">
                     </div>
-                    <div class="ex-editor-field">
-                        <label class="ex-editor-label">ID VK-группы тренера *</label>
-                        <input type="text" inputmode="numeric" class="ex-editor-input" id="nt-vkgroup" placeholder="123456789">
-                        <div class="nc-hint">Из ссылки на сообщество или из «Управление → Сообщения API → ID сообщества».</div>
+                    <div id="nt-active-fields">
+                        <div class="ex-editor-field">
+                            <label class="ex-editor-label">ID VK-группы тренера *</label>
+                            <input type="text" inputmode="numeric" class="ex-editor-input" id="nt-vkgroup" placeholder="123456789">
+                            <div class="nc-hint">Из ссылки на сообщество или из «Управление → Сообщения API → ID сообщества».</div>
+                        </div>
+                        <div class="ex-editor-field">
+                            <label class="ex-editor-label">Личный VK ID тренера</label>
+                            <input type="text" inputmode="numeric" class="ex-editor-input" id="nt-chatid" placeholder="987654321">
+                            <div class="nc-hint">Чтобы тренер получал уведомления и видел свою админку. Можно добавить позже.</div>
+                        </div>
+                        <div class="ex-editor-field">
+                            <label class="ex-editor-label">Цвет темы (HEX)</label>
+                            <input type="text" class="ex-editor-input" id="nt-color" placeholder="#14A38A">
+                            <div class="nc-hint">Необязательно — можно поменять позже. Без цвета будет тема по умолчанию.</div>
+                        </div>
+                        <div class="ex-editor-field">
+                            <label class="ex-editor-label">VK-токен сообщества</label>
+                            <input type="password" class="ex-editor-input" id="nt-vktoken" placeholder="vk1.a....">
+                            <div class="nc-hint">Из «Управление → Работа с API» группы тренера, права «Сообщения сообщества» + «Управление сообществом». Без него бот не сможет отвечать в этой группе — можно добавить позже.</div>
+                        </div>
                     </div>
-                    <div class="ex-editor-field">
-                        <label class="ex-editor-label">Личный VK ID тренера</label>
-                        <input type="text" inputmode="numeric" class="ex-editor-input" id="nt-chatid" placeholder="987654321">
-                        <div class="nc-hint">Чтобы тренер получал уведомления и видел свою админку. Можно добавить позже.</div>
-                    </div>
-                    <div class="ex-editor-field">
-                        <label class="ex-editor-label">Цвет темы (HEX)</label>
-                        <input type="text" class="ex-editor-input" id="nt-color" placeholder="#14A38A">
-                        <div class="nc-hint">Необязательно — можно поменять позже. Без цвета будет тема по умолчанию.</div>
-                    </div>
-                    <div class="ex-editor-field">
-                        <label class="ex-editor-label">VK-токен сообщества</label>
-                        <input type="password" class="ex-editor-input" id="nt-vktoken" placeholder="vk1.a....">
-                        <div class="nc-hint">Из «Управление → Работа с API» группы тренера, права «Сообщения сообщества» + «Управление сообществом». Без него бот не сможет отвечать в этой группе — можно добавить позже.</div>
-                    </div>
-                    <div class="ex-editor-field">
-                        <label class="ex-editor-label">Статус</label>
-                        <select class="prof-input" id="nt-status">
-                            <option value="active">Боевой (active)</option>
-                            <option value="demo">Демо на 48 часов</option>
-                        </select>
-                    </div>
-                    <div class="nc-hint">Таблица под тренера создастся автоматически, пустая — без твоих клиентов и упражнений. Тренер заведёт всё своё сам.</div>
+                    <div class="nc-hint" id="nt-mode-hint">Таблица под тренера создастся автоматически (копия шаблона с демо-клиентами), доступ сгорит через 48 часов сам. Ссылку — из списка тренеров, кнопка «Открыть как тренер».</div>
                 </div>
                 <div class="ex-editor-actions">
                     <button class="ex-editor-btn ex-editor-btn-save" id="nt-create-btn" onclick="submitNewTrainer()">💾 Создать</button>
