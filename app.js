@@ -291,9 +291,102 @@ var NEW_API_ACTIONS = {
                     });
                 });
         });
+    },
+    // Симметричная запись к уже готовому чтению — форма ответа у обоих уже
+    // {success:true[, ...]}, как ждёт старый код, реформатировать нечего.
+    updateClientProfile: function(nativeFetch, params) {
+        var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
+        var fields = {};
+        _PROFILE_KEYS.forEach(function(k) { if (params.has(k)) fields[k] = params.get(k); });
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/profile';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify(fields)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse(data, 200);
+        }); });
+    },
+    setClientArchived: function(nativeFetch, params) {
+        var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
+        var archived = params.get('archived') === 'true';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId);
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ archived: archived })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse(data, 200);
+        }); });
+    },
+    // Фото замера (photoBase64) новый API пока не умеет хранить (нет файлового
+    // хранилища на бэкенде, см. DB_SCHEMA.md) — честно НЕ перехватываем такой
+    // вызов (возвращаем null), он уйдёт по старому пути и фото не потеряется.
+    // Без фото — сохраняем как обычно.
+    saveMeasurements: function(nativeFetch, params, init) {
+        var chatId = params.get('chatId') || '';
+        var body;
+        try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
+        if (body.photoBase64) return null; // фолбэк на старый бэкенд, см. коммент выше
+        var payload = {};
+        ['weight', 'shoulders', 'chest', 'waist', 'hips', 'bicep', 'thigh'].forEach(function(k) {
+            if (body[k] !== undefined && body[k] !== '') payload[k] = parseFloat(body[k]);
+        });
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/measurements';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({ success: true }, 200);
+        }); });
+    },
+    // client_name в теле запроса (не chatId!) — та же причина, что и у
+    // заметок/истории, резолвим тем же кэшем.
+    saveMealPlan: function(nativeFetch, params, init) {
+        var body;
+        try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
+        var clientName = body.client_name || '';
+        var plan = body.plan || {};
+        return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден: ' + clientName }, 200);
+            var payload = {
+                target_calories: plan.target_calories || 0, target_protein: plan.target_protein || 0,
+                target_fats: plan.target_fats || 0, target_carbs: plan.target_carbs || 0,
+                meals: plan.meals || [], notes: plan.notes || ''
+            };
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan';
+            return nativeFetch(NEW_API_BASE + path, {
+                method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                return _fakeJsonResponse({ success: true }, 200);
+            }); });
+        });
+    },
+    // Форма ответа отличается от старой (у нас lastPayment — вложенный объект,
+    // раньше были плоские amount/endDate) — реформатируем под то, что ждут
+    // renderFinanceSummary/renderFinanceList.
+    getFinances: function(nativeFetch) {
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/finances';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            var clients = (res.data.clients || []).map(function(c) {
+                var p = c.lastPayment || {};
+                var endDate = '';
+                if (p.endDate) {
+                    var parts = p.endDate.split('-'); // yyyy-MM-dd
+                    endDate = parts.length === 3 ? (parts[2] + '.' + parts[1] + '.' + parts[0]) : p.endDate;
+                }
+                return { chatId: c.chatId, name: c.name, status: c.status, daysLeft: c.daysLeft, endDate: endDate, amount: p.amount };
+            });
+            return _fakeJsonResponse({ clients: clients }, 200);
+        });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
+var _PROFILE_KEYS = ['gender', 'age', 'height', 'weight', 'goal', 'level', 'frequency', 'limitations', 'inventory'];
 
 (function() {
     var nativeFetch = window.fetch.bind(window);
@@ -308,7 +401,15 @@ NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
                 var qIndex = input.indexOf('?');
                 var params = new URLSearchParams(qIndex === -1 ? '' : input.slice(qIndex + 1));
                 var handler = NEW_API_ACTIONS[params.get('action')];
-                if (handler) return _withTimeout(handler(nativeFetch, params), 15000);
+                // handler может вернуть null (не Promise) — значит сам решил не
+                // брать этот конкретный вызов (например saveMeasurements с фото:
+                // загрузка в файловое хранилище на новом бэкенде пока не сделана,
+                // честно не перехватываем, а не тихо теряем фото) — тогда падаем
+                // в обычный старый путь ниже, как будто шима и не было.
+                if (handler) {
+                    var result = handler(nativeFetch, params, init);
+                    if (result) return _withTimeout(result, 15000);
+                }
             }
             return _fetchWithRetry(nativeFetch, input, init, 2);
         }
