@@ -800,14 +800,34 @@ try {
     } catch (_) {}
 } catch (e) {
     console.error('Telegram WebApp not loaded:', e);
+    // БЕЗ user.id здесь (раньше был захардкожен chatId Матвея) — см.
+    // объяснение и единственное безопасное место для такого допущения в
+    // _myChatId() ниже.
     tg = {
-        initDataUnsafe: { user: { id: '739299264' } },
+        initDataUnsafe: {},
         showAlert: (msg) => alert(msg),
         openLink: (url) => window.open(url, '_blank'),
         openTelegramLink: (url) => window.open(url, '_blank'),
         HapticFeedback: null
     };
 }
+}
+
+// Единая точка получения chatId текущего пользователя — везде, где раньше
+// каждое место само писало `tg.initDataUnsafe.user ? ... : '739299264'`
+// (или TRAINER_CHAT_ID). Раньше это давало доступ ЛЮБОМУ, кто открыл ЛЮБУЮ
+// ссылку мини-аппа не в Telegram/VK (обычный браузер) — chatId молча
+// подставлялся как Матвея, а isTrainer()/isMatveySuperAdmin() сверяются
+// именно с этим id, то есть случайный человек с demo-ссылкой получал
+// полную супер-админку (найдено 2026-08-14 при подготовке демо-ссылки для
+// Анны). Внутри настоящего Telegram/VK tg.initDataUnsafe.user всегда
+// настоящий — туда фолбэк не попадает. Единственное место, где "предположить
+// Матвея" оправдано — локальная разработка (localhost), это НЕ публичный
+// домен, где ссылку может открыть кто угодно.
+function _myChatId() {
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) return String(tg.initDataUnsafe.user.id);
+    var isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    return isLocalDev ? TRAINER_CHAT_ID : '';
 }
 
 // Единая безопасная обёртка над tg.showConfirm — раньше в 9 местах файла
@@ -883,11 +903,10 @@ async function init() {
         // index.html не должен затирать это своим общим "грузится долго",
         // если он сработает уже ПОСЛЕ того, как мы сами разобрались с ошибкой.
         window.__appInitSettled = true;
-        // Тот же дефолт '739299264' (Matvey), что и в loadWorkoutData() ниже —
-        // без него в обычном браузере (реальный tg есть, но initDataUnsafe.user
-        // пуст вне настоящего Telegram) currentChatId получался '' и isTrainer()
-        // не срабатывал, хотя запрос к бэкенду ушёл именно с '739299264'.
-        var currentChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '739299264';
+        // См. _myChatId() — вне Telegram/VK (обычный браузер) и не на
+        // localhost currentChatId будет '', isTrainer('') = false, и код
+        // ниже честно уйдёт в общий экран ошибки, а не притворится Матвеем.
+        var currentChatId = _myChatId();
         if (/Client not found/.test(error.message) && isTrainer(currentChatId)) {
             // Тренер открыл свою же панель, но у него нет "своей" карточки клиента
             // (в отличие от Matvey, у которого в таблице есть тестовая запись о
@@ -938,7 +957,7 @@ function renderVkAccessRequest() {
 }
  
 async function loadWorkoutData() {
-    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+    var chatId = _myChatId();
     var url = APPS_SCRIPT_URL + '?action=read&chatId=' + chatId;
     // Google Apps Script изредка отвечает разовым сбоем (HTTP 404/500 на
     // редиректе к googleusercontent.com) без видимой причины — само по себе
@@ -1406,7 +1425,7 @@ document.getElementById('save-btn').addEventListener('click', async function() {
         if (exercisesToSave.length === 0) {
             tg.showAlert('Нечего сохранять! Заполни вес или повторы 📝');
         } else {
-            var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+            var chatId = _myChatId();
             var completionPercent = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
             var url = APPS_SCRIPT_URL + '?action=write&chatId=' + chatId + '&completionPercent=' + completionPercent;
             var data = null;
@@ -1592,7 +1611,7 @@ function renderHome() {
 
 // Подгружает рекорды и текущий вес для карточек на главной — асинхронно, не блокирует UI
 async function loadHomeExtras() {
-    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+    var chatId = _myChatId();
     try {
         // Последний рекорд
         var histRes = await fetch(APPS_SCRIPT_URL + '?action=history&chatId=' + chatId);
@@ -1648,7 +1667,7 @@ async function loadHomeExtras() {
  
 async function loadProgressData() {
     try {
-        var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+        var chatId = _myChatId();
         var statsUrl = APPS_SCRIPT_URL + '?action=progress&chatId=' + chatId;
         var statsResponse = await fetch(statsUrl);
         var stats = await statsResponse.json();
@@ -1698,7 +1717,7 @@ function getMuscleGroup(exerciseName) {
 
 async function loadExerciseHistory() {
     try {
-        var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+        var chatId = _myChatId();
         var url = APPS_SCRIPT_URL + '?action=history&chatId=' + chatId;
         var response = await fetch(url);
         var data = await response.json();
@@ -1872,7 +1891,7 @@ var dashboardClients = [];
 var currentFilter = 'all';
 
 function initAdminTab() {
-    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    var chatId = _myChatId();
     if (isTrainer(chatId)) {
         document.getElementById('admin-tab-btn').classList.remove('hidden');
         document.getElementById('tabs-container').classList.add('tabs-5');
@@ -1928,7 +1947,7 @@ function isMatveySuperAdmin(chatId) {
 }
 
 function initSuperAdminTab() {
-    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    var chatId = _myChatId();
     if (!isMatveySuperAdmin(chatId)) return;
     document.getElementById('superadmin-tab-btn').classList.remove('hidden');
     var tabsContainer = document.getElementById('tabs-container');
@@ -1953,7 +1972,7 @@ var SUPERADMIN_PAYMENT_LABELS = {
 };
 
 async function loadSuperAdminTrainers() {
-    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    var chatId = _myChatId();
     var container = document.getElementById('superadmin-trainers-list');
     try {
         var resp = await fetch(APPS_SCRIPT_URL + '?action=getTrainersOverview&chatId=' + encodeURIComponent(chatId));
@@ -2048,7 +2067,7 @@ async function saveTrainerPaymentFromModal() {
     var comment = document.getElementById('tp-comment').value.trim();
     if (!amount || amount <= 0) { tg.showAlert('Укажи сумму больше 0'); return; }
     if (!months || months <= 0) { tg.showAlert('Укажи кол-во месяцев больше 0'); return; }
-    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    var chatId = _myChatId();
     var btn = document.getElementById('tp-save-btn');
     btn.disabled = true;
     btn.textContent = '⏳ Сохранение...';
@@ -2117,7 +2136,7 @@ async function submitNewTrainer() {
     var name = document.getElementById('nt-name').value.trim();
     if (!name) { tg.showAlert('Укажи имя тренера'); return; }
     var status = document.getElementById('nt-status').value;
-    var myChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    var myChatId = _myChatId();
 
     var btn = document.getElementById('nt-create-btn');
     var origText = btn.textContent;
@@ -2193,7 +2212,7 @@ async function submitNewTrainer() {
 }
 
 async function toggleTrainerStatus(trainerId, newStatus) {
-    var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+    var chatId = _myChatId();
     try {
         var resp = await fetch(APPS_SCRIPT_URL + '?action=setTrainerStatus&chatId=' + encodeURIComponent(chatId) +
             '&targetTrainerId=' + encodeURIComponent(trainerId) + '&status=' + encodeURIComponent(newStatus));
@@ -3843,7 +3862,7 @@ async function saveMealPlanFromEditor() {
     };
 
     try {
-        var myChatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : TRAINER_CHAT_ID;
+        var myChatId = _myChatId();
         var resp = await fetch(APPS_SCRIPT_URL + '?action=saveMealPlan&chatId=' + encodeURIComponent(myChatId), {
             method: 'POST',
             body: JSON.stringify(payload)
@@ -6548,7 +6567,7 @@ var MEAS_UNITS = {
 
 async function loadMeasurementsData() {
     try {
-        var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+        var chatId = _myChatId();
         var url = APPS_SCRIPT_URL + '?action=getMeasurements&chatId=' + chatId;
         var response = await fetch(url);
         var data = await response.json();
@@ -6676,7 +6695,7 @@ async function saveMeasurements() {
     btn.disabled = true;
 
     try {
-        var chatId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : '739299264';
+        var chatId = _myChatId();
         var payload = Object.assign({}, fields);
         if (measPhotoPending) {
             payload.photoBase64 = measPhotoPending.base64;
