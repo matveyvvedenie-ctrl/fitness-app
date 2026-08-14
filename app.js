@@ -298,6 +298,27 @@ var NEW_API_ACTIONS = {
                 });
         });
     },
+    // Аналог action=createNewClient. Копирование программы у другого клиента
+    // (programOpts.type === 'copy') новый бэкенд не умеет — там нет
+    // отдельного "листа программы", который можно было бы скопировать (см.
+    // docstring create_client в api/main.py: клиент создаётся без единой
+    // недели, пока тренер не добавит первое упражнение). В этом случае честно
+    // отдаём null — уходит в старый Apps Script, тот же приём, что и у фото в
+    // saveMeasurements ниже. Только programOpts.type === 'blank' (пустая
+    // программа) перехватываем.
+    createNewClient: function(nativeFetch, params) {
+        var profile = JSON.parse(params.get('profile') || '{}');
+        var programOpts = JSON.parse(params.get('programOpts') || '{}');
+        if (programOpts.type === 'copy') return null; // фолбэк на старый бэкенд
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify(profile)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({ success: true, chatId: data.chatId, name: data.name }, 200);
+        }); });
+    },
     // Симметричная запись к уже готовому чтению — форма ответа у обоих уже
     // {success:true[, ...]}, как ждёт старый код, реформатировать нечего.
     updateClientProfile: function(nativeFetch, params) {
