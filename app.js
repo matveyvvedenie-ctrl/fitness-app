@@ -610,6 +610,18 @@ var NEW_API_ACTIONS = {
                     return _fakeJsonResponse({ success: true, newTitle: data.weekTitle }, 200);
                 }); });
         });
+    },
+    // Дашборд питания (вкладка "Админка" тренера) — сводка по ВСЕМ клиентам
+    // тренера разом, не по одному. Форма ответа у нового API 1-в-1 совпадает
+    // со старой ({stats, alerts, clients}) — реформатировать нечего. В
+    // отличие от остального пилота, не завязан на конкретного клиента/
+    // sheetName, поэтому резолвер имени не нужен.
+    getFoodDashboard: function(nativeFetch) {
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/food-dashboard';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
