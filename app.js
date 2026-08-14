@@ -654,6 +654,36 @@ var NEW_API_ACTIONS = {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             return _fakeJsonResponse(res.data, 200);
         });
+    },
+    // Аналог action=generateMealPlanAI — ИИ-генерация плана питания на день
+    // (не сохраняет сама, фронт открывает редактор с результатом на правку).
+    // Единственный ИИ-экшен мини-аппа в пилоте — остальной ИИ-анализ еды
+    // клиента (фото/голос/текст) идёт через ботов напрямую, не через
+    // fitness-app, поэтому вне периметра этого шима. Квота отдельная от
+    // клиентского анализа еды (15/день на ТРЕНЕРА, не 5/день на клиента —
+    // см. docstring generate_meal_plan_ai в api/main.py); ключ по clientName
+    // (не chatId, как в теле POST у оригинала), поэтому нужен резолвер.
+    generateMealPlanAI: function(nativeFetch, params, init) {
+        var body;
+        try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
+        var clientName = body.clientName || '';
+        return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден: ' + clientName }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan/generate';
+            return nativeFetch(NEW_API_BASE + path, {
+                method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    weight: body.weight || '', height: body.height || '', age: body.age || '',
+                    goal: body.goal || '', allergies: body.allergies || ''
+                })
+            }).then(function(r) { return r.json().then(function(data) {
+                // food_ai.generate_meal_plan уже отдаёт {success:false, error}
+                // при провале ИИ (HTTP 200) — просто пробрасываем как есть.
+                // Только не-2xx (429 квота, 404 клиент не найден) реформатируем.
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                return _fakeJsonResponse(data, 200);
+            }); });
+        });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
