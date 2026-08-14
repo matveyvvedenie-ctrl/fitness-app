@@ -525,6 +525,91 @@ var NEW_API_ACTIONS = {
                 return _fakeJsonResponse({ success: true, saved: savedCount }, 200);
             });
         });
+    },
+    // Управление днями/неделями. addClientDay (добавить ПУСТОЙ день, без
+    // единого упражнения) сюда намеренно НЕ включён — в новой модели день не
+    // отдельная сущность, а просто day_name на упражнениях, пустого дня без
+    // упражнений просто не существует. Если понадобится в новой системе —
+    // тренер добавляет день сразу с первым упражнением через "+ добавить
+    // упражнение" (addClientExercises и так создаёт день на лету). Пока
+    // action=addClientDay не перехватывается — уйдёт в старый Apps Script
+    // как раньше (день появится там, не здесь, до первого exercises-запроса
+    // в него на новой стороне).
+    renameClientDay: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        var oldDayName = params.get('oldDayName') || '';
+        var newDayName = params.get('newDayName') || '';
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+                '/program/days/' + encodeURIComponent(oldDayName);
+            return nativeFetch(NEW_API_BASE + path, {
+                method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newName: newDayName })
+            }).then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                return _fakeJsonResponse({ success: true }, 200);
+            }); });
+        });
+    },
+    deleteClientDay: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        var dayName = params.get('dayName') || '';
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+                '/program/days/' + encodeURIComponent(dayName);
+            return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
+                .then(function(r) { return r.json().then(function(data) {
+                    if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                    return _fakeJsonResponse({ success: true }, 200);
+                }); });
+        });
+    },
+    // Старый API даёт только плоский список rowIndex без явного dayName —
+    // все переставляемые строки уже гарантированно из одного дня (визуально
+    // тащат только внутри одной секции), так что находим день по первому id.
+    reorderDayExercises: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        var order = (params.get('order') || '').split(',').map(function(s) { return parseInt(s.trim(), 10); }).filter(function(n) { return !isNaN(n); });
+        if (order.length === 0) return _fakeJsonResponse({ success: false, error: 'Empty order' }, 200);
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
+            var progPath = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program';
+            return _newApiCall(nativeFetch, progPath).then(function(res) {
+                if (!res.ok) return _fakeJsonResponse({ success: false, error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+                var dayName = null;
+                (res.data.days || []).forEach(function(day) {
+                    if (day.exercises.some(function(ex) { return ex.id === order[0]; })) dayName = day.day;
+                });
+                if (!dayName) return _fakeJsonResponse({ success: false, error: 'День не найден' }, 200);
+                var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+                    '/program/days/' + encodeURIComponent(dayName) + '/reorder';
+                return nativeFetch(NEW_API_BASE + path, {
+                    method: 'PUT', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderedIds: order })
+                }).then(function(r) { return r.json().then(function(data) {
+                    if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                    return _fakeJsonResponse({ success: true }, 200);
+                }); });
+            });
+        });
+    },
+    // БЕЗ autoProgress (авто-подбор весов по фактам прошлой недели) — новый
+    // бэкенд его не умеет, параметр тихо игнорируется (неделя дублируется
+    // как есть, план копируется, факты чистые — то же самое, что autoProgress
+    // выключенный вручную).
+    duplicateClientWeek: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
+            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program/duplicate-week';
+            return nativeFetch(NEW_API_BASE + path, { method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY } })
+                .then(function(r) { return r.json().then(function(data) {
+                    if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                    return _fakeJsonResponse({ success: true, newTitle: data.weekTitle }, 200);
+                }); });
+        });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
