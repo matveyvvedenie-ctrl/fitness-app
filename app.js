@@ -2107,6 +2107,7 @@ function openNewTrainerForm() {
     document.getElementById('nt-name').value = '';
     document.getElementById('nt-vkgroup').value = '';
     document.getElementById('nt-chatid').value = '';
+    document.getElementById('nt-demo-chatid').value = '';
     document.getElementById('nt-color').value = '';
     document.getElementById('nt-vktoken').value = '';
     document.getElementById('nt-status').value = 'demo';
@@ -2120,12 +2121,19 @@ function closeNewTrainerForm() {
     document.body.classList.remove('no-scroll');
 }
 
-// Демо — только имя, остальное необязательно (см. submitNewTrainer: демо
-// уходит через action=createDemoTrainer, не createTrainer — там VK-группа/
-// токен не нужны вообще, готовая ссылка появляется в списке тренеров сразу
-// после создания). Боевой — как раньше, все поля.
+// Демо — имя + необязательный VK ID зрителя (см. submitNewTrainer: демо
+// уходит через action=createDemoTrainer, не createTrainer — VK-группа/токен
+// не нужны вообще, готовая ссылка появляется в списке тренеров сразу после
+// создания). Боевой — как раньше, все поля.
+//
+// VK ID зрителя (2026-08-14) — без него ссылку сможет открыть кто угодно в
+// обычном браузере, но НЕ увидит панель тренера: раньше "работало" только
+// из-за дыры в безопасности (обычный браузер притворялся Матвеем, см.
+// _myChatId()) — теперь дыра закрыта, и без настоящего VK ID зрителя
+// демо-ссылка никого не узнает.
 function updateNewTrainerFormMode() {
     var isDemo = document.getElementById('nt-status').value === 'demo';
+    document.getElementById('nt-demo-fields').classList.toggle('hidden', !isDemo);
     document.getElementById('nt-active-fields').classList.toggle('hidden', isDemo);
     document.getElementById('nt-mode-hint').textContent = isDemo
         ? 'Таблица под тренера создастся автоматически (копия шаблона с демо-клиентами), доступ сгорит через 48 часов сам. Ссылку — из списка тренеров, кнопка «Открыть как тренер».'
@@ -2146,13 +2154,17 @@ async function submitNewTrainer() {
     try {
         var data;
         if (status === 'demo') {
-            // Демо: только имя, ссылку показываем сразу — не нужно ждать,
-            // пока тренер сам её найдёт в списке. trainerChatId нарочно не
-            // передаём — Matvey и так видит админку ЛЮБОГО тенанта (isTrainer()
-            // в начале файла хардкодит его id независимо от тенанта), а угадывать
-            // chatId прицела ещё не выбранного демо-зрителя смысла нет.
+            // Демо: имя + необязательный VK ID зрителя, ссылку показываем
+            // сразу — не нужно ждать, пока тренер сам её найдёт в списке.
+            // trainerChatId (2026-08-14): раньше нарочно не передавали — но
+            // это опиралось на дыру в безопасности (обычный браузер
+            // притворялся Матвеем, см. _myChatId()), дыра закрыта, и без
+            // настоящего VK ID зрителя демо-ссылка теперь никого не узнает.
+            var demoChatIdRaw = document.getElementById('nt-demo-chatid').value.trim();
+            var demoTrainerChatId = demoChatIdRaw ? ('vk_' + demoChatIdRaw.replace(/\D/g, '')) : '';
             var demoQs = 'action=createDemoTrainer&chatId=' + encodeURIComponent(myChatId) +
                 '&displayName=' + encodeURIComponent(name) +
+                '&trainerChatId=' + encodeURIComponent(demoTrainerChatId) +
                 '&demoHours=48';
             var demoResp = await fetch(APPS_SCRIPT_URL + '?' + demoQs);
             data = await demoResp.json();
@@ -2168,7 +2180,9 @@ async function submitNewTrainer() {
             btn.textContent = origText;
             await loadSuperAdminTrainers();
             var link = window.location.origin + window.location.pathname + '?vk_group_id=' + encodeURIComponent(data.trainerId);
-            tg.showAlert('✅ Демо готово на 48 часов.\n\nСсылка:\n' + link);
+            var noViewerWarning = demoTrainerChatId ? '' :
+                '\n\n⚠️ VK ID зрителя не указан — по этой ссылке никто не увидит панель тренера. Добавь VK ID и создай демо заново, либо укажи его позже прямо в таблице.';
+            tg.showAlert('✅ Демо готово на 48 часов.\n\nСсылка:\n' + link + noViewerWarning);
         } else {
             var vkGroupId = document.getElementById('nt-vkgroup').value.trim();
             if (!vkGroupId || !/^\d+$/.test(vkGroupId)) {
