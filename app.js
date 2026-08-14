@@ -622,6 +622,17 @@ var NEW_API_ACTIONS = {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             return _fakeJsonResponse(res.data, 200);
         });
+    },
+    // Превью месячных отчётов — тоже сводка по всем клиентам разом, форма
+    // ответа ({reports:[...]}) 1-в-1 совпадает со старой. Саму отправку
+    // (sendMonthlyReportToClient) пилот не покрывает — уходит в старый
+    // Apps Script как раньше (нужна интеграция с ботами, см. MIGRATION_PLAN.md).
+    getMonthlyReportsPreview: function(nativeFetch) {
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/monthly-reports-preview';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
