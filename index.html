@@ -923,9 +923,35 @@
                     </div>
                 </div>
 
-                <!-- 3b. Фото прогресса из замеров -->
+                <!-- 3b. Полные замеры (не только вес) -->
+                <div class="stats-card stats-card-measurements">
+                    <div class="stats-card-title">📏 Замеры</div>
+                    <select id="stats-meas-select" class="exercise-select">
+                        <option value="weight">Вес (кг)</option>
+                        <option value="shoulders">Плечи (см)</option>
+                        <option value="chest">Грудь (см)</option>
+                        <option value="waist">Талия (см)</option>
+                        <option value="hips">Бёдра (см)</option>
+                        <option value="bicep">Бицепс (см)</option>
+                        <option value="thigh">Бедро (см)</option>
+                    </select>
+                    <div class="stats-chart-wrap" style="height:180px;">
+                        <canvas id="stats-meas-chart"></canvas>
+                    </div>
+                    <div class="stats-meas-latest-grid" id="stats-meas-latest-grid"></div>
+                    <div class="stats-empty hidden" id="stats-meas-empty">
+                        Клиент ещё не вносил замеры
+                    </div>
+                </div>
+
+                <!-- 3c. Фото прогресса из замеров -->
                 <div class="stats-card stats-card-photos">
-                    <div class="stats-card-title">📸 Фото прогресса</div>
+                    <div class="stats-photo-header">
+                        <div class="stats-card-title">📸 Фото прогресса</div>
+                        <button type="button" class="stats-compare-toggle" id="stats-compare-toggle" onclick="toggleStatsPhotoCompare()">🔍 Сравнить</button>
+                    </div>
+                    <div class="stats-compare-hint hidden" id="stats-compare-hint">Выбери 2-3 фото, чтобы сравнить рядом</div>
+                    <div class="stats-compare-strip" id="stats-compare-strip"></div>
                     <div class="stats-photos-grid" id="stats-photos-grid"></div>
                     <div class="stats-empty hidden" id="stats-photos-empty">
                         Клиент ещё не прикреплял фото к замерам

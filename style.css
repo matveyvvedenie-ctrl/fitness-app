@@ -2988,6 +2988,78 @@ body {
 }
 .stats-photo-date { font-size: 11px; color: #999; margin-top: 4px; }
 
+.stats-photo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+.stats-compare-toggle {
+    background: none;
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
+    border-radius: 14px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.stats-compare-hint {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 8px;
+}
+.stats-photo-item.selected img {
+    outline: 3px solid var(--color-primary);
+    outline-offset: -3px;
+}
+.stats-photo-check {
+    position: relative;
+    margin-top: -28px;
+    margin-left: 4px;
+    width: 20px; height: 20px;
+    background: var(--color-primary);
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.stats-compare-strip {
+    display: none;
+    gap: 6px;
+    align-items: flex-end;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+.stats-compare-strip.active { display: flex; }
+.stats-compare-item {
+    flex-shrink: 0;
+    width: 110px;
+    text-align: center;
+}
+.stats-compare-item img {
+    width: 100%;
+    aspect-ratio: 3/4;
+    object-fit: cover;
+    border-radius: 10px;
+    display: block;
+}
+.stats-compare-date { font-size: 11px; font-weight: 600; color: var(--color-primary); margin-top: 4px; }
+.stats-compare-weight { font-size: 12px; font-weight: 700; color: #333; }
+.stats-compare-gap {
+    flex-shrink: 0;
+    align-self: center;
+    font-size: 10px;
+    color: #999;
+    writing-mode: horizontal-tb;
+    white-space: nowrap;
+    padding: 0 2px;
+}
+
 .stats-progress-list {
     display: flex;
     flex-direction: column;
@@ -3980,6 +4052,39 @@ body {
 }
 
 .diff-neutral {
+    color: #999;
+}
+
+/* ===== Полные замеры в статистике тренера (не только вес) ===== */
+.stats-card-measurements #stats-meas-select { margin: 8px 0; }
+.stats-meas-latest-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 10px;
+}
+.stats-meas-item {
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 8px 4px;
+    text-align: center;
+}
+.stats-meas-item-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-primary);
+}
+.stats-meas-item-label {
+    font-size: 9px;
+    color: #888;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+.stats-meas-diff {
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 3px;
     color: #999;
 }
 

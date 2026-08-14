@@ -2414,6 +2414,9 @@ function initExerciseMediaLibrary() {
                 exerciseMediaPending['removePhoto' + slot] = false;
                 var preview = document.getElementById('ex-media-photo' + slot + '-preview');
                 if (preview) preview.innerHTML = '<img src="data:' + result.mime + ';base64,' + result.base64 + '">';
+            }, function(errMsg) {
+                fileInput.value = '';
+                tg.showAlert('❌ ' + errMsg);
             });
         });
         if (clearBtn) clearBtn.addEventListener('click', function() {
@@ -2569,10 +2572,21 @@ async function saveExerciseMediaEntry() {
 // Сжимает фото в браузере перед отправкой (иначе фото с телефона по 5-10 МБ
 // будут долго улетать и быстро съедят место в Google Drive). Возвращает через
 // callback { base64, mime } — без префикса "data:...;base64,".
-function _compressImageFile(file, maxDim, quality, callback) {
+// onError — необязательный колбэк, вызывается при сбое (например, HEIC-фото
+// с iPhone, которое браузер не может отрисовать через <img>/canvas — тогда
+// img.onload молча никогда не срабатывает). Раньше без onError сбой был
+// полностью незаметен: файл просто не попадал в форму, а трener видел
+// "клиент не прикладывал фото", хотя клиент был уверен, что прикрепил.
+function _compressImageFile(file, maxDim, quality, callback, onError) {
     var img = new Image();
     var reader = new FileReader();
+    reader.onerror = function() {
+        if (onError) onError('Не удалось прочитать файл');
+    };
     reader.onload = function(e) {
+        img.onerror = function() {
+            if (onError) onError('Браузер не смог открыть это фото (часто бывает с форматом HEIC с iPhone) — попробуй выбрать JPG/PNG или пересохранить фото');
+        };
         img.onload = function() {
             var w = img.width, h = img.height;
             if (w > maxDim || h > maxDim) {
@@ -3431,6 +3445,92 @@ function initClientCardTabs() {
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         });
     });
+    var measSelect = document.getElementById('stats-meas-select');
+    if (measSelect && !statsMeasSelectInitialized) {
+        statsMeasSelectInitialized = true;
+        measSelect.addEventListener('change', function() {
+            statsMeasSelectedKey = measSelect.value;
+            renderStatsMeasurements();
+        });
+    }
+}
+
+// Полные замеры клиента в статистике тренера — селектор метрики + график +
+// сетка последних значений с разницей от предыдущего (та же логика, что уже
+// была только на клиентской странице "Замеры" — раньше тренер видел только вес).
+function renderStatsMeasurements() {
+    var empty = document.getElementById('stats-meas-empty');
+    var canvas = document.getElementById('stats-meas-chart');
+    var select = document.getElementById('stats-meas-select');
+    var grid = document.getElementById('stats-meas-latest-grid');
+    if (!canvas || !empty || !grid) return;
+
+    if (statsMeasChart) { try { statsMeasChart.destroy(); } catch (_) {} statsMeasChart = null; }
+
+    if (statsMeasurements.length === 0) {
+        empty.classList.remove('hidden');
+        canvas.style.display = 'none';
+        grid.innerHTML = '';
+        return;
+    }
+    empty.classList.add('hidden');
+    if (select) select.value = statsMeasSelectedKey;
+
+    var filtered = statsMeasurements.filter(function(m) { return m[statsMeasSelectedKey] != null; });
+    if (filtered.length < 2) {
+        canvas.style.display = 'none';
+    } else {
+        canvas.style.display = '';
+        var colors = {
+            weight: '#1565C0', shoulders: '#455A64', chest: '#1565C0', waist: '#F57C00',
+            hips: '#7B1FA2', bicep: '#2E7D32', thigh: '#C62828'
+        };
+        var color = colors[statsMeasSelectedKey] || '#1565C0';
+        statsMeasChart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: filtered.map(function(m) { return m.dateLabel; }),
+                datasets: [{
+                    label: MEAS_LABELS[statsMeasSelectedKey],
+                    data: filtered.map(function(m) { return m[statsMeasSelectedKey]; }),
+                    borderColor: color,
+                    backgroundColor: color + '1A',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: color,
+                    pointBorderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { ticks: { callback: function(v) { return v + ' ' + MEAS_UNITS[statsMeasSelectedKey]; } } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // Сетка последних значений (все замеры разом) + разница от предыдущего.
+    var latest = statsMeasurements[statsMeasurements.length - 1];
+    var prev = statsMeasurements.length >= 2 ? statsMeasurements[statsMeasurements.length - 2] : null;
+    var keys = ['weight', 'shoulders', 'chest', 'waist', 'hips', 'bicep', 'thigh'];
+    grid.innerHTML = keys.map(function(key) {
+        var val = latest[key];
+        var diffHtml = '';
+        if (prev && prev[key] != null && val != null) {
+            var diff = (val - prev[key]).toFixed(1);
+            if (diff > 0) diffHtml = '<span class="stats-meas-diff diff-up">+' + diff + '</span>';
+            else if (diff < 0) diffHtml = '<span class="stats-meas-diff diff-down">' + diff + '</span>';
+        }
+        return '<div class="stats-meas-item">' +
+            '<div class="stats-meas-item-value">' + (val != null ? val : '—') + diffHtml + '</div>' +
+            '<div class="stats-meas-item-label">' + MEAS_LABELS[key] + '</div>' +
+        '</div>';
+    }).join('');
 }
 
 // ========== ПЛАН ПИТАНИЯ (вкладка "🍽 Питание" в карточке клиента) ==========
@@ -4335,6 +4435,65 @@ function resetClientHistoryCache() {
 
 var statsLoadedFor = '';
 var statsWeightChart = null;
+var statsMeasChart = null;
+var statsMeasSelectedKey = 'weight';
+var statsMeasSelectInitialized = false;
+var statsMeasurements = []; // [{dateLabel, dateObj, weight, shoulders, chest, waist, hips, bicep, thigh}]
+var statsPhotoCompareMode = false;
+var statsPhotoCompareSelected = []; // индексы в statsProgressPhotos, максимум 3
+
+function toggleStatsPhotoCompare() {
+    statsPhotoCompareMode = !statsPhotoCompareMode;
+    statsPhotoCompareSelected = [];
+    document.getElementById('stats-compare-toggle').textContent = statsPhotoCompareMode ? '✕ Отмена' : '🔍 Сравнить';
+    document.getElementById('stats-compare-hint').classList.toggle('hidden', !statsPhotoCompareMode);
+    renderStatsPhotoCompareStrip();
+    renderClientStats();
+}
+
+function toggleStatsPhotoSelect(i) {
+    var idx = statsPhotoCompareSelected.indexOf(i);
+    if (idx !== -1) {
+        statsPhotoCompareSelected.splice(idx, 1);
+    } else {
+        if (statsPhotoCompareSelected.length >= 3) statsPhotoCompareSelected.shift(); // максимум 3 — старейшее вылетает
+        statsPhotoCompareSelected.push(i);
+    }
+    renderStatsPhotoCompareStrip();
+    renderClientStats();
+}
+
+// Полоса сравнения — выбранные фото рядом в хронологическом порядке, с датой,
+// весом (если есть за эту дату) и промежутком между соседними датами — тот
+// же стиль, что коллега Matvey показывал ("каждые 6 недель согласно датам").
+function renderStatsPhotoCompareStrip() {
+    var strip = document.getElementById('stats-compare-strip');
+    if (!strip) return;
+    if (!statsPhotoCompareMode || statsPhotoCompareSelected.length < 2) {
+        strip.innerHTML = '';
+        strip.classList.remove('active');
+        return;
+    }
+    strip.classList.add('active');
+    var items = statsPhotoCompareSelected
+        .map(function(i) { return statsProgressPhotos[i]; })
+        .filter(Boolean)
+        .sort(function(a, b) { return a.dateObj - b.dateObj; });
+
+    strip.innerHTML = items.map(function(p, i) {
+        var gapHtml = '';
+        if (i > 0 && p.dateObj && items[i - 1].dateObj) {
+            var days = Math.round((p.dateObj - items[i - 1].dateObj) / 86400000);
+            gapHtml = '<div class="stats-compare-gap">→ ' + days + ' дн.</div>';
+        }
+        return (gapHtml ? gapHtml : '') +
+            '<div class="stats-compare-item">' +
+                '<img src="' + p.url + '">' +
+                '<div class="stats-compare-date">' + p.date + '</div>' +
+                (p.weight ? '<div class="stats-compare-weight">' + p.weight + ' кг</div>' : '') +
+            '</div>';
+    }).join('');
+}
 var statsVolumeChart = null;
 var statsBodyWeights = []; // [{date, weight}]
 var statsProgressPhotos = []; // [{date, url}]
@@ -4350,6 +4509,9 @@ async function loadClientStats(clientName, chatId) {
     // Также подгружаем замеры (для графика веса тела и фото прогресса)
     statsBodyWeights = [];
     statsProgressPhotos = [];
+    statsMeasurements = [];
+    statsPhotoCompareMode = false;
+    statsPhotoCompareSelected = [];
     if (chatId) {
         try {
             var url = APPS_SCRIPT_URL + '?action=getMeasurements&chatId=' + encodeURIComponent(chatId);
@@ -4361,14 +4523,37 @@ async function loadClientStats(clientName, chatId) {
                     .map(function(m) {
                         // m.date может быть «dd.MM.yyyy» — конвертируем в Date
                         var d = _parseDateRu(m.date);
-                        return { dateLabel: m.date, dateObj: d ? d.getTime() : 0, weight: parseFloat(m.weight) };
+                        return { dateLabel: formatDate(m.date), dateObj: d ? d.getTime() : 0, weight: parseFloat(m.weight) };
                     })
                     .filter(function(x) { return x.dateObj > 0; })
                     .sort(function(a, b) { return a.dateObj - b.dateObj; });
                 statsProgressPhotos = (data.measurements || [])
                     .filter(function(m) { return m && m.photoUrl; })
-                    .map(function(m) { return { date: m.date, url: m.photoUrl }; })
+                    .map(function(m) {
+                        var d = _parseDateRu(m.date);
+                        return {
+                            date: formatDate(m.date), dateObj: d ? d.getTime() : 0, url: m.photoUrl,
+                            weight: m.weight != null ? parseFloat(m.weight) : null
+                        };
+                    })
                     .reverse(); // свежие сверху
+                // Полный набор замеров (не только вес) — для селектора графика ниже.
+                statsMeasurements = (data.measurements || [])
+                    .map(function(m) {
+                        var d = _parseDateRu(m.date);
+                        return {
+                            dateLabel: formatDate(m.date), dateObj: d ? d.getTime() : 0,
+                            weight: m.weight != null ? parseFloat(m.weight) : null,
+                            shoulders: m.shoulders != null ? parseFloat(m.shoulders) : null,
+                            chest: m.chest != null ? parseFloat(m.chest) : null,
+                            waist: m.waist != null ? parseFloat(m.waist) : null,
+                            hips: m.hips != null ? parseFloat(m.hips) : null,
+                            bicep: m.bicep != null ? parseFloat(m.bicep) : null,
+                            thigh: m.thigh != null ? parseFloat(m.thigh) : null
+                        };
+                    })
+                    .filter(function(x) { return x.dateObj > 0; })
+                    .sort(function(a, b) { return a.dateObj - b.dateObj; });
             }
         } catch (_) {}
     }
@@ -4538,18 +4723,29 @@ function renderClientStats() {
         });
     }
 
+    // ── 3a2. Полные замеры (селектор + график, не только вес) ──
+    renderStatsMeasurements();
+
     // ── 3b. Фото прогресса ──
     var pGrid = document.getElementById('stats-photos-grid');
     var pEmpty = document.getElementById('stats-photos-empty');
+    var compareToggle = document.getElementById('stats-compare-toggle');
+    if (compareToggle) compareToggle.classList.toggle('hidden', statsProgressPhotos.length < 2);
+    renderStatsPhotoCompareStrip();
     if (statsProgressPhotos.length === 0) {
         pGrid.innerHTML = '';
         pEmpty.classList.remove('hidden');
     } else {
         pEmpty.classList.add('hidden');
-        pGrid.innerHTML = statsProgressPhotos.map(function(p) {
-            return '<div class="stats-photo-item" onclick="tg.openLink(\'' + p.url + '\')">' +
+        pGrid.innerHTML = statsProgressPhotos.map(function(p, i) {
+            var selected = statsPhotoCompareMode && statsPhotoCompareSelected.indexOf(i) !== -1;
+            var clickHandler = statsPhotoCompareMode
+                ? 'toggleStatsPhotoSelect(' + i + ')'
+                : 'tg.openLink(\'' + p.url + '\')';
+            return '<div class="stats-photo-item' + (selected ? ' selected' : '') + '" onclick="' + clickHandler + '">' +
                 '<img src="' + p.url + '">' +
-                '<div class="stats-photo-date">' + p.date + '</div>' +
+                (selected ? '<div class="stats-photo-check">✓</div>' : '') +
+                '<div class="stats-photo-date">' + p.date + (p.weight ? ' · ' + p.weight + 'кг' : '') + '</div>' +
             '</div>';
         }).join('');
     }
@@ -6314,7 +6510,7 @@ function renderLatestMeasurements() {
     document.getElementById('measurements-latest').innerHTML =
         '<div class="latest-card">' +
             '<div class="latest-card-title">Последние замеры</div>' +
-            '<div class="latest-card-date">' + latest.date + '</div>' +
+            '<div class="latest-card-date">' + formatDate(latest.date) + '</div>' +
             '<div class="latest-grid">' + items + '</div>' +
         '</div>';
 }
@@ -6349,6 +6545,10 @@ function initMeasForm() {
             var preview = document.getElementById('meas-photo-preview');
             preview.innerHTML = '<img src="data:' + result.mime + ';base64,' + result.base64 + '">';
             preview.classList.remove('hidden');
+        }, function(errMsg) {
+            e.target.value = '';
+            measPhotoPending = null;
+            tg.showAlert('❌ ' + errMsg);
         });
     });
 }
@@ -6448,7 +6648,7 @@ function renderMeasurementsChart(key) {
     measurementsChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: filtered.map(function(m) { return m.date; }),
+            labels: filtered.map(function(m) { return formatDate(m.date); }),
             datasets: [{
                 label: MEAS_LABELS[key] + ' (' + MEAS_UNITS[key] + ')',
                 data: filtered.map(function(m) { return m[key]; }),
@@ -6504,7 +6704,7 @@ function renderMeasurementsHistory() {
             ? '<img class="measurement-row-photo" src="' + m.photoUrl + '" onclick="tg.openLink(\'' + m.photoUrl + '\')">'
             : '';
         return '<div class="measurement-row" style="animation-delay:' + (i * 0.05) + 's">' +
-            '<div class="measurement-row-date">📅 ' + m.date + '</div>' +
+            '<div class="measurement-row-date">📅 ' + formatDate(m.date) + '</div>' +
             photoHtml +
             '<div class="measurement-row-values">' + values + '</div>' +
         '</div>';
