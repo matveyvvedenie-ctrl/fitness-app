@@ -87,7 +87,7 @@ function _fakeJsonResponse(obj, status) {
 
 function _newApiCall(nativeFetch, path) {
     return nativeFetch(NEW_API_BASE + path, { headers: { 'X-Api-Key': NEW_API_KEY } })
-        .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); });
+        .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, status: r.status, data: data }; }); });
 }
 
 // getClientHistory/getLastExerciseResult в старой системе ключуются по имени
@@ -103,6 +103,29 @@ function _resolveChatIdByName(nativeFetch, name) {
         _nameToChatIdCache = {};
         (res.ok ? (res.data.clients || []) : []).forEach(function(c) { _nameToChatIdCache[c.name] = c.chatId; });
         return _nameToChatIdCache[name] || null;
+    });
+}
+
+// Общее преобразование ответа GET .../program под то, что ждёт старый
+// фронтенд-код (readWorkoutData/readClientProgram в apps_script.js) — общее
+// между readClientProgram (тренер смотрит ЧУЖУЮ программу) и read (клиент
+// смотрит СВОЮ). rowIndex — это integer `id` из новой БД под старым именем
+// поля, как и везде в этом файле. НЕ переносим: photo1/photo2/videoVk (см.
+// комментарий у readClientProgram), completed/timestamp (были пустышками и
+// в оригинале).
+function _mapProgramDays(rawDays) {
+    return (rawDays || []).map(function(day) {
+        return {
+            day: day.day,
+            exercises: (day.exercises || []).map(function(ex) {
+                return {
+                    rowIndex: ex.id, exercise: ex.exercise, sets: ex.sets, reps: ex.reps,
+                    weightPlan: ex.weightPlan, rpe: ex.rpe, video: ex.video || '', videoVk: '',
+                    note: ex.note, weightFact: ex.weightFact, repsFact: ex.repsFact,
+                    completed: false, timestamp: '', comment: ex.comment, photo1: '', photo2: ''
+                };
+            })
+        };
     });
 }
 
@@ -495,21 +518,38 @@ var NEW_API_ACTIONS = {
             var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program';
             return _newApiCall(nativeFetch, path).then(function(res) {
                 if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
-                var days = (res.data.days || []).map(function(day) {
-                    return {
-                        day: day.day,
-                        exercises: (day.exercises || []).map(function(ex) {
-                            return {
-                                rowIndex: ex.id, exercise: ex.exercise, sets: ex.sets, reps: ex.reps,
-                                weightPlan: ex.weightPlan, rpe: ex.rpe, video: ex.video || '', videoVk: '',
-                                note: ex.note, weightFact: ex.weightFact, repsFact: ex.repsFact,
-                                completed: false, timestamp: '', comment: ex.comment, photo1: '', photo2: ''
-                            };
-                        })
-                    };
-                });
-                return _fakeJsonResponse({ weekTitle: res.data.weekTitle, days: days }, 200);
+                return _fakeJsonResponse({ weekTitle: res.data.weekTitle, days: _mapProgramDays(res.data.days) }, 200);
             });
+        });
+    },
+    // Аналог action=read — КЛИЕНТ читает СВОЮ программу (chatId — его
+    // собственный, из _myChatId(), не резолвер по имени, он и так свой
+    // chatId знает). Тот же бэкенд-эндпоинт и то же преобразование дней,
+    // что у readClientProgram (трenerской версии просмотра ЧУЖОЙ
+    // программы) — вынесено в общий _mapProgramDays. Добавляем clientName
+    // в ответ (в оригинале read кладёт его отдельно поверх readWorkoutData,
+    // readClientProgram — нет, ей это поле не нужно).
+    read: function(nativeFetch, params) {
+        var chatId = params.get('chatId') || '';
+        if (!chatId) return _fakeJsonResponse({ error: 'Missing chatId' }, 200);
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) {
+                // init() в app.js регексом ищет в тексте ошибки именно
+                // английское "Client not found" (см. getClientSheet в
+                // apps_script.js) — по нему решает, показать тренеру
+                // админку или клиенту экран запроса доступа в VK. Бэкенд
+                // отдаёт русский текст в detail — на 404 подменяем на
+                // оригинальную формулировку, чтобы этот механизм не сломался.
+                var msg = res.status === 404
+                    ? 'Client not found for chatId: ' + chatId
+                    : ((res.data && res.data.detail) || 'Ошибка');
+                return _fakeJsonResponse({ error: msg }, 200);
+            }
+            return _fakeJsonResponse({
+                weekTitle: res.data.weekTitle, days: _mapProgramDays(res.data.days),
+                clientName: res.data.clientName || ''
+            }, 200);
         });
     },
     updateClientExercise: function(nativeFetch, params) {
