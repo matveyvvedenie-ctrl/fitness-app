@@ -862,6 +862,40 @@ var NEW_API_ACTIONS = {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
             return _fakeJsonResponse(data, 200);
         }); });
+    },
+    // Аналог action=write/writeWorkoutData — клиент завершает тренировочный
+    // день (кнопка «Сохранить» в тренировке). ВАЖНО: этот экшен идёт через
+    // GET (см. save-btn обработчик — exercises кладутся в query string, не в
+    // тело POST), поэтому читаем всё из params, не из init.body, как в
+    // остальных write-шимах.
+    //
+    // Раньше в MIGRATION_PLAN.md этот экшен считался непереносимым — якобы
+    // нужен опрос самочувствия (wn/fr2/fb/fr), которого нет на новом
+    // бэкенде. Перепроверил апстрим (apps_script.js) — эти поля там тоже
+    // нигде не сохраняются, чисто фронтендовая штука (корректирует
+    // отображаемый план по самочувствию). Сохраняется только
+    // rowIndex/weightFact/repsFact/comment — это уже умеет
+    // POST .../program/complete-day.
+    write: function(nativeFetch, params) {
+        var chatId = params.get('chatId') || '';
+        var raw = [];
+        try { raw = JSON.parse(params.get('exercises') || '[]'); } catch (_) { raw = []; }
+        var exercises = raw.map(function(ex) {
+            return {
+                exerciseId: parseInt(ex.r !== undefined ? ex.r : ex.rowIndex, 10),
+                weightFact: (ex.w !== undefined ? ex.w : ex.weightFact) || '',
+                repsFact: (ex.p !== undefined ? ex.p : ex.repsFact) || '',
+                comment: (ex.c !== undefined ? ex.c : ex.comment) || ''
+            };
+        }).filter(function(e) { return !isNaN(e.exerciseId); });
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program/complete-day';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exercises: exercises })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
+            return _fakeJsonResponse({ success: true, saved: data.saved, timestamp: data.timestamp }, 200);
+        }); });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
