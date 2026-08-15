@@ -334,6 +334,26 @@ var NEW_API_ACTIONS = {
             return _fakeJsonResponse(data, 200);
         }); });
     },
+    // Аналог action=renameClientChatId/setClientChatId — тренер поправляет
+    // chat_id клиента (например, завели по Telegram id, а клиент зашёл
+    // через VK). У нового API есть уникальный индекс (trainer_id, chat_id)
+    // — попытка поставить уже занятый chat_id честно возвращает ошибку
+    // вместо тихой коллизии строк, как было бы в старой системе. Сбрасываем
+    // кэш имя→chatId (см. _resolveChatIdByName выше) — иначе он бы молча
+    // отдавал старый chatId до перезагрузки страницы.
+    renameClientChatId: function(nativeFetch, params) {
+        var oldChatId = params.get('oldChatId') || '';
+        var newChatId = params.get('newChatId') || '';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(oldChatId) + '/chat-id';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newChatId: newChatId })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            _nameToChatIdCache = null;
+            return _fakeJsonResponse({ success: true }, 200);
+        }); });
+    },
     setClientArchived: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
         var archived = params.get('archived') === 'true';
