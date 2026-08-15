@@ -108,7 +108,7 @@ var NEW_API_PILOT_TRAINERS = { '240703996': true }; // Роман
 // в теории может привести к ЛЮБОМУ тренеру, а не только к Matvey — гадать
 // на фронте не будем, оставляем такой запуск на старом бэкенде как есть.
 var NEW_API_DEFAULT_TENANT_TRAINER_ID = '739299264'; // Matvey, см. DEFAULT_TRAINER_CHAT_ID в apps_script.js
-var NEW_API_DEFAULT_TENANT_PILOT = false; // включаем отдельным шагом, не в этом деплое — см. MIGRATION_PLAN.md
+var NEW_API_DEFAULT_TENANT_PILOT = true; // 2026-08-16 — включено; бэкенд теперь требует подпись Telegram initData (см. api/telegram_auth.py), не только X-Api-Key
 
 function _newApiTrainerId() {
     if (NEW_API_PILOT_TRAINERS[CURRENT_TRAINER_ID]) return CURRENT_TRAINER_ID;
@@ -120,8 +120,24 @@ function _fakeJsonResponse(obj, status) {
     return new Response(JSON.stringify(obj), { status: status, headers: { 'Content-Type': 'application/json' } });
 }
 
+// Заголовки для запросов к новому API. Для дефолт-тенанта (Matvey, реальные
+// клиенты/деньги, см. MIGRATION_PLAN.md Фаза 5) бэкенд ТРЕБУЕТ ещё и
+// X-Telegram-Init-Data (см. api/telegram_auth.py) — X-Api-Key один сам по
+// себе виден в исходнике страницы (GitHub Pages публичен), initData
+// подделать нельзя без токена бота, которого во фронтенде нет и не будет.
+// Для остальных тренеров (Роман и т.п., пока без реальных денег/данных)
+// пока достаточно X-Api-Key, как и раньше — сознательно узкая правка.
+function _newApiHeaders(extra) {
+    var headers = { 'X-Api-Key': NEW_API_KEY };
+    if (extra) { for (var k in extra) headers[k] = extra[k]; }
+    if (_newApiTrainerId() === NEW_API_DEFAULT_TENANT_TRAINER_ID && tg && tg.initData) {
+        headers['X-Telegram-Init-Data'] = tg.initData;
+    }
+    return headers;
+}
+
 function _newApiCall(nativeFetch, path) {
-    return nativeFetch(NEW_API_BASE + path, { headers: { 'X-Api-Key': NEW_API_KEY } })
+    return nativeFetch(NEW_API_BASE + path, { headers: _newApiHeaders() })
         .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, status: r.status, data: data }; }); });
 }
 
@@ -333,7 +349,7 @@ var NEW_API_ACTIONS = {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден' }, 200);
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/notes';
             return nativeFetch(NEW_API_BASE + path, {
-                method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ text: text, important: important })
             }).then(function(r) { return r.json().then(function(data) {
                 if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -347,7 +363,7 @@ var NEW_API_ACTIONS = {
         return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден' }, 200);
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/notes/' + encodeURIComponent(ts);
-            return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
+            return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: _newApiHeaders() })
                 .then(function(r) {
                     if (r.status === 204 || r.ok) return _fakeJsonResponse({ success: true }, 200);
                     return r.json().then(function(data) {
@@ -370,7 +386,7 @@ var NEW_API_ACTIONS = {
         if (programOpts.type === 'copy') return null; // фолбэк на старый бэкенд
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(profile)
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -385,7 +401,7 @@ var NEW_API_ACTIONS = {
         _PROFILE_KEYS.forEach(function(k) { if (params.has(k)) fields[k] = params.get(k); });
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/profile';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(fields)
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -404,7 +420,7 @@ var NEW_API_ACTIONS = {
         var newChatId = params.get('newChatId') || '';
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(oldChatId) + '/chat-id';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ newChatId: newChatId })
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -417,7 +433,7 @@ var NEW_API_ACTIONS = {
         var archived = params.get('archived') === 'true';
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId);
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ archived: archived })
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -433,7 +449,7 @@ var NEW_API_ACTIONS = {
     deleteClient: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId);
-        return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
+        return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: _newApiHeaders() })
             .then(function(r) { return r.json().then(function(data) {
                 if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
                 return _fakeJsonResponse({ success: true }, 200);
@@ -454,7 +470,7 @@ var NEW_API_ACTIONS = {
         });
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/measurements';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(payload)
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -477,7 +493,7 @@ var NEW_API_ACTIONS = {
             };
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan';
             return nativeFetch(NEW_API_BASE + path, {
-                method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify(payload)
             }).then(function(r) { return r.json().then(function(data) {
                 if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -510,7 +526,7 @@ var NEW_API_ACTIONS = {
         };
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/payments';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(payload)
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -525,7 +541,7 @@ var NEW_API_ACTIONS = {
         var payload = { days: parseInt(params.get('days') || '0', 10), comment: params.get('comment') || '' };
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/payments/adjust';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(payload)
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -617,7 +633,7 @@ var NEW_API_ACTIONS = {
         var message = params.get('message') || '';
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/notify';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ message: message || null })
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -630,7 +646,7 @@ var NEW_API_ACTIONS = {
     sendMonthlyReportToClient: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/monthly-report/send';
-        return nativeFetch(NEW_API_BASE + path, { method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY } })
+        return nativeFetch(NEW_API_BASE + path, { method: 'POST', headers: _newApiHeaders() })
             .then(function(r) { return r.json().then(function(data) {
                 if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'нет данных для отчёта' }, 200);
                 return _fakeJsonResponse({ success: true }, 200);
@@ -644,7 +660,7 @@ var NEW_API_ACTIONS = {
         var name = params.get('name') || '';
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/request-access';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ chatId: chatId, name: name })
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -663,7 +679,7 @@ var NEW_API_ACTIONS = {
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/program/exercises/' + encodeURIComponent(rowIndex);
             return nativeFetch(NEW_API_BASE + path, {
-                method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify(fields)
             }).then(function(r) { return r.json().then(function(data) {
                 if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -678,7 +694,7 @@ var NEW_API_ACTIONS = {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/program/exercises/' + encodeURIComponent(rowIndex);
-            return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
+            return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: _newApiHeaders() })
                 .then(function(r) {
                     if (r.status === 204 || r.ok) return _fakeJsonResponse({ success: true }, 200);
                     return r.json().then(function(data) {
@@ -704,7 +720,7 @@ var NEW_API_ACTIONS = {
             exercises.forEach(function(ex) {
                 chain = chain.then(function() {
                     return nativeFetch(NEW_API_BASE + path, {
-                        method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                        method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify({
                             day: dayName, exercise: ex.exercise || '', sets: ex.sets || '', reps: ex.reps || '',
                             weightPlan: ex.weightPlan || '', rpe: ex.rpe || '', note: ex.note || ''
@@ -739,7 +755,7 @@ var NEW_API_ACTIONS = {
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/program/days/' + encodeURIComponent(oldDayName);
             return nativeFetch(NEW_API_BASE + path, {
-                method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ newName: newDayName })
             }).then(function(r) { return r.json().then(function(data) {
                 if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -754,7 +770,7 @@ var NEW_API_ACTIONS = {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/program/days/' + encodeURIComponent(dayName);
-            return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
+            return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: _newApiHeaders() })
                 .then(function(r) { return r.json().then(function(data) {
                     if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
                     return _fakeJsonResponse({ success: true }, 200);
@@ -781,7 +797,7 @@ var NEW_API_ACTIONS = {
                 var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                     '/program/days/' + encodeURIComponent(dayName) + '/reorder';
                 return nativeFetch(NEW_API_BASE + path, {
-                    method: 'PUT', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                    method: 'PUT', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify({ orderedIds: order })
                 }).then(function(r) { return r.json().then(function(data) {
                     if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -799,7 +815,7 @@ var NEW_API_ACTIONS = {
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program/duplicate-week';
-            return nativeFetch(NEW_API_BASE + path, { method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY } })
+            return nativeFetch(NEW_API_BASE + path, { method: 'POST', headers: _newApiHeaders() })
                 .then(function(r) { return r.json().then(function(data) {
                     if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
                     return _fakeJsonResponse({ success: true, newTitle: data.weekTitle }, 200);
@@ -845,7 +861,7 @@ var NEW_API_ACTIONS = {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден: ' + clientName }, 200);
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan/generate';
             return nativeFetch(NEW_API_BASE + path, {
-                method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+                method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({
                     weight: body.weight || '', height: body.height || '', age: body.age || '',
                     goal: body.goal || '', allergies: body.allergies || ''
@@ -891,7 +907,7 @@ var NEW_API_ACTIONS = {
         };
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/exercises/' + encodeURIComponent(name) + '/media';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(payload)
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
@@ -925,7 +941,7 @@ var NEW_API_ACTIONS = {
         }).filter(function(e) { return !isNaN(e.exerciseId); });
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program/complete-day';
         return nativeFetch(NEW_API_BASE + path, {
-            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ exercises: exercises })
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
