@@ -719,6 +719,17 @@ var NEW_API_ACTIONS = {
                 return _fakeJsonResponse(data, 200);
             }); });
         });
+    },
+    // Аналог action=getAdminClients — главный экран "Тренерской", список
+    // клиентов с цветными статусами по активности (не путать с getClients
+    // — та отдаёт только chatId/name/archived для простых списков типа
+    // резолвера имени). Форма ответа 1-в-1 совпадает со старой.
+    getAdminClients: function(nativeFetch) {
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/admin-clients';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
