@@ -572,6 +572,50 @@ var NEW_API_ACTIONS = {
             return _fakeJsonResponse(res.data, 200);
         });
     },
+    // Аналог action=notifyClient — тренер шлёт клиенту произвольное
+    // сообщение (или дефолтное "программа обновлена") через Telegram/VK.
+    // 2026-08-15: токены бота добавлены в новый сервис (то же решение, что
+    // и у sendMonthlyReportToClient/requestAccess ниже), прямой chatId,
+    // резолвер имени не нужен.
+    notifyClient: function(nativeFetch, params) {
+        var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
+        var message = params.get('message') || '';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/notify';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message || null })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({ success: true }, 200);
+        }); });
+    },
+    // Аналог action=sendMonthlyReportToClient — clientName с фронта не
+    // нужен, бэкенд сам знает имя клиента по chatId (строит тот же отчёт,
+    // что уже показывает getMonthlyReportsPreview, и реально его шлёт).
+    sendMonthlyReportToClient: function(nativeFetch, params) {
+        var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/monthly-report/send';
+        return nativeFetch(NEW_API_BASE + path, { method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY } })
+            .then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'нет данных для отчёта' }, 200);
+                return _fakeJsonResponse({ success: true }, 200);
+            }); });
+    },
+    // Аналог action=requestAccess — уведомление уходит ТРЕНЕРУ (не
+    // клиенту), chatId в параметрах — это chatId ПРОСЯЩЕГО доступ (обычно
+    // ещё не зарегистрированный клиент), не текущего тренера.
+    requestAccess: function(nativeFetch, params) {
+        var chatId = params.get('chatId') || '';
+        var name = params.get('name') || '';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/request-access';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chatId: chatId, name: name })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({ success: true }, 200);
+        }); });
+    },
     updateClientExercise: function(nativeFetch, params) {
         var sheetName = params.get('sheetName') || '';
         var rowIndex = params.get('rowIndex') || ''; // на самом деле id, см. коммент выше
