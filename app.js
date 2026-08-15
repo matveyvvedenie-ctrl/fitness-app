@@ -366,6 +366,21 @@ var NEW_API_ACTIONS = {
             return _fakeJsonResponse(data, 200);
         }); });
     },
+    // Аналог action=deleteClient — НЕ настоящее удаление (как и в
+    // оригинале): бэкенд помечает клиента статусом 'deleted', данные
+    // (программа/питание/замеры) остаются в базе целыми, клиент просто
+    // пропадает из getClients и получает 404 при любом обращении — тот же
+    // эффект, что и был ("клиент потерял доступ к боту"), без потери
+    // истории. См. docstring delete_client в api/main.py.
+    deleteClient: function(nativeFetch, params) {
+        var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId);
+        return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
+            .then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                return _fakeJsonResponse({ success: true }, 200);
+            }); });
+    },
     // Фото замера (photoBase64) новый API пока не умеет хранить (нет файлового
     // хранилища на бэкенде, см. DB_SCHEMA.md) — честно НЕ перехватываем такой
     // вызов (возвращаем null), он уйдёт по старому пути и фото не потеряется.
