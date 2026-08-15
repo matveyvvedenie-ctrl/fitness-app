@@ -834,6 +834,34 @@ var NEW_API_ACTIONS = {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             return _fakeJsonResponse(res.data, 200);
         });
+    },
+    // Аналог action=saveExerciseMedia — фото/видео техники упражнения.
+    // Поля тела запроса (name/group/video/videoVk/photo1Base64/photo1Mime/
+    // photo2Base64/photo2Mime/removePhoto1/removePhoto2) уже совпадают с
+    // новым бэкендом 1-в-1 (см. saveExerciseMediaEntry) — реформатировать
+    // нечего, только вынести name в путь URL. В отличие от saveMeasurements
+    // с фото, тут файловое хранилище на новом бэкенде УЖЕ есть (Railway
+    // volume, см. MIGRATION_PLAN.md), поэтому честно перехватываем, а не
+    // отдаём null.
+    saveExerciseMedia: function(nativeFetch, params, init) {
+        var body;
+        try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
+        var name = (body.name || '').trim();
+        if (!name) return _fakeJsonResponse({ success: false, error: 'Не указано название упражнения' }, 200);
+        var payload = {
+            photo1Base64: body.photo1Base64 || null, photo1Mime: body.photo1Mime || 'image/jpeg',
+            photo2Base64: body.photo2Base64 || null, photo2Mime: body.photo2Mime || 'image/jpeg',
+            removePhoto1: !!body.removePhoto1, removePhoto2: !!body.removePhoto2,
+            video: body.video, videoVk: body.videoVk, group: body.group
+        };
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/exercises/' + encodeURIComponent(name) + '/media';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
+            return _fakeJsonResponse(data, 200);
+        }); });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
