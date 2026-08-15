@@ -910,6 +910,24 @@ var NEW_API_ACTIONS = {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             return _fakeJsonResponse(res.data, 200);
         });
+    },
+    // Аналог action=getTenantConfig — тема оформления, дёргается один раз
+    // при старте мини-аппа. Не chatId-резолвинг (fallback на случай пустого
+    // trainerId в ссылке) — тот путь и не задет этим шимом вообще, он
+    // работает по CURRENT_TRAINER_ID, как и весь остальной пилот.
+    // На 403 с blocked:true (доступ отключён/демо истекло) бэкенд отдаёт
+    // detail ОБЪЕКТОМ {error, blocked}, не строкой, как везде — прокидываем
+    // как есть, фронту (loadTenantConfig) нужен именно плоский blocked:true.
+    getTenantConfig: function(nativeFetch) {
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/tenant-config';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) {
+                var d = res.data && res.data.detail;
+                if (d && typeof d === 'object') return _fakeJsonResponse(d, 200);
+                return _fakeJsonResponse({ error: d || 'Ошибка' }, 200);
+            }
+            return _fakeJsonResponse(res.data, 200);
+        });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
