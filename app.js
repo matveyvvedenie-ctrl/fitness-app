@@ -81,6 +81,41 @@ var NEW_API_BASE = 'https://fitness-api-fitness-bot-v2.up.railway.app';
 var NEW_API_KEY = '72bdc5e9073da1309592590508c0098bcaad8139c82aeafa77438c2ed46f7e61';
 var NEW_API_PILOT_TRAINERS = { '240703996': true }; // Роман
 
+// ── Фаза 5 (2026-08-15, см. MIGRATION_PLAN.md) ──────────────────────────────
+// Matvey — тенант ПО УМОЛЧАНИЮ в старой системе (_resolveTenant('') в
+// apps_script.js), у него в принципе НЕТ trainerId — поэтому CURRENT_TRAINER_ID
+// для него ВСЕГДА пустая строка, и NEW_API_PILOT_TRAINERS[''] никогда не
+// сработает (в отличие от Романа, у которого trainerId есть в ссылке).
+// НЕЛЬЗЯ просто дописать '': true в NEW_API_PILOT_TRAINERS и переиспользовать
+// CURRENT_TRAINER_ID как есть — эта же переменная used для трейлинга
+// ?trainerId=... к запросам в СТАРЫЙ Apps Script (см. ниже, isAppsScript-ветка);
+// если её подменить на 739299264, apps_script.js._resolveTenant('739299264')
+// не найдёт такую строку в реестре "Тренеры" (Matvey там не зарегистрирован,
+// он и есть дефолт) — и ВСЁ, что ещё не перенесено, разом сломается на
+// старом бэкенде. Поэтому — отдельная функция ТОЛЬКО для путей к новому API,
+// CURRENT_TRAINER_ID остаётся нетронутым везде, где он был раньше.
+//
+// "Это точно Matvey" различаем узко и консервативно: пустой CURRENT_TRAINER_ID
+// (не Роман, не какой-то другой тенант) И запуск НЕ через VK-без-группы
+// (vkLaunchUserId, см. ниже по файлу — объявлена как var, но код здесь
+// исполняется лишь при вызовах fetch НАМНОГО позже разбора скрипта, так что
+// объявление уже отработает к моменту вызова). Архитектурно у Matvey только
+// Telegram-бот (bot.py, один токен, один тенант) — остальные тренеры/их
+// клиенты заходят через vk_bot.py, всегда СО своим vk_group_id. Значит
+// пустой CURRENT_TRAINER_ID + Telegram = однозначно Matvey, без гадания.
+// VK-запуск БЕЗ группы сознательно НЕ трогаем — у старой системы там есть
+// отдельный фоллбэк-резолвинг по chatId (_resolveTrainerIdByChatId), который
+// в теории может привести к ЛЮБОМУ тренеру, а не только к Matvey — гадать
+// на фронте не будем, оставляем такой запуск на старом бэкенде как есть.
+var NEW_API_DEFAULT_TENANT_TRAINER_ID = '739299264'; // Matvey, см. DEFAULT_TRAINER_CHAT_ID в apps_script.js
+var NEW_API_DEFAULT_TENANT_PILOT = false; // включаем отдельным шагом, не в этом деплое — см. MIGRATION_PLAN.md
+
+function _newApiTrainerId() {
+    if (NEW_API_PILOT_TRAINERS[CURRENT_TRAINER_ID]) return CURRENT_TRAINER_ID;
+    if (NEW_API_DEFAULT_TENANT_PILOT && !CURRENT_TRAINER_ID && !vkLaunchUserId) return NEW_API_DEFAULT_TENANT_TRAINER_ID;
+    return '';
+}
+
 function _fakeJsonResponse(obj, status) {
     return new Response(JSON.stringify(obj), { status: status, headers: { 'Content-Type': 'application/json' } });
 }
@@ -98,7 +133,7 @@ function _newApiCall(nativeFetch, path) {
 var _nameToChatIdCache = null;
 function _resolveChatIdByName(nativeFetch, name) {
     if (_nameToChatIdCache) return Promise.resolve(_nameToChatIdCache[name] || null);
-    var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients';
+    var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients';
     return _newApiCall(nativeFetch, path).then(function(res) {
         _nameToChatIdCache = {};
         (res.ok ? (res.data.clients || []) : []).forEach(function(c) { _nameToChatIdCache[c.name] = c.chatId; });
@@ -168,7 +203,7 @@ var NEW_API_ACTIONS = {
     // пилотом пока не покрыто и честно упадёт "Sheet not found" на старом
     // бэкенде, если попробовать — это ожидаемый пробел, не баг).
     getClients: function(nativeFetch) {
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             var clients = (res.data.clients || []).map(function(c) {
@@ -181,7 +216,7 @@ var NEW_API_ACTIONS = {
     // success:true, старый код это проверяет.
     getClientProfile: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/profile';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/profile';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
             res.data.success = true;
@@ -193,7 +228,7 @@ var NEW_API_ACTIONS = {
     // реформатировать почти нечего — только 404 клиента в {error:...}.
     getMeasurements: function(nativeFetch, params) {
         var chatId = params.get('chatId') || '';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/measurements';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/measurements';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
             return _fakeJsonResponse(res.data, 200);
@@ -202,7 +237,7 @@ var NEW_API_ACTIONS = {
     getClientFoodEntries: function(nativeFetch, params) {
         var chatId = params.get('clientChatId') || params.get('chatId') || '';
         var days = params.get('days') || '14';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
             '/food-entries?days=' + encodeURIComponent(days);
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
@@ -213,7 +248,7 @@ var NEW_API_ACTIONS = {
     // эндпоинт (там уже расширенная форма с фото/видео, старому "простому"
     // getExerciseLibrary лишние поля не мешают).
     getExerciseLibrary: function(nativeFetch) {
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/exercises';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/exercises';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             return _fakeJsonResponse(res.data, 200);
@@ -221,7 +256,7 @@ var NEW_API_ACTIONS = {
     },
     getMealPlanForClient: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
             return _fakeJsonResponse(res.data, 200);
@@ -234,7 +269,7 @@ var NEW_API_ACTIONS = {
         var limit = params.get('limit') || '30';
         return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ history: [] }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/history?limit=' + encodeURIComponent(limit);
             return _newApiCall(nativeFetch, path).then(function(res) {
                 if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
@@ -261,7 +296,7 @@ var NEW_API_ACTIONS = {
         var exerciseName = params.get('exerciseName') || '';
         return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ empty: true }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/exercises/' + encodeURIComponent(exerciseName) + '/last-result';
             return _newApiCall(nativeFetch, path).then(function(res) {
                 if (!res.ok || res.data.empty) return _fakeJsonResponse({ empty: true }, 200);
@@ -280,7 +315,7 @@ var NEW_API_ACTIONS = {
         var clientName = params.get('clientName') || '';
         return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ notes: [] }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/notes';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/notes';
             return _newApiCall(nativeFetch, path).then(function(res) {
                 if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
                 var notes = (res.data.notes || []).map(function(n) {
@@ -296,7 +331,7 @@ var NEW_API_ACTIONS = {
         var important = params.get('important') === 'true';
         return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден' }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/notes';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/notes';
             return nativeFetch(NEW_API_BASE + path, {
                 method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: text, important: important })
@@ -311,7 +346,7 @@ var NEW_API_ACTIONS = {
         var ts = params.get('ts') || ''; // на самом деле id из новой БД, см. комментарий выше
         return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден' }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/notes/' + encodeURIComponent(ts);
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/notes/' + encodeURIComponent(ts);
             return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
                 .then(function(r) {
                     if (r.status === 204 || r.ok) return _fakeJsonResponse({ success: true }, 200);
@@ -333,7 +368,7 @@ var NEW_API_ACTIONS = {
         var profile = JSON.parse(params.get('profile') || '{}');
         var programOpts = JSON.parse(params.get('programOpts') || '{}');
         if (programOpts.type === 'copy') return null; // фолбэк на старый бэкенд
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify(profile)
@@ -348,7 +383,7 @@ var NEW_API_ACTIONS = {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
         var fields = {};
         _PROFILE_KEYS.forEach(function(k) { if (params.has(k)) fields[k] = params.get(k); });
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/profile';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/profile';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify(fields)
@@ -367,7 +402,7 @@ var NEW_API_ACTIONS = {
     renameClientChatId: function(nativeFetch, params) {
         var oldChatId = params.get('oldChatId') || '';
         var newChatId = params.get('newChatId') || '';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(oldChatId) + '/chat-id';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(oldChatId) + '/chat-id';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ newChatId: newChatId })
@@ -380,7 +415,7 @@ var NEW_API_ACTIONS = {
     setClientArchived: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
         var archived = params.get('archived') === 'true';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId);
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId);
         return nativeFetch(NEW_API_BASE + path, {
             method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ archived: archived })
@@ -397,7 +432,7 @@ var NEW_API_ACTIONS = {
     // истории. См. docstring delete_client в api/main.py.
     deleteClient: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId);
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId);
         return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
             .then(function(r) { return r.json().then(function(data) {
                 if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -417,7 +452,7 @@ var NEW_API_ACTIONS = {
         ['weight', 'shoulders', 'chest', 'waist', 'hips', 'bicep', 'thigh'].forEach(function(k) {
             if (body[k] !== undefined && body[k] !== '') payload[k] = parseFloat(body[k]);
         });
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/measurements';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/measurements';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -440,7 +475,7 @@ var NEW_API_ACTIONS = {
                 target_fats: plan.target_fats || 0, target_carbs: plan.target_carbs || 0,
                 meals: plan.meals || [], notes: plan.notes || ''
             };
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan';
             return nativeFetch(NEW_API_BASE + path, {
                 method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -454,7 +489,7 @@ var NEW_API_ACTIONS = {
     // раньше были плоские amount/endDate) — реформатируем под то, что ждут
     // renderFinanceSummary/renderFinanceList.
     getFinances: function(nativeFetch) {
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/finances';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/finances';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             var clients = (res.data.clients || []).map(function(c) {
@@ -473,7 +508,7 @@ var NEW_API_ACTIONS = {
             amount: parseFloat(params.get('amount') || '0'), months: parseInt(params.get('months') || '1', 10),
             comment: params.get('comment') || ''
         };
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/payments';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/payments';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -488,7 +523,7 @@ var NEW_API_ACTIONS = {
     adjustSubscriptionEnd: function(nativeFetch, params) {
         var chatId = params.get('clientChatId') || params.get('chatId') || '';
         var payload = { days: parseInt(params.get('days') || '0', 10), comment: params.get('comment') || '' };
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/payments/adjust';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/payments/adjust';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -515,7 +550,7 @@ var NEW_API_ACTIONS = {
         var sheetName = params.get('sheetName') || '';
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ error: 'Sheet not found: ' + sheetName }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program';
             return _newApiCall(nativeFetch, path).then(function(res) {
                 if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
                 return _fakeJsonResponse({ weekTitle: res.data.weekTitle, days: _mapProgramDays(res.data.days) }, 200);
@@ -532,7 +567,7 @@ var NEW_API_ACTIONS = {
     read: function(nativeFetch, params) {
         var chatId = params.get('chatId') || '';
         if (!chatId) return _fakeJsonResponse({ error: 'Missing chatId' }, 200);
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) {
                 // init() в app.js регексом ищет в тексте ошибки именно
@@ -561,7 +596,7 @@ var NEW_API_ACTIONS = {
     history: function(nativeFetch, params) {
         var chatId = params.get('chatId') || '';
         if (!chatId) return _fakeJsonResponse({ error: 'Missing chatId' }, 200);
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/history-flat';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/history-flat';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) {
                 var msg = res.status === 404
@@ -580,7 +615,7 @@ var NEW_API_ACTIONS = {
     notifyClient: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
         var message = params.get('message') || '';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/notify';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/notify';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: message || null })
@@ -594,7 +629,7 @@ var NEW_API_ACTIONS = {
     // что уже показывает getMonthlyReportsPreview, и реально его шлёт).
     sendMonthlyReportToClient: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/monthly-report/send';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/monthly-report/send';
         return nativeFetch(NEW_API_BASE + path, { method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY } })
             .then(function(r) { return r.json().then(function(data) {
                 if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'нет данных для отчёта' }, 200);
@@ -607,7 +642,7 @@ var NEW_API_ACTIONS = {
     requestAccess: function(nativeFetch, params) {
         var chatId = params.get('chatId') || '';
         var name = params.get('name') || '';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/request-access';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/request-access';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ chatId: chatId, name: name })
@@ -625,7 +660,7 @@ var NEW_API_ACTIONS = {
             ['exercise', 'sets', 'reps', 'weightPlan', 'rpe', 'note'].forEach(function(k) {
                 if (params.has(k)) fields[k] = params.get(k);
             });
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/program/exercises/' + encodeURIComponent(rowIndex);
             return nativeFetch(NEW_API_BASE + path, {
                 method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
@@ -641,7 +676,7 @@ var NEW_API_ACTIONS = {
         var rowIndex = params.get('rowIndex') || '';
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/program/exercises/' + encodeURIComponent(rowIndex);
             return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
                 .then(function(r) {
@@ -662,7 +697,7 @@ var NEW_API_ACTIONS = {
         var exercises = body.exercises || [];
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program/exercises';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program/exercises';
             var chain = Promise.resolve();
             var savedCount = 0;
             var firstError = null;
@@ -701,7 +736,7 @@ var NEW_API_ACTIONS = {
         var newDayName = params.get('newDayName') || '';
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/program/days/' + encodeURIComponent(oldDayName);
             return nativeFetch(NEW_API_BASE + path, {
                 method: 'PATCH', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
@@ -717,7 +752,7 @@ var NEW_API_ACTIONS = {
         var dayName = params.get('dayName') || '';
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                 '/program/days/' + encodeURIComponent(dayName);
             return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: { 'X-Api-Key': NEW_API_KEY } })
                 .then(function(r) { return r.json().then(function(data) {
@@ -735,7 +770,7 @@ var NEW_API_ACTIONS = {
         if (order.length === 0) return _fakeJsonResponse({ success: false, error: 'Empty order' }, 200);
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
-            var progPath = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program';
+            var progPath = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program';
             return _newApiCall(nativeFetch, progPath).then(function(res) {
                 if (!res.ok) return _fakeJsonResponse({ success: false, error: (res.data && res.data.detail) || 'Ошибка' }, 200);
                 var dayName = null;
@@ -743,7 +778,7 @@ var NEW_API_ACTIONS = {
                     if (day.exercises.some(function(ex) { return ex.id === order[0]; })) dayName = day.day;
                 });
                 if (!dayName) return _fakeJsonResponse({ success: false, error: 'День не найден' }, 200);
-                var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) +
+                var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
                     '/program/days/' + encodeURIComponent(dayName) + '/reorder';
                 return nativeFetch(NEW_API_BASE + path, {
                     method: 'PUT', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
@@ -763,7 +798,7 @@ var NEW_API_ACTIONS = {
         var sheetName = params.get('sheetName') || '';
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program/duplicate-week';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program/duplicate-week';
             return nativeFetch(NEW_API_BASE + path, { method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY } })
                 .then(function(r) { return r.json().then(function(data) {
                     if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -777,7 +812,7 @@ var NEW_API_ACTIONS = {
     // отличие от остального пилота, не завязан на конкретного клиента/
     // sheetName, поэтому резолвер имени не нужен.
     getFoodDashboard: function(nativeFetch) {
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/food-dashboard';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/food-dashboard';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             return _fakeJsonResponse(res.data, 200);
@@ -788,7 +823,7 @@ var NEW_API_ACTIONS = {
     // (sendMonthlyReportToClient) пилот не покрывает — уходит в старый
     // Apps Script как раньше (нужна интеграция с ботами, см. MIGRATION_PLAN.md).
     getMonthlyReportsPreview: function(nativeFetch) {
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/monthly-reports-preview';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/monthly-reports-preview';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             return _fakeJsonResponse(res.data, 200);
@@ -808,7 +843,7 @@ var NEW_API_ACTIONS = {
         var clientName = body.clientName || '';
         return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден: ' + clientName }, 200);
-            var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan/generate';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan/generate';
             return nativeFetch(NEW_API_BASE + path, {
                 method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -829,7 +864,7 @@ var NEW_API_ACTIONS = {
     // — та отдаёт только chatId/name/archived для простых списков типа
     // резолвера имени). Форма ответа 1-в-1 совпадает со старой.
     getAdminClients: function(nativeFetch) {
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/admin-clients';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/admin-clients';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             return _fakeJsonResponse(res.data, 200);
@@ -854,7 +889,7 @@ var NEW_API_ACTIONS = {
             removePhoto1: !!body.removePhoto1, removePhoto2: !!body.removePhoto2,
             video: body.video, videoVk: body.videoVk, group: body.group
         };
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/exercises/' + encodeURIComponent(name) + '/media';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/exercises/' + encodeURIComponent(name) + '/media';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -888,7 +923,7 @@ var NEW_API_ACTIONS = {
                 comment: (ex.c !== undefined ? ex.c : ex.comment) || ''
             };
         }).filter(function(e) { return !isNaN(e.exerciseId); });
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/program/complete-day';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program/complete-day';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'POST', headers: { 'X-Api-Key': NEW_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ exercises: exercises })
@@ -905,7 +940,7 @@ var NEW_API_ACTIONS = {
     // в отличие от старой системы). Форма ответа 1-в-1 совпадает со старой.
     progress: function(nativeFetch, params) {
         var chatId = params.get('chatId') || '';
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/progress';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/progress';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
             return _fakeJsonResponse(res.data, 200);
@@ -919,7 +954,7 @@ var NEW_API_ACTIONS = {
     // detail ОБЪЕКТОМ {error, blocked}, не строкой, как везде — прокидываем
     // как есть, фронту (loadTenantConfig) нужен именно плоский blocked:true.
     getTenantConfig: function(nativeFetch) {
-        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/tenant-config';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/tenant-config';
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) {
                 var d = res.data && res.data.detail;
@@ -938,11 +973,16 @@ var _PROFILE_KEYS = ['gender', 'age', 'height', 'weight', 'goal', 'level', 'freq
     window.fetch = function(input, init) {
         var isAppsScript = typeof input === 'string' && input.indexOf(APPS_SCRIPT_URL) === 0;
         if (CURRENT_TRAINER_ID && isAppsScript) {
+            // ВАЖНО: тут именно CURRENT_TRAINER_ID, не _newApiTrainerId() — это
+            // трейлинг к запросу в СТАРЫЙ Apps Script, где для Matvey (тенант по
+            // умолчанию) trainerId вообще не должен передаваться (см. комментарий
+            // у _newApiTrainerId выше — иначе _resolveTenant('739299264') не
+            // найдёт такую строку в реестре "Тренеры" и всё сломается).
             var sep = input.indexOf('?') === -1 ? '?' : '&';
             input = input + sep + 'trainerId=' + encodeURIComponent(CURRENT_TRAINER_ID);
         }
         if (isAppsScript) {
-            if (NEW_API_PILOT_TRAINERS[CURRENT_TRAINER_ID]) {
+            if (_newApiTrainerId()) {
                 var qIndex = input.indexOf('?');
                 var params = new URLSearchParams(qIndex === -1 ? '' : input.slice(qIndex + 1));
                 var handler = NEW_API_ACTIONS[params.get('action')];
