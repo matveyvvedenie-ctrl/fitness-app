@@ -896,6 +896,20 @@ var NEW_API_ACTIONS = {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
             return _fakeJsonResponse({ success: true, saved: data.saved, timestamp: data.timestamp }, 200);
         }); });
+    },
+    // Аналог action=progress/getProgressStats — 3 плитки на клиентском
+    // экране "Прогресс". Раньше числился заблокированным (нужен лист
+    // "Архив", которого нет в новой БД) — при перепроверке оказалось, что
+    // архив и не нужен: новый бэкенд считает по всем прошлым неделям
+    // клиента на лету (они не перезатираются при переходе на новую неделю,
+    // в отличие от старой системы). Форма ответа 1-в-1 совпадает со старой.
+    progress: function(nativeFetch, params) {
+        var chatId = params.get('chatId') || '';
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/progress';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
