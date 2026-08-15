@@ -552,6 +552,26 @@ var NEW_API_ACTIONS = {
             }, 200);
         });
     },
+    // Аналог action=history — КЛИЕНТСКАЯ версия (chatId свой, не резолвер по
+    // имени). НЕ путать с getClientHistory (тренерская, другой экшен, другая
+    // форма ответа — группирует по дню с RPE-бейджами). Эта — плоский список
+    // (дата, упражнение, вес) для графика прогресса и топ-5 рекордов на
+    // клиентском экране. Бэкенд уже отдаёт ровно эту форму — реформатировать
+    // нечего.
+    history: function(nativeFetch, params) {
+        var chatId = params.get('chatId') || '';
+        if (!chatId) return _fakeJsonResponse({ error: 'Missing chatId' }, 200);
+        var path = '/trainers/' + encodeURIComponent(CURRENT_TRAINER_ID) + '/clients/' + encodeURIComponent(chatId) + '/history-flat';
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) {
+                var msg = res.status === 404
+                    ? 'Client not found for chatId: ' + chatId
+                    : ((res.data && res.data.detail) || 'Ошибка');
+                return _fakeJsonResponse({ error: msg }, 200);
+            }
+            return _fakeJsonResponse(res.data, 200);
+        });
+    },
     updateClientExercise: function(nativeFetch, params) {
         var sheetName = params.get('sheetName') || '';
         var rowIndex = params.get('rowIndex') || ''; // на самом деле id, см. коммент выше
