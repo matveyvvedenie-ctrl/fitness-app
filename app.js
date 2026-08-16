@@ -79,7 +79,14 @@ function _fetchWithRetry(nativeFetch, input, init, retriesLeft) {
 // (проверка подписи VK/Telegram initData на сервере, а не общий ключ).
 var NEW_API_BASE = 'https://fitness-api-fitness-bot-v2.up.railway.app';
 var NEW_API_KEY = '72bdc5e9073da1309592590508c0098bcaad8139c82aeafa77438c2ed46f7e61';
-var NEW_API_PILOT_TRAINERS = { '240703996': true }; // Роман
+// 2026-08-16: Рома временно ВЫКЛЮЧЕН из пилота — не может открыть мини-апп
+// во VK на телефоне (таймаут 15 сек на каком-то запросе к новому бэкенду;
+// VK-десктоп и Telegram работают у других). Подозрение — VK-мобильное
+// приложение специфично не может достучаться до Railway (fitness-api),
+// хотя сам Railway отвечает быстро при проверке отсюда. Пока разбираюсь —
+// откатил на старый Apps Script (проверенно надёжный для него), чтобы Рома
+// прямо сейчас мог попасть в мини-апп. См. MIGRATION_PLAN.md.
+var NEW_API_PILOT_TRAINERS = {}; // '240703996': true — Роман, временно выключен
 
 // ── Фаза 5 (2026-08-15, см. MIGRATION_PLAN.md) ──────────────────────────────
 // Matvey — тенант ПО УМОЛЧАНИЮ в старой системе (_resolveTenant('') в
