@@ -161,9 +161,11 @@ function _resolveChatIdByName(nativeFetch, name) {
 // фронтенд-код (readWorkoutData/readClientProgram в apps_script.js) — общее
 // между readClientProgram (тренер смотрит ЧУЖУЮ программу) и read (клиент
 // смотрит СВОЮ). rowIndex — это integer `id` из новой БД под старым именем
-// поля, как и везде в этом файле. НЕ переносим: photo1/photo2/videoVk (см.
-// комментарий у readClientProgram), completed/timestamp (были пустышками и
-// в оригинале).
+// поля, как и везде в этом файле. photo1/photo2/videoVk — раньше отдавались
+// пустыми (файлового хранилища для фото ещё не было), бэкенд теперь сам
+// матчит их из библиотеки упражнений по имени (см. _exercise_photo_map в
+// main.py) — просто прокидываем как есть. completed/timestamp — были
+// пустышками и в оригинале, не трогаем.
 function _mapProgramDays(rawDays) {
     return (rawDays || []).map(function(day) {
         return {
@@ -171,9 +173,10 @@ function _mapProgramDays(rawDays) {
             exercises: (day.exercises || []).map(function(ex) {
                 return {
                     rowIndex: ex.id, exercise: ex.exercise, sets: ex.sets, reps: ex.reps,
-                    weightPlan: ex.weightPlan, rpe: ex.rpe, video: ex.video || '', videoVk: '',
+                    weightPlan: ex.weightPlan, rpe: ex.rpe, video: ex.video || '', videoVk: ex.videoVk || '',
                     note: ex.note, weightFact: ex.weightFact, repsFact: ex.repsFact,
-                    completed: false, timestamp: '', comment: ex.comment, photo1: '', photo2: ''
+                    completed: false, timestamp: '', comment: ex.comment,
+                    photo1: ex.photo1 || '', photo2: ex.photo2 || ''
                 };
             })
         };
