@@ -13,21 +13,25 @@
          не блокируя отрисовку страницы, и выполняются по порядку сразу после парсинга —
          то же самое поведение, но быстрее. app.js ниже по той же причине тоже defer,
          чтобы гарантированно выполниться ПОСЛЕ этих четырёх (порядок defer-скриптов
-         сохраняется), а не раньше, как могло бы получиться без этого. -->
-    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
-    <!-- Раньше грузили с unpkg.com — предположительно именно это глушило
-         открытие мини-аппа во VK НА ТЕЛЕФОНЕ (крутится "VK mini apps" загрузка
-         вечно, дальше нашей страницы вообще не доходит): VK показывает свой
-         сплэш, пока не получит от нас событие VKWebAppInit, а его шлёт именно
-         vk-bridge — если он не догрузился (unpkg лишний редирект + сторонний
-         CDN, во встроенном браузере VK на мобильной сети менее надёжно, чем на
-         десктопе), VKWebAppInit не уходит НИКОГДА и сплэш VK не убирается,
-         даже если наша страница под ним отработала бы нормально. Self-host
-         убирает этот сторонний CDN из цепочки (см. vendor/vk-bridge.min.js,
-         версия 3.0.2 — 2026-08-12). -->
+         сохраняется), а не раньше, как могло бы получиться без этого.
+
+         2026-08-16: ВСЕ 4 скрипта теперь self-host (vendor/), не только
+         vk-bridge (та была self-host ещё с 12.08). Нашли живьём через
+         Safari Web Inspector (Matvey, обычный браузер на iPhone, БЕЗ VK) —
+         именно telegram-web-app.js с telegram.org зависал бесконечно в
+         сетевой вкладке, у остальных запросов время — доли миллисекунды.
+         Из-за defer's document-order execution guarantee зависший ПЕРВЫЙ
+         скрипт блокирует исполнение ВСЕХ следующих defer-скриптов, включая
+         уже самостоятельно захостенный vk-bridge и сам app.js — то есть
+         self-host одного vk-bridge не мог помочь, пока первым в очереди
+         стоял ненадёжный внешний telegram-web-app.js. Та же логика и для
+         chart.js/Sortable.js (cdn.jsdelivr.net) — на всякий случай тоже
+         убрали внешнюю зависимость, раз уж нашли реальный кейс, когда
+         сторонний CDN недоступен на конкретной сети. -->
+    <script src="vendor/telegram-web-app.js" defer></script>
     <script src="vendor/vk-bridge.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer></script>
+    <script src="vendor/chart.umd.min.js" defer></script>
+    <script src="vendor/Sortable.min.js" defer></script>
 </head>
 <body>
     <!-- Loading Screen -->
