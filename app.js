@@ -1019,7 +1019,17 @@ var _PROFILE_KEYS = ['gender', 'age', 'height', 'weight', 'goal', 'level', 'freq
                 // в обычный старый путь ниже, как будто шима и не было.
                 if (handler) {
                     var result = handler(nativeFetch, params, init);
-                    if (result) return _withTimeout(result, 15000);
+                    // Promise.resolve(...), не result напрямую — большинство
+                    // хендлеров возвращают Promise (через .then-цепочку), но
+                    // некоторые (например read: при пустом chatId — реальный
+                    // случай: голый браузер без Telegram/VK контекста, см.
+                    // _myChatId()) делают ранний return _fakeJsonResponse(...)
+                    // СИНХРОННО — это просто Response, не Promise, и
+                    // _withTimeout(response, ...) падал с "promise.then is not
+                    // a function" вместо аккуратной обработки ошибки. Нашли
+                    // 2026-08-16 при тестировании фикса telegram-web-app.js
+                    // (см. index.html) в обычном браузере без контекста.
+                    if (result) return _withTimeout(Promise.resolve(result), 15000);
                 }
             }
             return _fetchWithRetry(nativeFetch, input, init, 2);
