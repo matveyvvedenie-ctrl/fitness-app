@@ -1060,13 +1060,24 @@ function _darkenHex(hex, amount) {
 }
 
 function applyTenantTheme(theme) {
-    if (!theme || !theme.primary) return;
-    var root = document.documentElement;
-    root.style.setProperty('--color-primary', theme.primary);
-    root.style.setProperty('--color-primary-dark', _darkenHex(theme.primary, 0.2));
+    if (!theme) return;
+    if (theme.primary) {
+        var root = document.documentElement;
+        root.style.setProperty('--color-primary', theme.primary);
+        root.style.setProperty('--color-primary-dark', _darkenHex(theme.primary, 0.2));
+    }
     if (theme.displayName) {
         var titleEl = document.querySelector('title');
         if (titleEl) titleEl.textContent = theme.displayName;
+    }
+    // Фирменный фон мини-аппа (лейбл/лого тренера) — тот же themeLogo, что
+    // раньше приходил с бэкенда, но нигде не выводился. Опционально: без
+    // него — как раньше, обычный светло-серый фон.
+    if (theme.logo) {
+        document.body.style.setProperty('--tenant-bg-image', 'url("' + String(theme.logo).replace(/"/g, '') + '")');
+        document.body.classList.add('has-tenant-bg');
+    } else {
+        document.body.classList.remove('has-tenant-bg');
     }
 }
 
