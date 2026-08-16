@@ -108,7 +108,7 @@ var NEW_API_PILOT_TRAINERS = { '240703996': true }; // Роман
 // в теории может привести к ЛЮБОМУ тренеру, а не только к Matvey — гадать
 // на фронте не будем, оставляем такой запуск на старом бэкенде как есть.
 var NEW_API_DEFAULT_TENANT_TRAINER_ID = '739299264'; // Matvey, см. DEFAULT_TRAINER_CHAT_ID в apps_script.js
-var NEW_API_DEFAULT_TENANT_PILOT = true; // 2026-08-16 — включено; бэкенд теперь требует подпись Telegram initData (см. api/telegram_auth.py), не только X-Api-Key
+var NEW_API_DEFAULT_TENANT_PILOT = false; // 2026-08-16 — ОТКАЧЕНО: реальные клиенты увидели сломанные историю/фото/статусы дней сразу после включения, см. MIGRATION_PLAN.md
 
 function _newApiTrainerId() {
     if (NEW_API_PILOT_TRAINERS[CURRENT_TRAINER_ID]) return CURRENT_TRAINER_ID;
