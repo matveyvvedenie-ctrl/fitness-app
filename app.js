@@ -7146,16 +7146,6 @@ function initMeasForm() {
     // Save button
     document.getElementById('meas-save-btn').addEventListener('click', saveMeasurements);
 
-    // Подсказка «Как измерять» — сворачиваемая картинка-гайд
-    var guideToggle = document.getElementById('meas-guide-toggle');
-    var guideBox = document.getElementById('meas-guide-box');
-    if (guideToggle && guideBox) {
-        guideToggle.addEventListener('click', function() {
-            guideBox.classList.toggle('hidden');
-            guideToggle.classList.toggle('active');
-        });
-    }
-
     // Фото прогресса — до 3 ракурсов (спереди/сбоку/сзади). Каждый слот
     // сжимается в браузере и показывает превью, как в редакторе упражнений.
     [1, 2, 3].forEach(function(slot) {

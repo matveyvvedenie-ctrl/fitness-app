@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260818d">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -197,7 +197,13 @@
 
         <!-- Measurements Tab -->
         <div id="measurements-tab" class="tab-content">
-            <!-- Photo Progress (первым делом — живые фото клиента) -->
+            <!-- Guide (самое первое — как правильно делать замеры и фото) -->
+            <div class="meas-guide-section">
+                <h3 class="section-title">📐 Как правильно делать замеры</h3>
+                <img src="body.png?v=20260818d" alt="Как правильно делать замеры" class="meas-guide-image">
+            </div>
+
+            <!-- Photo Progress (живые фото клиента) -->
             <div class="photo-progress-section">
                 <h3 class="section-title">📸 Фото прогресса</h3>
                 <div id="photo-progress-content" class="photo-progress-content">
@@ -212,13 +218,7 @@
 
             <!-- Input Form -->
             <div class="meas-form-section" id="meas-form-section">
-                <div class="meas-form-header">
-                    <h3 class="section-title">✏️ Записать замеры</h3>
-                    <button type="button" class="meas-guide-toggle" id="meas-guide-toggle">ℹ️ Как измерять</button>
-                </div>
-                <div class="meas-guide-box hidden" id="meas-guide-box">
-                    <img src="body.png" alt="Как правильно делать замеры" class="meas-guide-image">
-                </div>
+                <h3 class="section-title">✏️ Записать замеры</h3>
                 <div class="meas-form-grid">
                     <div class="meas-input-group">
                         <label class="meas-input-label">⚖️ Вес (кг)</label>
@@ -1626,6 +1626,6 @@
         </div>
     </div>
 
-    <script src="app.js" defer></script>
+    <script src="app.js?v=20260818d" defer></script>
 </body>
 </html>

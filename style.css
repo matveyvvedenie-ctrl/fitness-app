@@ -4208,6 +4208,23 @@ body.has-tenant-bg {
     margin-top: 10px;
 }
 
+/* Гайд «Как правильно делать замеры» — самое первое на вкладке */
+.meas-guide-section {
+    background: white;
+    margin: 12px 8px;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.meas-guide-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    border-radius: 10px;
+}
+
 /* Measurements Form */
 .meas-form-section {
     background: white;
@@ -4216,47 +4233,6 @@ body.has-tenant-bg {
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     overflow: hidden;
-}
-
-.meas-form-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.meas-form-header .section-title { margin-bottom: 0; }
-
-.meas-guide-toggle {
-    flex-shrink: 0;
-    background: none;
-    border: 1px solid #E53935;
-    color: #E53935;
-    border-radius: 14px;
-    padding: 4px 10px;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.meas-guide-toggle.active {
-    background: #E53935;
-    color: white;
-}
-
-.meas-guide-box {
-    display: flex;
-    justify-content: center;
-    padding: 10px 0;
-}
-
-.meas-guide-image {
-    width: 100%;
-    max-width: 320px;
-    height: auto;
-    display: block;
-    margin: 0 auto;
-    border-radius: 10px;
 }
 
 .meas-form-grid {
