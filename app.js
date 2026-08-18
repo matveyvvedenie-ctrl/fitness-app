@@ -7004,16 +7004,15 @@ async function loadMeasurementsData() {
             return;
         }
         measurementsData = data.measurements || [];
+        renderPhotoProgress();
         if (measurementsData.length === 0) {
             document.getElementById('measurements-latest').innerHTML =
                 '<div class="no-data">Пока нет замеров 📏<br><br>Заполни форму ниже чтобы записать первые замеры!</div>';
             document.getElementById('measurements-list').innerHTML = '';
-            // body figure is now a static image
             initMeasForm();
             return;
         }
         renderLatestMeasurements();
-        // body figure is now a static image
         renderMeasurementsChart('weight');
         renderMeasurementsHistory();
         initMeasForm();
@@ -7028,6 +7027,76 @@ async function loadMeasurementsData() {
         document.getElementById('measurements-latest').innerHTML = '<div class="no-data">Ошибка загрузки замеров</div>';
         initMeasForm();
     }
+}
+
+// ===== ФОТО ПРОГРЕССА (хиро-секция вкладки «Замеры») =====
+// Показываем клиенту его же фото: первое сохранённое и последнее — рядом,
+// с датой и весом, как в отчёте тренера (см. renderStatsPhotoCompareStrip).
+function renderPhotoProgress() {
+    var container = document.getElementById('photo-progress-content');
+    if (!container) return;
+
+    var withPhotos = measurementsData
+        .map(function(m) {
+            var photos = (m.photos && m.photos.length)
+                ? m.photos
+                : [m.photoUrl, m.photoUrl2, m.photoUrl3].filter(function(u) { return !!u; });
+            return { date: m.date, weight: m.weight, photos: photos };
+        })
+        .filter(function(m) { return m.photos.length > 0; });
+
+    if (withPhotos.length === 0) {
+        container.innerHTML =
+            '<div class="photo-progress-empty">' +
+                '<div class="photo-progress-empty-icon">🤳</div>' +
+                '<div>Пока нет фото прогресса.<br>Прикрепи первое фото в форме ниже 👇</div>' +
+            '</div>';
+        return;
+    }
+
+    var first = withPhotos[0];
+    var last = withPhotos[withPhotos.length - 1];
+    var showBoth = withPhotos.length > 1;
+
+    // В карточке "Было/Сейчас" — один (главный) ракурс на дату, чтобы влезало
+    // на любой ширине экрана; остальные ракурсы этой же даты — бейджем и
+    // полностью доступны в истории замеров ниже.
+    function renderCol(m, badge) {
+        var extra = m.photos.length - 1;
+        return '<div class="photo-progress-col">' +
+            (badge ? '<div class="photo-progress-badge">' + badge + '</div>' : '') +
+            '<div class="photo-progress-date">' + formatDate(m.date) + '</div>' +
+            (m.weight != null ? '<div class="photo-progress-weight">' + m.weight + ' кг</div>' : '') +
+            '<div class="photo-progress-photos">' +
+                '<img class="photo-progress-photo" src="' + m.photos[0] + '" onclick="tg.openLink(\'' + m.photos[0] + '\')">' +
+            '</div>' +
+            (extra > 0 ? '<div class="photo-progress-extra">+' + extra + ' ' + (extra === 1 ? 'ракурс' : 'ракурса') + '</div>' : '') +
+        '</div>';
+    }
+
+    var colsHtml = showBoth
+        ? renderCol(first, 'Было') + renderCol(last, 'Сейчас')
+        : renderCol(first, null);
+
+    var gapHtml = '';
+    if (showBoth) {
+        var d1 = _parseDateRu(first.date), d2 = _parseDateRu(last.date);
+        if (d1 && d2 && d2 > d1) {
+            var days = Math.round((d2 - d1) / 86400000);
+            var weightDiffHtml = '';
+            if (first.weight != null && last.weight != null) {
+                var diff = (last.weight - first.weight).toFixed(1);
+                var cls = diff > 0 ? 'diff-up' : (diff < 0 ? 'diff-down' : 'diff-neutral');
+                weightDiffHtml = ' · <span class="' + cls + '">' + (diff > 0 ? '+' : '') + diff + ' кг</span>';
+            }
+            gapHtml = '<div class="photo-progress-gap">' + days + ' дн. в пути' + weightDiffHtml + '</div>';
+        }
+    }
+
+    container.innerHTML =
+        '<div class="photo-progress-cols">' + colsHtml + '</div>' +
+        gapHtml +
+        (withPhotos.length > 2 ? '<div class="photo-progress-hint">Все фото — в истории замеров ниже 📋</div>' : '');
 }
 
 function renderLatestMeasurements() {
@@ -7058,8 +7127,6 @@ function renderLatestMeasurements() {
         '</div>';
 }
 
-// ===== BODY FIGURE LABELS =====
-
 // ===== MEASUREMENTS INPUT FORM =====
 
 var measFormInitialized = false;
@@ -7079,24 +7146,52 @@ function initMeasForm() {
     // Save button
     document.getElementById('meas-save-btn').addEventListener('click', saveMeasurements);
 
-    // Фото прогресса — сжимаем в браузере и показываем превью, как в редакторе упражнений
-    document.getElementById('meas-photo-file').addEventListener('change', function(e) {
-        var file = e.target.files && e.target.files[0];
-        if (!file) return;
-        _compressImageFile(file, 1280, 0.82, function(result) {
-            measPhotoPending = result;
-            var preview = document.getElementById('meas-photo-preview');
-            preview.innerHTML = '<img src="data:' + result.mime + ';base64,' + result.base64 + '">';
-            preview.classList.remove('hidden');
-        }, function(errMsg) {
-            e.target.value = '';
-            measPhotoPending = null;
-            tg.showAlert('❌ ' + errMsg);
+    // Подсказка «Как измерять» — сворачиваемая картинка-гайд
+    var guideToggle = document.getElementById('meas-guide-toggle');
+    var guideBox = document.getElementById('meas-guide-box');
+    if (guideToggle && guideBox) {
+        guideToggle.addEventListener('click', function() {
+            guideBox.classList.toggle('hidden');
+            guideToggle.classList.toggle('active');
+        });
+    }
+
+    // Фото прогресса — до 3 ракурсов (спереди/сбоку/сзади). Каждый слот
+    // сжимается в браузере и показывает превью, как в редакторе упражнений.
+    [1, 2, 3].forEach(function(slot) {
+        var slotEl = document.getElementById('meas-photo-slot-' + slot);
+        var fileInput = document.getElementById('meas-photo-file-' + slot);
+        var removeBtn = slotEl.querySelector('.meas-photo-slot-remove');
+        slotEl.addEventListener('click', function(e) {
+            if (e.target === removeBtn) return;
+            fileInput.click();
+        });
+        fileInput.addEventListener('change', function(e) {
+            var file = e.target.files && e.target.files[0];
+            if (!file) return;
+            _compressImageFile(file, 1280, 0.82, function(result) {
+                measPhotoPending[slot] = result;
+                slotEl.classList.add('filled');
+                slotEl.style.backgroundImage = 'url(data:' + result.mime + ';base64,' + result.base64 + ')';
+                removeBtn.classList.remove('hidden');
+            }, function(errMsg) {
+                e.target.value = '';
+                measPhotoPending[slot] = null;
+                tg.showAlert('❌ ' + errMsg);
+            });
+        });
+        removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            measPhotoPending[slot] = null;
+            fileInput.value = '';
+            slotEl.classList.remove('filled');
+            slotEl.style.backgroundImage = '';
+            removeBtn.classList.add('hidden');
         });
     });
 }
 
-var measPhotoPending = null;
+var measPhotoPending = { 1: null, 2: null, 3: null };
 
 async function saveMeasurements() {
     var btn = document.getElementById('meas-save-btn');
@@ -7111,7 +7206,8 @@ async function saveMeasurements() {
     };
 
     // Check at least one field filled (фото само по себе тоже считается записью)
-    var hasAny = Object.values(fields).some(function(v) { return v && v.trim() !== ''; }) || !!measPhotoPending;
+    var hasAnyPhoto = !!(measPhotoPending[1] || measPhotoPending[2] || measPhotoPending[3]);
+    var hasAny = Object.values(fields).some(function(v) { return v && v.trim() !== ''; }) || hasAnyPhoto;
     if (!hasAny) {
         tg.showAlert('Заполни хотя бы одно поле или прикрепи фото! 📏');
         return;
@@ -7124,9 +7220,17 @@ async function saveMeasurements() {
     try {
         var chatId = _myChatId();
         var payload = Object.assign({}, fields);
-        if (measPhotoPending) {
-            payload.photoBase64 = measPhotoPending.base64;
-            payload.photoMime = measPhotoPending.mime;
+        if (measPhotoPending[1]) {
+            payload.photoBase64 = measPhotoPending[1].base64;
+            payload.photoMime = measPhotoPending[1].mime;
+        }
+        if (measPhotoPending[2]) {
+            payload.photo2Base64 = measPhotoPending[2].base64;
+            payload.photo2Mime = measPhotoPending[2].mime;
+        }
+        if (measPhotoPending[3]) {
+            payload.photo3Base64 = measPhotoPending[3].base64;
+            payload.photo3Mime = measPhotoPending[3].mime;
         }
         var url = APPS_SCRIPT_URL + '?action=saveMeasurements&chatId=' + chatId;
         // Без явного Content-Type: application/json — иначе браузер шлёт CORS
@@ -7150,11 +7254,14 @@ async function saveMeasurements() {
                 input.value = '';
                 input.classList.remove('filled');
             });
-            measPhotoPending = null;
-            document.getElementById('meas-photo-file').value = '';
-            var preview = document.getElementById('meas-photo-preview');
-            preview.innerHTML = '';
-            preview.classList.add('hidden');
+            [1, 2, 3].forEach(function(slot) {
+                measPhotoPending[slot] = null;
+                var slotEl = document.getElementById('meas-photo-slot-' + slot);
+                document.getElementById('meas-photo-file-' + slot).value = '';
+                slotEl.classList.remove('filled');
+                slotEl.style.backgroundImage = '';
+                slotEl.querySelector('.meas-photo-slot-remove').classList.add('hidden');
+            });
             // Reload data
             setTimeout(function() {
                 btn.classList.remove('success');
@@ -7243,8 +7350,13 @@ function renderMeasurementsHistory() {
                 '<div class="measurement-row-value">' + (m[key] != null ? m[key] + ' ' + MEAS_UNITS[key] : '—') + '</div>' +
             '</div>';
         }).join('');
-        var photoHtml = m.photoUrl
-            ? '<img class="measurement-row-photo" src="' + m.photoUrl + '" onclick="tg.openLink(\'' + m.photoUrl + '\')">'
+        var photos = (m.photos && m.photos.length)
+            ? m.photos
+            : [m.photoUrl, m.photoUrl2, m.photoUrl3].filter(function(u) { return !!u; });
+        var photoHtml = photos.length
+            ? '<div class="measurement-row-photos">' + photos.map(function(url) {
+                return '<img class="measurement-row-photo" src="' + url + '" onclick="tg.openLink(\'' + url + '\')">';
+            }).join('') + '</div>'
             : '';
         return '<div class="measurement-row" style="animation-delay:' + (i * 0.05) + 's">' +
             '<div class="measurement-row-date">📅 ' + formatDate(m.date) + '</div>' +

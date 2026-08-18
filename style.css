@@ -4109,8 +4109,8 @@ body.has-tenant-bg {
     color: #999;
 }
 
-/* Body Figure */
-.body-figure-section {
+/* Фото прогресса — хиро-секция вкладки «Замеры», первое что видит клиент */
+.photo-progress-section {
     background: white;
     margin: 12px 8px;
     padding: 16px;
@@ -4118,18 +4118,94 @@ body.has-tenant-bg {
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-.body-figure {
-    display: flex;
-    justify-content: center;
-    padding: 10px 0;
+.photo-progress-empty {
+    text-align: center;
+    padding: 24px 12px;
+    color: #999;
+    font-size: 13px;
+    line-height: 1.6;
 }
 
-.body-image {
+.photo-progress-empty-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+
+.photo-progress-cols {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.photo-progress-col {
+    flex: 1;
+    max-width: 220px;
+    text-align: center;
+    background: #f5f5f7;
+    border-radius: 14px;
+    padding: 10px;
+}
+
+.photo-progress-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: white;
+    background: linear-gradient(135deg, #E53935, #C62828);
+    border-radius: 20px;
+    padding: 2px 10px;
+    margin-bottom: 6px;
+}
+
+.photo-progress-date {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.photo-progress-weight {
+    font-size: 15px;
+    font-weight: 700;
+    color: #E53935;
+    margin-bottom: 8px;
+}
+
+.photo-progress-photo {
     width: 100%;
-    max-width: 320px;
-    height: auto;
+    aspect-ratio: 3/4;
+    border-radius: 10px;
+    object-fit: cover;
+    cursor: pointer;
     display: block;
-    margin: 0 auto;
+}
+
+.photo-progress-extra {
+    font-size: 10px;
+    color: #999;
+    font-weight: 600;
+    margin-top: 6px;
+}
+
+.photo-progress-gap {
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+    font-weight: 600;
+    margin-top: 10px;
+}
+
+.photo-progress-gap .diff-up { color: #E53935; }
+.photo-progress-gap .diff-down { color: #43A047; }
+.photo-progress-gap .diff-neutral { color: #999; }
+
+.photo-progress-hint {
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+    margin-top: 10px;
 }
 
 /* Measurements Form */
@@ -4140,6 +4216,47 @@ body.has-tenant-bg {
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     overflow: hidden;
+}
+
+.meas-form-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.meas-form-header .section-title { margin-bottom: 0; }
+
+.meas-guide-toggle {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid #E53935;
+    color: #E53935;
+    border-radius: 14px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.meas-guide-toggle.active {
+    background: #E53935;
+    color: white;
+}
+
+.meas-guide-box {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0;
+}
+
+.meas-guide-image {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    border-radius: 10px;
 }
 
 .meas-form-grid {
@@ -4198,16 +4315,71 @@ body.has-tenant-bg {
 }
 
 .meas-photo-field { margin-bottom: 14px; }
-.meas-photo-preview {
-    width: 100%;
-    max-height: 220px;
+
+.meas-photo-slots {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.meas-photo-slot {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    aspect-ratio: 3/4;
+    border: 2px dashed #d8d8d8;
     border-radius: 12px;
     background: #f5f5f7;
-    overflow: hidden;
-    margin: 6px 0;
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
-.meas-photo-preview img { width: 100%; max-height: 220px; object-fit: cover; display: block; }
-.meas-photo-file-input { width: 100%; font-size: 13px; }
+
+.meas-photo-slot-icon { font-size: 20px; }
+
+.meas-photo-slot-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.meas-photo-slot.filled {
+    border: 2px solid #43A047;
+    border-style: solid;
+}
+
+.meas-photo-slot.filled .meas-photo-slot-icon,
+.meas-photo-slot.filled .meas-photo-slot-label {
+    background: rgba(0,0,0,0.55);
+    color: white;
+    border-radius: 6px;
+    padding: 1px 5px;
+}
+
+.meas-photo-slot-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
 .meas-save-btn {
     background: linear-gradient(135deg, #E53935, #C62828);
@@ -4276,13 +4448,19 @@ body.has-tenant-bg {
     gap: 6px;
 }
 
+.measurement-row-photos {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
 .measurement-row-photo {
     display: block;
-    max-width: 120px;
-    max-height: 120px;
+    width: 90px;
+    max-width: 33%;
+    aspect-ratio: 3/4;
     border-radius: 10px;
     object-fit: cover;
-    margin-bottom: 8px;
     cursor: pointer;
 }
 

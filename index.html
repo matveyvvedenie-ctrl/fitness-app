@@ -197,22 +197,28 @@
 
         <!-- Measurements Tab -->
         <div id="measurements-tab" class="tab-content">
+            <!-- Photo Progress (первым делом — живые фото клиента) -->
+            <div class="photo-progress-section">
+                <h3 class="section-title">📸 Фото прогресса</h3>
+                <div id="photo-progress-content" class="photo-progress-content">
+                    <div class="no-data">Загрузка фото...</div>
+                </div>
+            </div>
+
             <!-- Latest Measurements -->
             <div class="measurements-latest" id="measurements-latest">
                 <div class="no-data">Загрузка замеров...</div>
             </div>
 
-            <!-- Body Figure Image -->
-            <div class="body-figure-section">
-                <h3 class="section-title">📏 Последние замеры</h3>
-                <div class="body-figure" id="body-figure">
-                    <img src="body.png" alt="Замеры тела" class="body-image">
-                </div>
-            </div>
-
             <!-- Input Form -->
             <div class="meas-form-section" id="meas-form-section">
-                <h3 class="section-title">✏️ Записать замеры</h3>
+                <div class="meas-form-header">
+                    <h3 class="section-title">✏️ Записать замеры</h3>
+                    <button type="button" class="meas-guide-toggle" id="meas-guide-toggle">ℹ️ Как измерять</button>
+                </div>
+                <div class="meas-guide-box hidden" id="meas-guide-box">
+                    <img src="body.png" alt="Как правильно делать замеры" class="meas-guide-image">
+                </div>
                 <div class="meas-form-grid">
                     <div class="meas-input-group">
                         <label class="meas-input-label">⚖️ Вес (кг)</label>
@@ -244,9 +250,27 @@
                     </div>
                 </div>
                 <div class="meas-photo-field">
-                    <label class="meas-input-label">📸 Фото прогресса (раз в месяц)</label>
-                    <div class="meas-photo-preview hidden" id="meas-photo-preview"></div>
-                    <input type="file" accept="image/*" id="meas-photo-file" class="meas-photo-file-input">
+                    <label class="meas-input-label">📸 Фото прогресса (можно 1-3 ракурса)</label>
+                    <div class="meas-photo-slots">
+                        <div class="meas-photo-slot" id="meas-photo-slot-1" data-slot="1">
+                            <span class="meas-photo-slot-icon">📷</span>
+                            <span class="meas-photo-slot-label">Спереди</span>
+                            <button type="button" class="meas-photo-slot-remove hidden" data-slot="1">✕</button>
+                            <input type="file" accept="image/*" id="meas-photo-file-1" class="meas-photo-file-input hidden">
+                        </div>
+                        <div class="meas-photo-slot" id="meas-photo-slot-2" data-slot="2">
+                            <span class="meas-photo-slot-icon">📷</span>
+                            <span class="meas-photo-slot-label">Сбоку</span>
+                            <button type="button" class="meas-photo-slot-remove hidden" data-slot="2">✕</button>
+                            <input type="file" accept="image/*" id="meas-photo-file-2" class="meas-photo-file-input hidden">
+                        </div>
+                        <div class="meas-photo-slot" id="meas-photo-slot-3" data-slot="3">
+                            <span class="meas-photo-slot-icon">📷</span>
+                            <span class="meas-photo-slot-label">Сзади</span>
+                            <button type="button" class="meas-photo-slot-remove hidden" data-slot="3">✕</button>
+                            <input type="file" accept="image/*" id="meas-photo-file-3" class="meas-photo-file-input hidden">
+                        </div>
+                    </div>
                 </div>
                 <button class="meas-save-btn" id="meas-save-btn">💾 Сохранить замеры</button>
             </div>
