@@ -77,7 +77,15 @@ function _fetchWithRetry(nativeFetch, input, init, retriesLeft) {
 // нужно знать trainerId/chatId). Обсуждали с Matvey — приемлемо для пилота
 // на пустом тенанте; для реальных данных понадобится другой механизм
 // (проверка подписи VK/Telegram initData на сервере, а не общий ключ).
-var NEW_API_BASE = 'https://fitness-api-fitness-bot-v2.up.railway.app';
+// 2026-08-18: NEW_API_BASE переключён с Railway на Timeweb App Platform —
+// именно та инфраструктурная проблема, описанная ниже (Railway требует
+// VPN, VK работает только без VPN), и есть причина переезда, см.
+// project_vk_hosting_migration в памяти/MIGRATION_PLAN.md. Данные (все 12
+// таблиц) перенесены и сверены 2026-08-18, счётчики автоинкремента
+// поправлены. NEW_API_KEY тот же — совпадает с API_SECRET на обоих
+// бэкендах намеренно, чтобы фронтенду не нужно было ничего менять кроме
+// адреса.
+var NEW_API_BASE = 'https://matveyvvedenie-ctrl-fitness-telegram-bot-c136.twc1.net';
 var NEW_API_KEY = '72bdc5e9073da1309592590508c0098bcaad8139c82aeafa77438c2ed46f7e61';
 // 2026-08-16: Рома временно ВЫКЛЮЧЕН из пилота — не может открыть мини-апп
 // во VK на телефоне (таймаут 15 сек на каком-то запросе к новому бэкенду;
