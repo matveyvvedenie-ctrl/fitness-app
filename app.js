@@ -3,6 +3,18 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqpppW2wnxH4nA
 const TRAINER_CHAT_ID = '739299264';
 const TRAINER_VK_CHAT_ID = 'vk_458191089'; // тот же тренер, но заходит через VK
 
+// 2026-08-19: у Matvey (дефолт-тенант) второй вход, кроме Telegram — его
+// собственная VK-группа matpavbot (vk_group_id=240408566). Раньше при входе
+// оттуда CURRENT_TRAINER_ID становился этим числом, _newApiTrainerId() не
+// узнавал его ни как пилотного тренера, ни как дефолт-тенанта — и падал в
+// "нет доступа". См. _newApiTrainerId ниже и project_vk_hosting_migration
+// в памяти.
+const MATVEY_VK_GROUP_ID = '240408566';
+// Сырые launch-параметры VK (с sign) — снимок ДО того, как что-либо их
+// тронет, нужен бэкенду для проверки подписи (см. vk_auth.py). Именно
+// window.location.search целиком, не отдельные поля.
+const VK_LAUNCH_PARAMS_RAW = window.location.search.replace(/^\?/, '');
+
 // Мульти-тенантность: если мини-апп открыт из сообщества тренера, VK кладёт
 // vk_group_id в параметры запуска — это и есть trainerId для бэкенда (см.
 // apps_script.js _resolveTenant). Без него (Telegram, или VK без группы) —
@@ -140,6 +152,10 @@ var NEW_API_DEFAULT_TENANT_PILOT = true; // 2026-08-16 (повторно) — 3 
 function _newApiTrainerId() {
     if (NEW_API_PILOT_TRAINERS[CURRENT_TRAINER_ID]) return CURRENT_TRAINER_ID;
     if (NEW_API_DEFAULT_TENANT_PILOT && !CURRENT_TRAINER_ID && !vkLaunchUserId) return NEW_API_DEFAULT_TENANT_TRAINER_ID;
+    // 2026-08-19: вход через собственную VK-группу Matvey (matpavbot) — тоже
+    // дефолт-тенант, просто с другим "паспортом" (подпись VK вместо Telegram,
+    // см. _newApiHeaders ниже и vk_auth.py на бэкенде).
+    if (NEW_API_DEFAULT_TENANT_PILOT && CURRENT_TRAINER_ID === MATVEY_VK_GROUP_ID) return NEW_API_DEFAULT_TENANT_TRAINER_ID;
     return '';
 }
 
@@ -157,8 +173,15 @@ function _fakeJsonResponse(obj, status) {
 function _newApiHeaders(extra) {
     var headers = { 'X-Api-Key': NEW_API_KEY };
     if (extra) { for (var k in extra) headers[k] = extra[k]; }
-    if (_newApiTrainerId() === NEW_API_DEFAULT_TENANT_TRAINER_ID && tg && tg.initData) {
-        headers['X-Telegram-Init-Data'] = tg.initData;
+    if (_newApiTrainerId() === NEW_API_DEFAULT_TENANT_TRAINER_ID) {
+        if (tg && tg.initData) {
+            headers['X-Telegram-Init-Data'] = tg.initData;
+        } else if (vkLaunchUserId && VK_LAUNCH_PARAMS_RAW) {
+            // Вход через matpavbot (см. MATVEY_VK_GROUP_ID выше) — вместо
+            // подписи Telegram шлём сырые launch-параметры VK (там есть
+            // sign), бэкенд проверяет их через vk_auth.py.
+            headers['X-VK-Launch-Params'] = VK_LAUNCH_PARAMS_RAW;
+        }
     }
     return headers;
 }
