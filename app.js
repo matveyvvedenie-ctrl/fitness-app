@@ -156,6 +156,14 @@ function _newApiTrainerId() {
     // дефолт-тенант, просто с другим "паспортом" (подпись VK вместо Telegram,
     // см. _newApiHeaders ниже и vk_auth.py на бэкенде).
     if (NEW_API_DEFAULT_TENANT_PILOT && CURRENT_TRAINER_ID === MATVEY_VK_GROUP_ID) return NEW_API_DEFAULT_TENANT_TRAINER_ID;
+    // Прямая ссылка вида ?vk_user_id=458191089 БЕЗ vk_group_id — раньше
+    // сознательно не трогали (резолвинг по chatId в теории мог привести к
+    // ЛЮБОМУ тренеру, гадать на фронте не хотели, см. комментарий выше по
+    // файлу). Но конкретно ЭТОТ VK ID — уже давно известная константа
+    // (TRAINER_VK_CHAT_ID, "это точно Matvey"), тут ничего не гадаем.
+    if (NEW_API_DEFAULT_TENANT_PILOT && !CURRENT_TRAINER_ID && vkLaunchUserId === '458191089') {
+        return NEW_API_DEFAULT_TENANT_TRAINER_ID;
+    }
     return '';
 }
 
@@ -1305,9 +1313,29 @@ var weekTitle = '';
 async function init() {
     console.log('Init started...');
     try {
-        const tenantOk = await loadTenantConfig();
-        if (!tenantOk) return;
-        const response = await loadWorkoutData();
+        // 2026-08-19: раньше эти два запроса шли строго по очереди (await
+        // loadTenantConfig() → await loadWorkoutData()) — при медленной сети
+        // (особенно заметно в VK, см. project_vk_hosting_migration в памяти)
+        // это УДВАИВАЕТ время до первого экрана, хотя оба запроса не зависят
+        // друг от друга в подавляющем большинстве случаев. Параллелим их —
+        // КРОМЕ одного узкого случая: VK-запуск БЕЗ vk_group_id в ссылке
+        // (vkLaunchUserId есть, CURRENT_TRAINER_ID пуст) — тогда
+        // loadTenantConfig() сам резолвит тенанта по chatId и может
+        // ПОДМЕНИТЬ CURRENT_TRAINER_ID (см. её тело выше), а loadWorkoutData()
+        // должен уйти уже с правильным id — здесь порядок важен, оставляем
+        // как было.
+        var needsSequentialTenant = !!vkLaunchUserId && !CURRENT_TRAINER_ID;
+        var tenantOk, response;
+        if (needsSequentialTenant) {
+            tenantOk = await loadTenantConfig();
+            if (!tenantOk) return;
+            response = await loadWorkoutData();
+        } else {
+            var results = await Promise.all([loadTenantConfig(), loadWorkoutData()]);
+            tenantOk = results[0];
+            response = results[1];
+            if (!tenantOk) return;
+        }
         console.log('Data received:', response);
         clientName = response.clientName || '';
         weekTitle = response.weekTitle || '';
