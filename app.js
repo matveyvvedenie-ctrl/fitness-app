@@ -1050,6 +1050,120 @@ var NEW_API_ACTIONS = {
             }
             return _fakeJsonResponse(res.data, 200);
         });
+    },
+
+    // ── Супер-админка (только Matvey), 2026-08-19 ───────────────────────────
+    // В отличие от всего остального в NEW_API_ACTIONS — эти 5 НЕ про "текущий
+    // тенант" (_newApiTrainerId()), а про ВСЮ площадку разом, поэтому идут
+    // не на /trainers/{tenantId}/..., а на /admin/trainers[...]. Бэкенд для
+    // них был готов ещё с Фазы 3 (main.py, группа 5) — не хватало только
+    // этого шима. Разрешено ОДНОМУ chatId — Matvey (asChatId, проверяется
+    // на бэкенде через _require_super_admin, тот же принцип, что раньше был
+    // у _isSuperAdmin в apps_script.js). createDemoTrainer СОЗНАТЕЛЬНО не
+    // тронут — в оригинале это копирование шаблонной Google Таблицы с демо-
+    // данными, для новой архитектуры без таблиц нужно отдельное решение
+    // (см. MIGRATION_PLAN.md) — тот один экшен и дальше уходит в Apps Script
+    // как раньше, ничего не сломано.
+    getTrainersOverview: function(nativeFetch) {
+        var path = '/admin/trainers?asChatId=' + encodeURIComponent(_myChatId());
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            return _fakeJsonResponse({ trainers: res.data.trainers || [] }, 200);
+        });
+    },
+    // Старый getTrainerPayments отдавал ОДНУ сводную запись НА ТРЕНЕРА (статус
+    // подписки на площадку + сколько дней осталось) — новый бэкенд же (Фаза 3)
+    // отдаёт полную ИСТОРИЮ платежей ОДНОГО тренера, форма другая. Собираем
+    // сводку на лету: список тренеров → для каждого история → берём запись
+    // с самым поздним endDate → считаем daysLeft/status 1-в-1 как раньше
+    // делал apps_script.js. Трейдофф: N+1 запросов вместо одного, но
+    // тренеров пока единицы, а вызывается только при открытии вкладки
+    // "Тренеры" супер-админкой, не на каждую загрузку мини-аппа.
+    getTrainerPayments: function(nativeFetch) {
+        var asChatId = encodeURIComponent(_myChatId());
+        return _newApiCall(nativeFetch, '/admin/trainers?asChatId=' + asChatId).then(function(listRes) {
+            if (!listRes.ok) return _fakeJsonResponse({ error: (listRes.data && listRes.data.detail) || 'Ошибка' }, 200);
+            var trainerIds = (listRes.data.trainers || []).map(function(t) { return t.trainerId; });
+            return Promise.all(trainerIds.map(function(tid) {
+                var payPath = '/admin/trainers/' + encodeURIComponent(tid) + '/payments?asChatId=' + asChatId;
+                return _newApiCall(nativeFetch, payPath).then(function(payRes) {
+                    if (!payRes.ok) return null;
+                    var latest = null;
+                    (payRes.data.payments || []).forEach(function(p) {
+                        if (p.endDate && (!latest || p.endDate > latest.endDate)) latest = p;
+                    });
+                    if (!latest) return null;
+                    var daysLeft = Math.ceil((new Date(latest.endDate) - new Date()) / 86400000);
+                    var status = daysLeft < 0 ? 'expired' : daysLeft <= 3 ? 'expiring_soon' : daysLeft <= 7 ? 'expiring_week' : 'active';
+                    return {
+                        trainerId: tid, lastPayment: _isoDateToRu(latest.date), amount: latest.amount,
+                        endDate: _isoDateToRu(latest.endDate), daysLeft: daysLeft, status: status
+                    };
+                });
+            })).then(function(results) {
+                return _fakeJsonResponse({ payments: results.filter(Boolean) }, 200);
+            });
+        });
+    },
+    saveTrainerPayment: function(nativeFetch, params) {
+        var asChatId = encodeURIComponent(_myChatId());
+        var targetTrainerId = params.get('targetTrainerId') || '';
+        var path = '/admin/trainers/' + encodeURIComponent(targetTrainerId) + '/payments?asChatId=' + asChatId;
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({
+                amount: parseFloat(params.get('amount')) || 0,
+                months: parseInt(params.get('months'), 10) || 1,
+                comment: params.get('comment') || ''
+            })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({
+                success: true, trainerId: targetTrainerId, amount: data.amount,
+                months: data.months, endDate: _isoDateToRu(data.endDate)
+            }, 200);
+        }); });
+    },
+    setTrainerStatus: function(nativeFetch, params) {
+        var asChatId = encodeURIComponent(_myChatId());
+        var targetTrainerId = params.get('targetTrainerId') || '';
+        var path = '/admin/trainers/' + encodeURIComponent(targetTrainerId) + '/status?asChatId=' + asChatId;
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ status: params.get('status') || '' })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({ success: true }, 200);
+        }); });
+    },
+    // Только "боевой" путь (status=active из submitNewTrainer) — createDemoTrainer
+    // не перехвачен (см. комментарий выше блока), уходит в Apps Script как есть.
+    // vkToken create_trainer на бэкенде не принимает (см. её докстринг в
+    // main.py) — отдельным точечным PATCH сразу следом; если он вдруг не
+    // удастся, тренер всё равно уже создан и виден в списке, токен можно
+    // будет доставить позже через ту же форму (create_trainer — upsert).
+    createTrainer: function(nativeFetch, params) {
+        var asChatId = encodeURIComponent(_myChatId());
+        var vkGroupId = params.get('vkGroupId') || '';
+        var vkToken = params.get('vkToken') || '';
+        var body = {
+            trainerId: vkGroupId, displayName: params.get('displayName') || '',
+            vkGroupId: vkGroupId, status: params.get('status') || 'active',
+            themePrimary: params.get('themePrimary') || '', trainerChatId: params.get('trainerChatId') || ''
+        };
+        return nativeFetch(NEW_API_BASE + '/admin/trainers?asChatId=' + asChatId, {
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(body)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            var finish = function() { return _fakeJsonResponse({ success: true, trainerId: vkGroupId }, 200); };
+            if (!vkToken) return finish();
+            var connPath = '/admin/trainers/' + encodeURIComponent(vkGroupId) + '/vk-connection?asChatId=' + asChatId;
+            return nativeFetch(NEW_API_BASE + connPath, {
+                method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ vkGroupId: vkGroupId, vkToken: vkToken })
+            }).then(finish, finish);
+        }); });
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
