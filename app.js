@@ -1276,7 +1276,24 @@ async function loadTenantConfig() {
             // ссылки (которого у нас не было) — подхватываем узнанный id,
             // чтобы все дальнейшие запросы (через monkey-patch fetch выше)
             // тоже шли в правильную таблицу, а не только этот один.
-            if (data.trainerId && data.trainerId !== 'default') {
+            //
+            // 2026-08-19: НЕ подхватываем, если это NEW_API_DEFAULT_TENANT_TRAINER_ID
+            // ('739299264') — реальный найденный баг ("Тренер не найден: 739299264"
+            // при входе через личный VK-профиль Matvey без vk_group_id в ссылке).
+            // Этот getTenantConfig для дефолт-тенанта уходит НЕ в Apps Script, а в
+            // новый бэкенд (см. NEW_API_ACTIONS.getTenantConfig) — и тот честно
+            // отвечает canonical trainerId ('739299264', Telegram id) в data.trainerId
+            // (см. get_tenant_config в main.py). Но CURRENT_TRAINER_ID везде по
+            // файлу — это vk_group_id-пространство (используется и для трейлинга
+            // к СТАРОМУ Apps Script, и для сравнения с MATVEY_VK_GROUP_ID в
+            // _newApiTrainerId()) — Telegram id туда не подходит вообще. Подхватив
+            // его, следующий же запрос (loadWorkoutData) переставал совпадать ни с
+            // одним условием в _newApiTrainerId(), падал в СТАРЫЙ Apps Script с
+            // трейлингом &trainerId=739299264 — а такой строки в реестре
+            // "Тренеры" никогда не было (Matvey там дефолт, без trainerId).
+            // _newApiTrainerId() и без этой подмены уже правильно резолвит
+            // дефолт-тенант по vkLaunchUserId — сама подмена тут просто не нужна.
+            if (data.trainerId && data.trainerId !== 'default' && data.trainerId !== NEW_API_DEFAULT_TENANT_TRAINER_ID) {
                 CURRENT_TRAINER_ID = data.trainerId;
             }
             applyTenantTheme(tenantTheme);
