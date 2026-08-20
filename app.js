@@ -24,7 +24,15 @@ const VK_LAUNCH_PARAMS_RAW = window.location.search.replace(/^\?/, '');
 // бэкенд сам находит тенанта по chatId (см. _resolveTrainerIdByChatId в
 // apps_script.js), а loadTenantConfig() ниже подхватывает узнанный trainerId
 // и переучивает эту переменную, чтобы ВСЕ следующие запросы тоже шли верно.
-let CURRENT_TRAINER_ID = new URLSearchParams(window.location.search).get('vk_group_id') || '';
+//
+// superadmin_view_trainer_id (2026-08-19, см. openAsTrainer) — приоритетнее
+// vk_group_id: супер-админ (Matvey) просматривает ЧУЖОГО тренера, не меняя
+// свою собственную подпись VK/Telegram (та остаётся как есть в URL/сессии,
+// см. VK_LAUNCH_PARAMS_RAW ниже) — бэкенд узнаёт "это супер-админ, ему можно
+// любой /trainers/{id}/..." по ПОДПИСИ, не по этому параметру, см.
+// require_telegram_or_vk_auth_for_trainer_routes в main.py.
+let CURRENT_TRAINER_ID = new URLSearchParams(window.location.search).get('superadmin_view_trainer_id') ||
+    new URLSearchParams(window.location.search).get('vk_group_id') || '';
 
 // Тема текущего тенанта, подтягивается в init() через loadTenantConfig().
 // tenantTrainerChatId — фоллбэк для isTrainer() у тренеров, подключённых
@@ -2733,8 +2741,25 @@ async function saveTrainerPaymentFromModal() {
 // Открыть мини-апп «от лица» тренера — vk_group_id уже подхватывается всей
 // остальной логикой мульти-тенантности сам по себе (см. CURRENT_TRAINER_ID,
 // isTrainer() в начале файла), отдельный бэкенд-эндпоинт не нужен.
+//
+// 2026-08-19: раньше ПОЛНОСТЬЮ заменяли window.location.search на один
+// vk_group_id — при заходе из VK это стирало настоящие подписанные VK
+// launch-параметры (sign/vk_user_id/vk_ts) со страницы Matvey. После
+// расширения проверки подписи на ВСЕ /trainers/{id}/... (см.
+// require_telegram_or_vk_auth_for_trainer_routes в main.py) это стало
+// реальным багом: "Открыть как тренер" из VK-сессии превращало каждый
+// следующий запрос в неавторизованный (нет подписи вообще) — в т.ч.
+// createNewClient, из-за чего добавленный клиент физически не создавался,
+// хотя UI не показывал явной ошибки. Теперь ДОБАВЛЯЕМ параметр поверх
+// существующих, не трогая vk_group_id/sign — бэкенд признаёт валидную
+// подпись Matvey (супер-админа) достаточной для ЛЮБОГО /trainers/{id}/...,
+// независимо от того, для какой VK-группы она изначально выдана (сама
+// подпись перестать быть валидной при подмене vk_group_id — это встроенное
+// свойство HMAC, не обойти на фронте, поэтому его и не трогаем).
 function openAsTrainer(vkGroupId) {
-    window.location.search = '?vk_group_id=' + encodeURIComponent(vkGroupId);
+    var params = new URLSearchParams(window.location.search);
+    params.set('superadmin_view_trainer_id', vkGroupId);
+    window.location.search = params.toString();
 }
 
 function openNewTrainerForm() {
