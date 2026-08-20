@@ -194,8 +194,31 @@ function _newApiHeaders(extra) {
     return headers;
 }
 
+// 2026-08-19: найдено по жалобе Романа — в VK на телефоне мини-апп "раз через
+// раз" падал с "Ошибка загрузки / Load failed", перезагрузка страницы (=
+// свежая попытка) чинила. Причина — асимметрия с _fetchWithRetry (старый путь
+// к Apps Script, ретраит дважды на СЕТЕВОЙ сбой): _newApiCall (а через неё —
+// вообще ВСЁ чтение с нового бэкенда, включая getTenantConfig/read — то, с
+// чего стартует загрузка) вообще не ретраила, один случайный обрыв соединения
+// сразу долетал до пользователя текстом ошибки.
+//
+// НЕ добавляем сюда свой _withTimeout — общий таймаут на зависшую цепочку и
+// так уже есть СНАРУЖИ (monkey-patch fetch ниже, 15 секунд на весь результат
+// хендлера целиком) — свой таймаут тут конфликтовал бы с ним (два таймера
+// гонялись бы за одним и тем же результатом), а не помогал. Ретраим только на
+// УЖЕ случившийся сбой fetch() (нечего ждать, повторяем сразу) — весь повтор
+// укладывается в доли секунды, бюджет внешнего таймаута на реально зависший
+// запрос не крадёт.
+function _fetchNewApiWithRetry(nativeFetch, url, init, retriesLeft) {
+    return nativeFetch(url, init).catch(function(err) {
+        if (retriesLeft <= 0) throw err;
+        return new Promise(function(resolve) { setTimeout(resolve, 400); })
+            .then(function() { return _fetchNewApiWithRetry(nativeFetch, url, init, retriesLeft - 1); });
+    });
+}
+
 function _newApiCall(nativeFetch, path) {
-    return nativeFetch(NEW_API_BASE + path, { headers: _newApiHeaders() })
+    return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, { headers: _newApiHeaders() }, 1)
         .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, status: r.status, data: data }; }); });
 }
 
