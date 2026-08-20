@@ -232,7 +232,16 @@ function _fetchNewApiWithRetry(nativeFetch, url, init, retriesLeft) {
 }
 
 function _newApiCall(nativeFetch, path) {
-    return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, { headers: _newApiHeaders() }, 1)
+    // 2026-08-19: было 1 повтор (2 попытки всего) — по факту оказалось мало.
+    // Прямые замеры (curl на /health, 20 запросов подряд) поймали 15% сырых
+    // сбоев соединения до Timeweb прямо в моменте — с одним повтором шанс
+    // поймать сбой ДВАЖДЫ подряд на один вызов всё равно ~2%, а вызовов на
+    // загрузку минимум два (getTenantConfig + read) — заметный процент живых
+    // "Load failed" у реальных пользователей, ровно то, на что жаловался
+    // Роман/Ася. 3 повтора (4 попытки) — тот же сбой подряд 4 раза ~0.05%,
+    // с большим запасом укладывается в общий бюджет 15с (см. комментарий
+    // выше — попытки быстро проваливаются, не ждут таймаута).
+    return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, { headers: _newApiHeaders() }, 3)
         .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, status: r.status, data: data }; }); });
 }
 
