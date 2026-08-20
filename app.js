@@ -181,15 +181,21 @@ function _fakeJsonResponse(obj, status) {
 function _newApiHeaders(extra) {
     var headers = { 'X-Api-Key': NEW_API_KEY };
     if (extra) { for (var k in extra) headers[k] = extra[k]; }
-    if (_newApiTrainerId() === NEW_API_DEFAULT_TENANT_TRAINER_ID) {
-        if (tg && tg.initData) {
-            headers['X-Telegram-Init-Data'] = tg.initData;
-        } else if (vkLaunchUserId && VK_LAUNCH_PARAMS_RAW) {
-            // Вход через matpavbot (см. MATVEY_VK_GROUP_ID выше) — вместо
-            // подписи Telegram шлём сырые launch-параметры VK (там есть
-            // sign), бэкенд проверяет их через vk_auth.py.
-            headers['X-VK-Launch-Params'] = VK_LAUNCH_PARAMS_RAW;
-        }
+    // 2026-08-19: раньше слали X-Telegram-Init-Data/X-VK-Launch-Params ТОЛЬКО
+    // для дефолт-тенанта (Matvey) — для остальных пилотных тренеров (Роман)
+    // бэкенд проверял только X-Api-Key, а он публично виден в исходнике
+    // app.js на GitHub Pages — то есть curl с этим ключом мог напрямую читать/
+    // писать данные ЛЮБОГО пилотного тренера в обход VK вообще. Раньше это
+    // было осознанным компромиссом ("у Романа терять нечего, пустой пилот") —
+    // с реальными клиентами так уже нельзя. Шлём эти заголовки всегда, когда
+    // они доступны — бэкенду они не мешают, если конкретный маршрут их пока
+    // не требует (только дефолт-тенант) — а как только require_telegram_auth
+    // расширят на остальных пилотных тренеров (main.py), всё уже готово, без
+    // повторного передеплоя фронтенда.
+    if (tg && tg.initData) {
+        headers['X-Telegram-Init-Data'] = tg.initData;
+    } else if (vkLaunchUserId && VK_LAUNCH_PARAMS_RAW) {
+        headers['X-VK-Launch-Params'] = VK_LAUNCH_PARAMS_RAW;
     }
     return headers;
 }
