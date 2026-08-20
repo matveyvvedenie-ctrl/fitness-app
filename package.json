@@ -1,0 +1,14 @@
+{
+  "name": "fitness-app",
+  "version": "1.0.0",
+  "private": true,
+  "homepage": ".",
+  "scripts": {
+    "build": "rm -rf build && mkdir -p build && cp index.html app.js style.css body.jpg build/ && cp index.html build/index_DG.html && cp -r assets vendor build/",
+    "predeploy": "npm run build",
+    "deploy": "vk-miniapps-deploy"
+  },
+  "dependencies": {
+    "@vkontakte/vk-miniapps-deploy": "^1.0.2"
+  }
+}

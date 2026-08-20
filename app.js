@@ -1323,9 +1323,13 @@ function applyTenantTheme(theme) {
 // у Романа): угадывать за него нельзя, показываем выбор и запоминаем.
 var TENANT_CHOICE_KEY = 'fitnessapp:chosenTrainerId';
 
+// С теми же 3 повторами, что и остальные запросы к новому бэкенду (см.
+// _newApiCall) — разовый обрыв соединения тут не должен молча возвращать
+// человека на старый путь и на экран «Доступа пока нет».
 function _fetchJsonWithTimeout(url, ms) {
-    return _withTimeout(fetch(url, { headers: _newApiHeaders() }), ms || 12000)
-        .then(function(r) { return r.json(); });
+    return _withTimeout(
+        _fetchNewApiWithRetry(window.fetch, url, { headers: _newApiHeaders() }, 3), ms || 12000
+    ).then(function(r) { return r.json(); });
 }
 
 function renderTenantPicker(tenants) {
