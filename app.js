@@ -157,7 +157,17 @@ var NEW_API_PILOT_TRAINERS = {'240703996': true}; // Роман
 var NEW_API_DEFAULT_TENANT_TRAINER_ID = '739299264'; // Matvey, см. DEFAULT_TRAINER_CHAT_ID в apps_script.js
 var NEW_API_DEFAULT_TENANT_PILOT = true; // 2026-08-16 (повторно) — 3 подтверждённых бага (фото/история/статусы Тренерской, все из-за непереехавшей exercise_history) исправлены и проверены на реальных данных, см. MIGRATION_PLAN.md
 
+// 2026-08-20. Тенант, УЗНАННЫЙ по самому человеку (см. resolveTenantForVkUser
+// ниже) — для запусков во VK БЕЗ vk_group_id в ссылке. Отдельная переменная,
+// а НЕ подмена CURRENT_TRAINER_ID: та живёт в пространстве vk_group_id и
+// используется для трейлинга &trainerId=... к старому Apps Script, положить
+// туда канонический trainer_id уже один раз всё ломало (см. комментарий в
+// loadTenantConfig и коммит d5820b6).
+var NEW_API_RESOLVED_TRAINER_ID = '';
+
 function _newApiTrainerId() {
+    // Явно узнанный тенант важнее любых догадок ниже.
+    if (NEW_API_RESOLVED_TRAINER_ID) return NEW_API_RESOLVED_TRAINER_ID;
     if (NEW_API_PILOT_TRAINERS[CURRENT_TRAINER_ID]) return CURRENT_TRAINER_ID;
     if (NEW_API_DEFAULT_TENANT_PILOT && !CURRENT_TRAINER_ID && !vkLaunchUserId) return NEW_API_DEFAULT_TENANT_TRAINER_ID;
     // 2026-08-19: вход через собственную VK-группу Matvey (matpavbot) — тоже
@@ -1296,6 +1306,77 @@ function applyTenantTheme(theme) {
     }
 }
 
+// ── Кто этот человек и к какому тренеру он относится (2026-08-20) ──────────
+// Нужно ровно для одного случая: мини-апп открыт во VK, но в ссылке НЕТ
+// vk_group_id (человек открыл его из «Сервисов»/списка приложений/закладки, а
+// не ссылкой из сообщения бота — VK тогда не говорит, чьё это сообщество).
+//
+// Раньше в этом случае тенанта искал СТАРЫЙ Apps Script по своим Google
+// Таблицам (_resolveTrainerIdByChatId). После переезда на Postgres клиентов
+// туда больше никто не пишет — и человек, добавленный уже на новом бэкенде,
+// не находился НИГДЕ: мини-апп молча падал в тенант по умолчанию (Matvey),
+// читал его старую таблицу и показывал «Доступа пока нет», хотя доступ есть.
+// Ровно так выглядела жалоба Аси 2026-08-20.
+//
+// Спрашиваем новый бэкенд напрямую. Отдельно разбираем случай, когда человек
+// числится у НЕСКОЛЬКИХ тренеров сразу (у Аси так и есть — она и у Matvey, и
+// у Романа): угадывать за него нельзя, показываем выбор и запоминаем.
+var TENANT_CHOICE_KEY = 'fitnessapp:chosenTrainerId';
+
+function _fetchJsonWithTimeout(url, ms) {
+    return _withTimeout(fetch(url, { headers: _newApiHeaders() }), ms || 12000)
+        .then(function(r) { return r.json(); });
+}
+
+function renderTenantPicker(tenants) {
+    return new Promise(function(resolve) {
+        // Человек может думать над выбором дольше, чем 20 секунд сторожевого
+        // таймера в index.html — иначе тот затрёт кнопки своим «загрузка идёт
+        // дольше обычного», и выбрать станет нечего.
+        window.__appInitSettled = true;
+        var box = document.getElementById('loading');
+        box.innerHTML = '<div style="padding:24px;text-align:center;">' +
+            '<h3 style="margin-bottom:8px;">Чей кабинет открыть?</h3>' +
+            '<p style="opacity:.7;margin-bottom:16px;">Ты занимаешься у нескольких тренеров. ' +
+            'Выбор запомнится — поменять можно, открыв мини-апп ссылкой из сообщения нужного тренера.</p>' +
+            '<div id="tenant-picker-list"></div></div>';
+        var list = document.getElementById('tenant-picker-list');
+        tenants.forEach(function(t) {
+            var btn = document.createElement('button');
+            btn.textContent = t.displayName || t.trainerId;
+            btn.style.cssText = 'display:block;width:100%;padding:14px;margin:8px 0;font-size:16px;' +
+                'border-radius:12px;border:1px solid #ddd;background:#fff;cursor:pointer;';
+            btn.onclick = function() {
+                try { localStorage.setItem(TENANT_CHOICE_KEY, t.trainerId); } catch (_) {}
+                box.innerHTML = '<div style="padding:40px;text-align:center;">Загружаю…</div>';
+                resolve(t.trainerId);
+            };
+            list.appendChild(btn);
+        });
+    });
+}
+
+async function resolveTenantForVkUser() {
+    var chatId = _myChatId();
+    if (!chatId) return;
+    var data;
+    try {
+        data = await _fetchJsonWithTimeout(NEW_API_BASE + '/internal/whois/' + encodeURIComponent(chatId));
+    } catch (e) {
+        console.error('resolveTenantForVkUser failed:', e);
+        return; // сеть подвела — дальше как раньше, старым путём
+    }
+    var tenants = (data && data.tenants || []).filter(function(t) {
+        return t.trainerStatus !== 'disabled' && t.clientStatus !== 'deleted' && t.clientStatus !== 'archived';
+    });
+    if (!tenants.length) return;
+    if (tenants.length === 1) { NEW_API_RESOLVED_TRAINER_ID = tenants[0].trainerId; return; }
+    var saved = '';
+    try { saved = localStorage.getItem(TENANT_CHOICE_KEY) || ''; } catch (_) {}
+    var match = tenants.filter(function(t) { return t.trainerId === saved; })[0];
+    NEW_API_RESOLVED_TRAINER_ID = match ? match.trainerId : await renderTenantPicker(tenants);
+}
+
 // Возвращает false, если доступ тенанта заблокирован (демо истекло/отключён) —
 // в этом случае сообщение уже показано и init() должен остановиться, ничего
 // больше не загружая.
@@ -1304,6 +1385,10 @@ async function loadTenantConfig() {
     // равно спрашиваем бэкенд: он найдёт тенанта по chatId сам (см. выше).
     // Только чистый Telegram-запуск пропускаем — там тенант всегда Matvey.
     if (!CURRENT_TRAINER_ID && !vkLaunchUserId) return true;
+    // VK без vk_group_id в ссылке — сначала выясняем, чей это клиент, иначе
+    // ниже уйдём в тенант по умолчанию и покажем «Доступа пока нет» человеку,
+    // у которого доступ есть (см. resolveTenantForVkUser выше).
+    if (!CURRENT_TRAINER_ID && vkLaunchUserId) await resolveTenantForVkUser();
     try {
         var myChatId = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '';
         var url = APPS_SCRIPT_URL + '?action=getTenantConfig' +
