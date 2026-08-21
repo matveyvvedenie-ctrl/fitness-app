@@ -1180,6 +1180,21 @@ var NEW_API_ACTIONS = {
             }, 200);
         }); });
     },
+    setTrainerTheme: function(nativeFetch, params) {
+        var asChatId = encodeURIComponent(_myChatId());
+        var path = '/admin/trainers/' + encodeURIComponent(params.get('targetTrainerId') || '') +
+            '/theme?asChatId=' + asChatId;
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({
+                themeMode: params.get('themeMode') || '',
+                themePrimary: params.get('themePrimary') || ''
+            })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse(data, 200);
+        }); });
+    },
     setTrainerStatus: function(nativeFetch, params) {
         var asChatId = encodeURIComponent(_myChatId());
         var targetTrainerId = params.get('targetTrainerId') || '';
@@ -1291,6 +1306,9 @@ function applyTenantTheme(theme) {
         root.style.setProperty('--color-primary', theme.primary);
         root.style.setProperty('--color-primary-dark', _darkenHex(theme.primary, 0.2));
     }
+    // Тёмная тема тенанта целиком (не только акцент). Всё переключение —
+    // один класс на body, дальше работают переменные в style.css.
+    document.body.classList.toggle('theme-dark', theme.mode === 'dark');
     if (theme.displayName) {
         var titleEl = document.querySelector('title');
         if (titleEl) titleEl.textContent = theme.displayName;
@@ -2771,6 +2789,10 @@ function renderSuperAdminTrainers(trainers) {
                 '</div>' +
                 '<div class="superadmin-trainer-actions">' +
                     '<button class="superadmin-pay-btn" onclick="openTrainerPaymentModal(\'' + t.trainerId + '\', \'' + name.replace(/'/g, "\\'") + '\')">💰 Оплата</button>' +
+                    '<button class="superadmin-toggle-btn" onclick="toggleTrainerTheme(\'' + t.trainerId + '\', \'' +
+                        (t.themeMode === 'dark' ? '' : 'dark') + '\')">' +
+                        (t.themeMode === 'dark' ? '☀️ Светлая' : '🌙 Тёмная') +
+                    '</button>' +
                     '<button class="superadmin-toggle-btn' + (isDisabled ? ' is-disabled' : '') +
                         '" onclick="toggleTrainerStatus(\'' + t.trainerId + '\', \'' + (isDisabled ? 'active' : 'disabled') + '\')">' +
                         (isDisabled ? 'Включить' : 'Отключить') +
@@ -2782,6 +2804,31 @@ function renderSuperAdminTrainers(trainers) {
 }
 
 var currentPaymentTrainer = null;
+
+// Переключить тему тенанта: светлая (как у всех) или тёмная целиком.
+// Акцент для тёмной ставим красный сразу — светлый синий по умолчанию на
+// чёрном фоне выглядит грязно, а отдельного поля для цвета в списке нет.
+async function toggleTrainerTheme(trainerId, mode) {
+    var ok = await tgConfirm(mode === 'dark'
+        ? 'Включить тёмную тему у этого тренера?'
+        : 'Вернуть светлую тему?');
+    if (!ok) return;
+    try {
+        var qs = 'action=setTrainerTheme&targetTrainerId=' + encodeURIComponent(trainerId) +
+            '&themeMode=' + encodeURIComponent(mode) +
+            (mode === 'dark' ? '&themePrimary=' + encodeURIComponent('#e53935') : '');
+        var resp = await fetch(APPS_SCRIPT_URL + '?' + qs);
+        var data = await resp.json();
+        if (!data.success) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadSuperAdminTrainers();
+        tg.showAlert(mode === 'dark'
+            ? '🌙 Тёмная тема включена. Тренеру и его клиентам нужно закрыть и открыть мини-апп заново.'
+            : '☀️ Светлая тема возвращена.');
+    } catch (e) {
+        tg.showAlert('Ошибка соединения');
+    }
+}
 
 function openTrainerPaymentModal(trainerId, displayName) {
     currentPaymentTrainer = { trainerId: trainerId, name: displayName };

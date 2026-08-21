@@ -1,9 +1,22 @@
-/* Основной брендовый цвет (тёмно-синий по умолчанию) — единственное, что
-   реально меняется по тренерам сейчас. Переопределяется в рантайме из JS
-   (applyTenantTheme в app.js) по теме тенанта; без темы — эти же значения. */
+/* Палитра поверхностей и текста. Вынесена в переменные, чтобы у тенанта
+   могла быть СВОЯ тема целиком, а не только акцентный цвет: раньше менялся
+   один --color-primary, а карточки всё равно оставались белыми. Значения
+   ниже — прежний светлый вид, один в один; тёмная тема переопределяет их
+   на body.theme-dark (см. ниже). */
 :root {
     --color-primary: #1a1a2e;
     --color-primary-dark: #16213e;
+
+    --page-bg: #f5f5f5;
+    --surface: #ffffff;
+    --surface-2: #f5f5f7;
+    --surface-3: #fafafa;
+    --surface-4: #f0f0f0;
+    --border: #e0e0e0;
+    --border-soft: #f0f0f0;
+    --text: #1a1a1a;
+    --text-muted: #666666;
+    --text-faint: #999999;
 }
 
 * {
@@ -20,7 +33,11 @@ html, body {
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
-    background: #f5f5f5;
+    background: var(--page-bg);
+    /* Цвет текста у body раньше не задавался вообще — работал чёрный по
+       умолчанию. В светлой теме это незаметно, а в тёмной всё, что не
+       красит себя само, оказалось бы чёрным по чёрному. */
+    color: var(--text);
     padding-bottom: 80px;
     /* --tg-top-pad устанавливается из JS при инициализации Telegram WebApp */
     padding-top: var(--tg-top-pad, 0);
@@ -33,12 +50,51 @@ body {
    cover!) — лейбл/лого обычно широкий и невысокий, cover бы его обрезал
    так же, как раньше обрезались квадратные фото упражнений (см. выше). */
 body.has-tenant-bg {
-    background-color: #0a0a0a;
+    background-color: var(--page-bg);
     background-image: var(--tenant-bg-image);
     background-repeat: no-repeat;
     background-position: center 20px;
     background-size: min(420px, 80vw) auto;
     background-attachment: fixed;
+}
+
+/* ── Тёмная тема тенанта ─────────────────────────────────────────────────
+   Включается классом theme-dark на body (см. applyTenantTheme в app.js) по
+   полю themeMode тренера. Переопределяются ТОЛЬКО переменные — ни одного
+   правила ниже трогать не нужно, поэтому светлые тенанты остаются ровно
+   такими же, как были.
+
+   Поверхности не чёрные, а очень тёмно-серые с холодным уклоном: чистый
+   чёрный на телефоне даёт резкие границы карточек и «проваленные» тени.
+   Чёрным остаётся только фон страницы — на нём лежит баннер тренера. */
+body.theme-dark {
+    --page-bg: #0a0b0d;
+    --surface: #16181c;
+    --surface-2: #101216;
+    --surface-3: #1b1e23;
+    --surface-4: #23262c;
+    --border: #2b2f36;
+    --border-soft: #21242a;
+    --text: #f0f2f4;
+    --text-muted: #a4aab4;
+    --text-faint: #7b828d;
+}
+
+/* Поля ввода в тёмной теме браузер по умолчанию рисует светлыми — говорим
+   ему, что схема тёмная, и он сам чинит и рамки, и курсор, и автозаполнение. */
+body.theme-dark {
+    color-scheme: dark;
+}
+
+/* Тени на тёмном фоне не видны и только мылят края — заменяем их на
+   тонкую границу, иначе карточки сливаются с фоном. */
+body.theme-dark .stat-card,
+body.theme-dark .exercise-card,
+body.theme-dark .day-body,
+body.theme-dark .cc-day-block,
+body.theme-dark .cc-exercise {
+    box-shadow: none;
+    border: 1px solid var(--border);
 }
 
 .tab-content {
@@ -57,13 +113,13 @@ body.has-tenant-bg {
     align-items: center;
     justify-content: center;
     height: 100vh;
-    color: #666;
+    color: var(--text-muted);
 }
 
 .spinner {
     width: 50px;
     height: 50px;
-    border: 4px solid #f0f0f0;
+    border: 4px solid var(--border-soft);
     border-top-color: #E53935;
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -244,7 +300,7 @@ body.has-tenant-bg {
 
 /* Exercise Card */
 .exercise-card {
-    background: white;
+    background: var(--surface);
     margin: 8px;
     border-radius: 12px;
     overflow: hidden;
@@ -283,7 +339,7 @@ body.has-tenant-bg {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2px;
-    background: #e0e0e0;
+    background: var(--surface-4);
 }
 
 .exercise-photo {
@@ -317,7 +373,7 @@ body.has-tenant-bg {
 .exercise-name {
     font-size: 16px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
     margin-bottom: 10px;
     line-height: 1.3;
 }
@@ -353,7 +409,7 @@ body.has-tenant-bg {
 }
 
 .param {
-    background: #f5f5f5;
+    background: var(--surface-2);
     border-radius: 8px;
     padding: 10px 4px;
     text-align: center;
@@ -366,7 +422,7 @@ body.has-tenant-bg {
 
 .param-label {
     font-size: 10px;
-    color: #999;
+    color: var(--text-faint);
     text-transform: uppercase;
     font-weight: 600;
     margin-bottom: 4px;
@@ -376,7 +432,7 @@ body.has-tenant-bg {
 .param-value {
     font-size: 16px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
 }
 
 .param-value.plan { color: #1565C0; }
@@ -529,8 +585,8 @@ body.has-tenant-bg {
 .tabs {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    background: white;
-    border-bottom: 2px solid #e0e0e0;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
     position: sticky;
     top: var(--tg-top-pad, 0);
     z-index: 50;
@@ -541,12 +597,12 @@ body.has-tenant-bg {
 }
 
 .tab-btn {
-    background: white;
+    background: var(--surface);
     border: none;
     padding: 14px 6px;
     font-size: 14px;
     font-weight: 600;
-    color: #999;
+    color: var(--text-faint);
     cursor: pointer;
     border-bottom: 3px solid transparent;
     transition: all 0.2s ease;
@@ -557,7 +613,7 @@ body.has-tenant-bg {
 .tab-btn.active {
     color: #E53935;
     border-bottom-color: #E53935;
-    background: linear-gradient(to bottom, #fff, #ffebee);
+    background: linear-gradient(to bottom, var(--surface), #ffebee);
 }
 
 .tab-btn:active {
@@ -585,11 +641,11 @@ body.has-tenant-bg {
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
     padding: 12px 8px;
-    background: white;
+    background: var(--surface);
 }
 
 .stat-card {
-    background: linear-gradient(135deg, #f5f5f5, #ffffff);
+    background: linear-gradient(135deg, var(--surface-2), var(--surface));
     border-radius: 12px;
     padding: 16px 8px;
     text-align: center;
@@ -615,7 +671,7 @@ body.has-tenant-bg {
 
 .stat-label {
     font-size: 11px;
-    color: #666;
+    color: var(--text-muted);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -623,7 +679,7 @@ body.has-tenant-bg {
 
 /* Chart Section */
 .chart-section {
-    background: white;
+    background: var(--surface);
     margin: 12px 8px;
     padding: 16px;
     border-radius: 12px;
@@ -633,19 +689,19 @@ body.has-tenant-bg {
 .section-title {
     font-size: 16px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
     margin-bottom: 12px;
 }
 
 .exercise-select {
     width: 100%;
     padding: 12px;
-    border: 2px solid #E0E0E0;
+    border: 2px solid var(--border);
     border-radius: 8px;
     font-size: 15px;
     font-weight: 600;
     color: #333;
-    background: white;
+    background: var(--surface);
     margin-bottom: 16px;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -668,15 +724,15 @@ body.has-tenant-bg {
     align-items: center;
     justify-content: center;
     height: 250px;
-    background: #f5f5f5;
+    background: var(--surface-2);
     border-radius: 8px;
-    color: #999;
+    color: var(--text-faint);
     font-size: 14px;
 }
 
 /* Records */
 .records-section {
-    background: white;
+    background: var(--surface);
     margin: 12px 8px;
     padding: 16px;
     border-radius: 12px;
@@ -729,7 +785,7 @@ body.has-tenant-bg {
 .no-data {
     text-align: center;
     padding: 40px 20px;
-    color: #999;
+    color: var(--text-faint);
     font-size: 14px;
 }
 
@@ -760,7 +816,7 @@ body.has-tenant-bg {
     justify-content: space-between;
     gap: 12px;
     padding: 14px 16px;
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     margin-bottom: 10px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
@@ -779,7 +835,7 @@ body.has-tenant-bg {
 
 .superadmin-trainer-meta {
     font-size: 12px;
-    color: #888;
+    color: var(--text-faint);
 }
 
 .superadmin-status-badge {
@@ -793,7 +849,7 @@ body.has-tenant-bg {
 
 .superadmin-status-badge.status-active { background: #E8F5E9; color: #2E7D32; }
 .superadmin-status-badge.status-demo { background: #FFF3E0; color: #E65100; }
-.superadmin-status-badge.status-disabled { background: #F5F5F5; color: #999; }
+.superadmin-status-badge.status-disabled { background: var(--surface-2); color: var(--text-faint); }
 .superadmin-status-badge.payment-active { background: #E8F5E9; color: #2E7D32; margin-left: 4px; }
 .superadmin-status-badge.payment-expiring_week { background: #FFF3E0; color: #E65100; margin-left: 4px; }
 .superadmin-status-badge.payment-expiring_soon { background: #FFEBEE; color: #C62828; margin-left: 4px; }
@@ -877,8 +933,8 @@ body.has-tenant-bg {
 }
 
 .superadmin-toggle-btn.is-disabled {
-    background: #E0E0E0;
-    color: #666;
+    background: var(--surface-4);
+    color: var(--text-muted);
 }
 
 /* ========== ADMIN DASHBOARD ========== */
@@ -908,11 +964,11 @@ body.has-tenant-bg {
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
     padding: 12px 8px;
-    background: white;
+    background: var(--surface);
 }
 
 .summary-card {
-    background: linear-gradient(135deg, #f5f5f5, #ffffff);
+    background: linear-gradient(135deg, var(--surface-2), var(--surface));
     border-radius: 12px;
     padding: 16px 8px;
     text-align: center;
@@ -938,7 +994,7 @@ body.has-tenant-bg {
 
 .summary-label {
     font-size: 10px;
-    color: #666;
+    color: var(--text-muted);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -946,7 +1002,7 @@ body.has-tenant-bg {
 
 /* Clients Section */
 .clients-section {
-    background: white;
+    background: var(--surface);
     margin: 12px 8px;
     padding: 16px;
     border-radius: 12px;
@@ -962,7 +1018,7 @@ body.has-tenant-bg {
 
 /* Client Card */
 .client-card {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 14px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -977,17 +1033,17 @@ body.has-tenant-bg {
 
 .client-card.status-green {
     border-left-color: #43A047;
-    background: linear-gradient(135deg, #ffffff, #f1f8e9);
+    background: linear-gradient(135deg, var(--surface), #f1f8e9);
 }
 
 .client-card.status-yellow {
     border-left-color: #FFA726;
-    background: linear-gradient(135deg, #ffffff, #fff8e1);
+    background: linear-gradient(135deg, var(--surface), #fff8e1);
 }
 
 .client-card.status-red {
     border-left-color: #E53935;
-    background: linear-gradient(135deg, #ffffff, #ffebee);
+    background: linear-gradient(135deg, var(--surface), #ffebee);
 }
 
 .client-header {
@@ -1004,7 +1060,7 @@ body.has-tenant-bg {
 .client-name {
     font-size: 16px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
 }
 
 .client-stats {
@@ -1015,7 +1071,7 @@ body.has-tenant-bg {
 }
 
 .client-stat {
-    background: #f5f5f5;
+    background: var(--surface-2);
     border-radius: 8px;
     padding: 10px 6px;
     text-align: center;
@@ -1023,7 +1079,7 @@ body.has-tenant-bg {
 
 .client-stat-label {
     font-size: 10px;
-    color: #999;
+    color: var(--text-faint);
     text-transform: uppercase;
     font-weight: 600;
     margin-bottom: 4px;
@@ -1065,18 +1121,18 @@ body.has-tenant-bg {
     display: flex;
     gap: 6px;
     padding: 10px 8px;
-    background: white;
+    background: var(--surface);
     overflow-x: auto;
 }
 
 .filter-btn {
-    background: #f5f5f5;
+    background: var(--surface-2);
     border: 2px solid transparent;
     border-radius: 20px;
     padding: 8px 16px;
     font-size: 13px;
     font-weight: 600;
-    color: #666;
+    color: var(--text-muted);
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.2s ease;
@@ -1100,14 +1156,14 @@ body.has-tenant-bg {
 
 .cal-label {
     font-size: 11px;
-    color: #999;
+    color: var(--text-faint);
     font-weight: 600;
     text-transform: uppercase;
     margin-bottom: 4px;
 }
 
 .cal-bar-bg {
-    background: #f0f0f0;
+    background: var(--surface-4);
     border-radius: 4px;
     height: 8px;
     overflow: hidden;
@@ -1200,7 +1256,7 @@ body.has-tenant-bg {
 .food-log-day {
     margin-bottom: 16px;
     padding-bottom: 14px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-soft);
 }
 .food-log-day:last-child { border-bottom: none; }
 .food-log-day-header {
@@ -1214,7 +1270,7 @@ body.has-tenant-bg {
 }
 .food-log-day-header span:last-child {
     font-weight: 500;
-    color: #666;
+    color: var(--text-muted);
     font-size: 12px;
 }
 .food-log-entry {
@@ -1231,9 +1287,9 @@ body.has-tenant-bg {
     font-weight: 600;
     color: var(--color-primary);
 }
-.food-log-time { color: #999; font-weight: 500; }
-.food-log-macros { font-size: 12px; color: #666; margin-top: 2px; }
-.food-log-note { font-size: 12px; color: #888; margin-top: 4px; font-style: italic; }
+.food-log-time { color: var(--text-faint); font-weight: 500; }
+.food-log-macros { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.food-log-note { font-size: 12px; color: var(--text-faint); margin-top: 4px; font-style: italic; }
 
 /* ========== ADMIN: КЛИЕНТЫ ПО ТРЕНИРОВКАМ ========== */
 
@@ -1242,11 +1298,11 @@ body.has-tenant-bg {
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
     padding: 12px 8px;
-    background: white;
+    background: var(--surface);
 }
 
 .admin-summary-card {
-    background: linear-gradient(135deg, #f5f5f5, #ffffff);
+    background: linear-gradient(135deg, var(--surface-2), var(--surface));
     border-radius: 12px;
     padding: 16px 8px;
     text-align: center;
@@ -1257,12 +1313,12 @@ body.has-tenant-bg {
 
 .admin-summary-card.admin-summary-warning {
     border-left-color: #FFA726;
-    background: linear-gradient(135deg, #fff8e1, #ffffff);
+    background: linear-gradient(135deg, #fff8e1, var(--surface));
 }
 
 .admin-summary-card.admin-summary-ok {
     border-left-color: #43A047;
-    background: linear-gradient(135deg, #f1f8e9, #ffffff);
+    background: linear-gradient(135deg, #f1f8e9, var(--surface));
 }
 
 .admin-summary-icon {
@@ -1279,7 +1335,7 @@ body.has-tenant-bg {
 
 .admin-summary-label {
     font-size: 10px;
-    color: #666;
+    color: var(--text-muted);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -1290,31 +1346,31 @@ body.has-tenant-bg {
     display: flex;
     gap: 8px;
     padding: 0 8px 8px;
-    background: white;
+    background: var(--surface);
 }
 
 .admin-search {
     flex: 1;
     padding: 10px 14px;
     border-radius: 10px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     font-size: 14px;
-    background: #fafafa;
+    background: var(--surface-3);
     outline: none;
     transition: border-color 0.2s ease;
 }
 
 .admin-search:focus {
     border-color: var(--color-primary);
-    background: white;
+    background: var(--surface);
 }
 
 .admin-sort {
     padding: 10px 12px;
     border-radius: 10px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     font-size: 13px;
-    background: #fafafa;
+    background: var(--surface-3);
     color: #333;
     cursor: pointer;
     outline: none;
@@ -1326,18 +1382,18 @@ body.has-tenant-bg {
     display: flex;
     gap: 6px;
     padding: 0 8px 10px;
-    background: white;
+    background: var(--surface);
     overflow-x: auto;
 }
 
 .admin-filter-btn {
-    background: #f5f5f5;
+    background: var(--surface-2);
     border: 2px solid transparent;
     border-radius: 20px;
     padding: 8px 16px;
     font-size: 13px;
     font-weight: 600;
-    color: #666;
+    color: var(--text-muted);
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.2s ease;
@@ -1363,7 +1419,7 @@ body.has-tenant-bg {
 }
 
 .admin-client-card {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 14px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -1376,11 +1432,11 @@ body.has-tenant-bg {
     transform: scale(0.985);
 }
 
-.admin-client-card.admin-st-green    { border-left-color: #43A047; background: linear-gradient(135deg, #ffffff, #f1f8e9); }
-.admin-client-card.admin-st-yellow   { border-left-color: #FFA726; background: linear-gradient(135deg, #ffffff, #fff8e1); }
-.admin-client-card.admin-st-orange   { border-left-color: #FB8C00; background: linear-gradient(135deg, #ffffff, #fff3e0); }
-.admin-client-card.admin-st-red      { border-left-color: #E53935; background: linear-gradient(135deg, #ffffff, #ffebee); }
-.admin-client-card.admin-st-inactive { border-left-color: #BDBDBD; background: linear-gradient(135deg, #ffffff, #f5f5f5); opacity: 0.85; }
+.admin-client-card.admin-st-green    { border-left-color: #43A047; background: linear-gradient(135deg, var(--surface), #f1f8e9); }
+.admin-client-card.admin-st-yellow   { border-left-color: #FFA726; background: linear-gradient(135deg, var(--surface), #fff8e1); }
+.admin-client-card.admin-st-orange   { border-left-color: #FB8C00; background: linear-gradient(135deg, var(--surface), #fff3e0); }
+.admin-client-card.admin-st-red      { border-left-color: #E53935; background: linear-gradient(135deg, var(--surface), #ffebee); }
+.admin-client-card.admin-st-inactive { border-left-color: #BDBDBD; background: linear-gradient(135deg, var(--surface), var(--surface-2)); opacity: 0.85; }
 
 .admin-card-top {
     display: flex;
@@ -1396,7 +1452,7 @@ body.has-tenant-bg {
 .admin-card-name {
     font-size: 16px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
     flex: 1;
 }
 
@@ -1430,7 +1486,7 @@ body.has-tenant-bg {
 
 .admin-card-meta-label {
     font-size: 10px;
-    color: #999;
+    color: var(--text-faint);
     font-weight: 600;
     text-transform: uppercase;
 }
@@ -1463,7 +1519,7 @@ body.has-tenant-bg {
 
 .admin-card-btn {
     flex: 1;
-    background: #f5f5f5;
+    background: var(--surface-2);
     border: none;
     padding: 9px 10px;
     border-radius: 8px;
@@ -1509,7 +1565,7 @@ body.has-tenant-bg {
 
 .admin-filter-count {
     font-size: 11px;
-    color: #999;
+    color: var(--text-faint);
     margin-left: 2px;
 }
 
@@ -1532,7 +1588,7 @@ body.has-tenant-bg {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -1552,7 +1608,7 @@ body.has-tenant-bg {
 .admin-clients-table td {
     padding: 12px 14px;
     font-size: 14px;
-    border-top: 1px solid #f0f0f0;
+    border-top: 1px solid var(--border-soft);
     vertical-align: middle;
 }
 
@@ -1569,13 +1625,13 @@ body.has-tenant-bg {
 
 .admin-row-status-label {
     font-size: 12px;
-    color: #666;
+    color: var(--text-muted);
     font-weight: 600;
 }
 
 .admin-row-name {
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
 }
 
 .admin-row-actions {
@@ -1584,7 +1640,7 @@ body.has-tenant-bg {
 }
 
 .admin-row-btn {
-    background: #f5f5f5;
+    background: var(--surface-2);
     border: none;
     width: 34px;
     height: 34px;
@@ -1595,12 +1651,12 @@ body.has-tenant-bg {
 }
 
 .admin-row-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.admin-row-btn:not(:disabled):hover { background: #e0e0e0; }
+.admin-row-btn:not(:disabled):hover { background: var(--surface-4); }
 
 /* Свёрнутый блок «Питание клиентов» */
 .admin-food-details {
     margin: 12px 8px 80px;
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     overflow: hidden;
@@ -1612,7 +1668,7 @@ body.has-tenant-bg {
     font-size: 14px;
     color: var(--color-primary);
     cursor: pointer;
-    background: linear-gradient(135deg, #f5f5f5, #ffffff);
+    background: linear-gradient(135deg, var(--surface-2), var(--surface));
     list-style: none;
     user-select: none;
 }
@@ -1630,7 +1686,7 @@ body.has-tenant-bg {
 }
 
 .admin-food-body {
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--border-soft);
 }
 
 /* На десктопе показываем таблицу, скрываем карточки */
@@ -1670,7 +1726,7 @@ body.has-tenant-bg {
     bottom: 0;
     left: 0;
     right: 0;
-    background: #f5f5f7;
+    background: var(--surface-2);
     z-index: 1000;
     overflow-y: auto;
     animation: ccSlideIn 0.22s ease;
@@ -1742,8 +1798,8 @@ body.has-tenant-bg {
 
 .cc-tabs {
     display: flex;
-    background: white;
-    border-bottom: 1px solid #e0e0e0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
     overflow-x: auto;
     position: sticky;
     top: 68px;
@@ -1865,7 +1921,7 @@ body.has-tenant-bg {
     transition: all 0.15s ease;
 }
 .admin-section-btn.active {
-    background: white;
+    background: var(--surface);
     color: var(--color-primary);
     box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
@@ -1880,7 +1936,7 @@ body.has-tenant-bg {
     margin-bottom: 16px;
 }
 .finance-summary-card {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 14px 8px;
     text-align: center;
@@ -1907,7 +1963,7 @@ body.has-tenant-bg {
     gap: 10px;
 }
 .finance-client-card {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 14px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.06);
@@ -1943,7 +1999,7 @@ body.has-tenant-bg {
 .fc-status-badge.b-expiring_week { background: #fffde7; color: #f57f17; }
 .fc-status-badge.b-expiring_soon { background: #fff3e0; color: #ef6c00; }
 .fc-status-badge.b-expired { background: #ffebee; color: #c62828; }
-.fc-status-badge.b-none { background: #f5f5f5; color: #757575; }
+.fc-status-badge.b-none { background: var(--surface-2); color: #757575; }
 
 .fc-info {
     margin-top: 8px;
@@ -2005,7 +2061,7 @@ body.has-tenant-bg {
 }
 .reports-list { display: flex; flex-direction: column; gap: 10px; }
 .report-card {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 14px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.06);
@@ -2024,7 +2080,7 @@ body.has-tenant-bg {
     display: inline-block;
 }
 .report-card-status.s-ok { background: #e8f5e9; color: #2e7d32; }
-.report-card-status.s-empty { background: #f5f5f5; color: #757575; }
+.report-card-status.s-empty { background: var(--surface-2); color: #757575; }
 .report-card-actions {
     margin-top: 12px;
     display: flex;
@@ -2065,7 +2121,7 @@ body.has-tenant-bg {
     margin-top: 12px;
 }
 .ex-media-item {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 10px 12px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.06);
@@ -2080,7 +2136,7 @@ body.has-tenant-bg {
     width: 40px;
     height: 40px;
     border-radius: 8px;
-    background: #f5f5f7;
+    background: var(--surface-2);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2096,7 +2152,7 @@ body.has-tenant-bg {
     font-weight: 600;
     padding: 2px 7px;
     border-radius: 8px;
-    background: #f5f5f5;
+    background: var(--surface-2);
     color: #9e9e9e;
 }
 .ex-media-badge.filled { background: #e8f5e9; color: #2e7d32; }
@@ -2111,7 +2167,7 @@ body.has-tenant-bg {
     aspect-ratio: 3 / 4;
     max-height: 220px;
     border-radius: 12px;
-    background: #f5f5f7;
+    background: var(--surface-2);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2181,7 +2237,7 @@ body.has-tenant-bg {
 }
 
 .cc-day-block {
-    background: white;
+    background: var(--surface);
     border-radius: 14px;
     padding: 12px 6px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -2190,7 +2246,7 @@ body.has-tenant-bg {
 .cc-add-ex-btn {
     width: calc(100% - 12px);
     margin: 8px 6px 0;
-    background: white;
+    background: var(--surface);
     color: var(--color-primary);
     border: 2px dashed #c5c8d6;
     border-radius: 10px;
@@ -2202,7 +2258,7 @@ body.has-tenant-bg {
 }
 
 .cc-add-ex-btn:hover {
-    background: #f5f5f7;
+    background: var(--surface-2);
     border-color: var(--color-primary);
 }
 
@@ -2221,14 +2277,14 @@ body.has-tenant-bg {
 .cc-day-title-row {
     display: flex;
     align-items: center;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-soft);
     margin-bottom: 8px;
 }
 
 .cc-day-menu-btn {
     background: transparent;
     border: none;
-    color: #888;
+    color: var(--text-faint);
     font-size: 22px;
     line-height: 1;
     padding: 0 10px;
@@ -2238,7 +2294,7 @@ body.has-tenant-bg {
     transition: all 0.15s ease;
 }
 
-.cc-day-menu-btn:hover { background: #f5f5f7; color: var(--color-primary); }
+.cc-day-menu-btn:hover { background: var(--surface-2); color: var(--color-primary); }
 .cc-day-menu-btn:active { transform: scale(0.92); }
 
 /* Кнопка «+ Добавить день тренировки» под всеми днями */
@@ -2275,7 +2331,7 @@ body.has-tenant-bg {
     display: flex;
     gap: 6px;
     padding: 10px 4px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-soft);
     align-items: flex-start;
 }
 
@@ -2344,7 +2400,7 @@ body.has-tenant-bg {
 .cc-ex-name {
     font-size: 14px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
     margin-bottom: 8px;
     line-height: 1.3;
 }
@@ -2369,7 +2425,7 @@ body.has-tenant-bg {
 }
 
 .cc-ex-cell {
-    background: #f5f5f7;
+    background: var(--surface-2);
     border-radius: 8px;
     padding: 7px 3px;
     text-align: center;
@@ -2379,7 +2435,7 @@ body.has-tenant-bg {
 
 .cc-cell-label {
     font-size: 10px;
-    color: #888;
+    color: var(--text-faint);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -2478,7 +2534,7 @@ body.has-tenant-bg {
 }
 
 .cc-superset-body {
-    background: white;
+    background: var(--surface);
     border-radius: 10px;
     padding: 8px 6px;
     border: 1px solid #e0e6ff;
@@ -2530,7 +2586,7 @@ body.has-tenant-bg {
 }
 
 .cc-ex-edit-btn {
-    background: #f5f5f7;
+    background: var(--surface-2);
     border: 1px solid #ececf0;
     width: 32px;
     height: 32px;
@@ -2571,7 +2627,7 @@ body.has-tenant-bg {
     bottom: 0;
     left: 0;
     right: 0;
-    background: #f5f5f7;
+    background: var(--surface-2);
     z-index: 1100;
     overflow-y: auto;
     display: flex;
@@ -2614,7 +2670,7 @@ body.has-tenant-bg {
 }
 
 .ex-stat-select-wrap {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 10px 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
@@ -2642,19 +2698,19 @@ body.has-tenant-bg {
 
 .ex-stat-pr-date {
     font-size: 12px;
-    color: #999;
+    color: var(--text-faint);
     font-weight: 500;
     margin-left: 6px;
 }
 
 .ex-stat-empty {
-    color: #999;
+    color: var(--text-faint);
     font-style: italic;
     font-weight: 500;
 }
 
 .ex-stat-chart-wrap {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 12px 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
@@ -2663,7 +2719,7 @@ body.has-tenant-bg {
 }
 
 .ex-stat-table-section {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
@@ -2688,13 +2744,13 @@ body.has-tenant-bg {
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
-    background: #fafafa;
+    background: var(--surface-3);
     border-radius: 8px;
     font-size: 13px;
 }
 
 .ex-stat-row-date {
-    color: #666;
+    color: var(--text-muted);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
@@ -2704,7 +2760,7 @@ body.has-tenant-bg {
 }
 
 .ex-stat-row-rpe {
-    color: #888;
+    color: var(--text-faint);
     font-weight: 500;
     margin-left: 4px;
 }
@@ -2748,7 +2804,7 @@ body.has-tenant-bg {
     bottom: 0;
     left: 0;
     right: 0;
-    background: #f5f5f7;
+    background: var(--surface-2);
     z-index: 1200;
     overflow-y: auto;
     animation: ccSlideIn 0.22s ease;
@@ -2764,7 +2820,7 @@ body.has-tenant-bg {
 .nc-step.active { display: block; }
 
 .nc-section {
-    background: white;
+    background: var(--surface);
     border-radius: 14px;
     padding: 14px;
     margin-bottom: 12px;
@@ -2787,7 +2843,7 @@ body.has-tenant-bg {
 
 .nc-hint {
     font-size: 11px;
-    color: #888;
+    color: var(--text-faint);
     margin-top: 4px;
     font-style: italic;
 }
@@ -2800,7 +2856,7 @@ body.has-tenant-bg {
 
 .nc-btn {
     flex: 1;
-    background: #f5f5f7;
+    background: var(--surface-2);
     color: var(--color-primary);
     border: none;
     border-radius: 12px;
@@ -2825,7 +2881,7 @@ body.has-tenant-bg {
     align-items: center;
     gap: 14px;
     padding: 14px 16px;
-    background: #f5f5f7;
+    background: var(--surface-2);
     border: 2px solid transparent;
     border-radius: 14px;
     cursor: pointer;
@@ -2844,7 +2900,7 @@ body.has-tenant-bg {
     flex-shrink: 0;
     width: 48px;
     height: 48px;
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -2887,7 +2943,7 @@ body.has-tenant-bg {
 }
 
 .stats-card {
-    background: white;
+    background: var(--surface);
     border-radius: 14px;
     padding: 14px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -2902,7 +2958,7 @@ body.has-tenant-bg {
 
 .stats-card-hint {
     font-size: 11px;
-    color: #888;
+    color: var(--text-faint);
     margin-bottom: 10px;
 }
 
@@ -2922,7 +2978,7 @@ body.has-tenant-bg {
 
 .stats-consistency-bar {
     height: 8px;
-    background: #f0f0f0;
+    background: var(--surface-4);
     border-radius: 4px;
     overflow: hidden;
 }
@@ -2949,7 +3005,7 @@ body.has-tenant-bg {
     align-items: center;
     gap: 10px;
     padding: 8px 10px;
-    background: linear-gradient(135deg, #FFF8E1, #ffffff);
+    background: linear-gradient(135deg, #FFF8E1, var(--surface));
     border-left: 4px solid #FFC107;
     border-radius: 8px;
 }
@@ -2964,13 +3020,13 @@ body.has-tenant-bg {
 .stats-pr-name {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
     line-height: 1.2;
 }
 
 .stats-pr-date {
     font-size: 11px;
-    color: #888;
+    color: var(--text-faint);
     margin-top: 2px;
 }
 
@@ -2989,7 +3045,7 @@ body.has-tenant-bg {
 .stats-empty {
     padding: 20px 10px;
     text-align: center;
-    color: #999;
+    color: var(--text-faint);
     font-size: 13px;
     font-style: italic;
 }
@@ -3007,7 +3063,7 @@ body.has-tenant-bg {
     border-radius: 10px;
     display: block;
 }
-.stats-photo-date { font-size: 11px; color: #999; margin-top: 4px; }
+.stats-photo-date { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
 
 .stats-photo-header {
     display: flex;
@@ -3027,7 +3083,7 @@ body.has-tenant-bg {
 }
 .stats-compare-hint {
     font-size: 12px;
-    color: #888;
+    color: var(--text-faint);
     margin-bottom: 8px;
 }
 .stats-photo-item.selected img {
@@ -3054,7 +3110,7 @@ body.has-tenant-bg {
     overflow-x: auto;
     padding-bottom: 10px;
     margin-bottom: 10px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-soft);
 }
 .stats-compare-strip.active { display: flex; }
 .stats-compare-item {
@@ -3075,7 +3131,7 @@ body.has-tenant-bg {
     flex-shrink: 0;
     align-self: center;
     font-size: 10px;
-    color: #999;
+    color: var(--text-faint);
     writing-mode: horizontal-tb;
     white-space: nowrap;
     padding: 0 2px;
@@ -3093,14 +3149,14 @@ body.has-tenant-bg {
     align-items: center;
     gap: 6px;
     padding: 8px 10px;
-    background: #fafafa;
+    background: var(--surface-3);
     border-radius: 8px;
 }
 
 .stats-progress-name {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
     grid-column: 1 / -1;
     line-height: 1.2;
 }
@@ -3111,7 +3167,7 @@ body.has-tenant-bg {
 }
 
 .stats-progress-prev {
-    color: #999;
+    color: var(--text-faint);
     text-decoration: line-through;
 }
 
@@ -3142,7 +3198,7 @@ body.has-tenant-bg {
 /* ===== ВКЛАДКА «ЗАМЕТКИ» В КАРТОЧКЕ КЛИЕНТА ===== */
 
 .notes-new-card, .notes-list-section {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 14px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -3158,12 +3214,12 @@ body.has-tenant-bg {
 
 .notes-textarea {
     width: 100%;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     border-radius: 10px;
     padding: 10px 12px;
     font-family: inherit;
     font-size: 14px;
-    background: #fafafa;
+    background: var(--surface-3);
     outline: none;
     resize: vertical;
     min-height: 70px;
@@ -3173,7 +3229,7 @@ body.has-tenant-bg {
 
 .notes-textarea:focus {
     border-color: var(--color-primary);
-    background: white;
+    background: var(--surface);
 }
 
 .notes-new-controls {
@@ -3217,7 +3273,7 @@ body.has-tenant-bg {
 }
 
 .notes-item {
-    background: #fafafa;
+    background: var(--surface-3);
     border-radius: 10px;
     padding: 10px 12px;
     border-left: 4px solid var(--color-primary);
@@ -3234,7 +3290,7 @@ body.has-tenant-bg {
     gap: 8px;
     margin-bottom: 4px;
     font-size: 11px;
-    color: #888;
+    color: var(--text-faint);
 }
 
 .notes-item-date { font-weight: 600; }
@@ -3261,7 +3317,7 @@ body.has-tenant-bg {
 
 .notes-item-text {
     font-size: 13px;
-    color: #1a1a1a;
+    color: var(--text);
     line-height: 1.4;
     white-space: pre-wrap;
     word-break: break-word;
@@ -3269,7 +3325,7 @@ body.has-tenant-bg {
 
 /* Анкета (свёрнутая details) */
 .notes-profile-card {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     overflow: hidden;
@@ -3283,7 +3339,7 @@ body.has-tenant-bg {
     cursor: pointer;
     list-style: none;
     user-select: none;
-    background: linear-gradient(135deg, #f5f5f5, #ffffff);
+    background: linear-gradient(135deg, var(--surface-2), var(--surface));
 }
 
 .notes-profile-summary::-webkit-details-marker { display: none; }
@@ -3301,7 +3357,7 @@ body.has-tenant-bg {
 
 .notes-profile-body {
     padding: 14px;
-    border-top: 1px solid #f0f0f0;
+    border-top: 1px solid var(--border-soft);
 }
 
 .notes-profile-grid {
@@ -3317,7 +3373,7 @@ body.has-tenant-bg {
 .prof-field label {
     font-size: 11px;
     font-weight: 600;
-    color: #888;
+    color: var(--text-faint);
     text-transform: uppercase;
     letter-spacing: 0.3px;
 }
@@ -3325,24 +3381,24 @@ body.has-tenant-bg {
 .prof-input {
     width: 100%;
     padding: 9px 11px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     border-radius: 8px;
-    background: #fafafa;
+    background: var(--surface-3);
     font-size: 14px;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--text);
     outline: none;
     box-sizing: border-box;
     font-family: inherit;
 }
 
-.prof-input:focus { background: white; border-color: var(--color-primary); }
+.prof-input:focus { background: var(--surface); border-color: var(--color-primary); }
 
 .prof-radio-group { display: flex; gap: 6px; }
 .prof-radio {
     flex: 1;
-    background: #fafafa;
-    border: 1px solid #e0e0e0;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 9px 0;
     text-align: center;
@@ -3373,14 +3429,14 @@ body.has-tenant-bg {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: #fafafa;
-    border: 1px solid #e0e0e0;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 7px 10px;
     cursor: pointer;
     user-select: none;
     font-size: 13px;
-    color: #1a1a1a;
+    color: var(--text);
     transition: all 0.15s ease;
 }
 
@@ -3407,7 +3463,7 @@ body.has-tenant-bg {
 }
 
 .hh-day {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     overflow: hidden;
@@ -3422,7 +3478,7 @@ body.has-tenant-bg {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    background: linear-gradient(135deg, #fafafa, #ffffff);
+    background: linear-gradient(135deg, var(--surface-3), var(--surface));
     transition: background 0.15s ease;
     position: relative;
 }
@@ -3434,7 +3490,7 @@ body.has-tenant-bg {
     position: absolute;
     top: 14px;
     right: 16px;
-    color: #888;
+    color: var(--text-faint);
     font-size: 14px;
     transition: transform 0.2s ease;
 }
@@ -3444,7 +3500,7 @@ body.has-tenant-bg {
 }
 
 .hh-day[open] > .hh-day-summary {
-    background: linear-gradient(135deg, #f0f4ff, #ffffff);
+    background: linear-gradient(135deg, #f0f4ff, var(--surface));
 }
 
 .hh-day-head {
@@ -3462,7 +3518,7 @@ body.has-tenant-bg {
 
 .hh-ago {
     font-size: 11px;
-    color: #888;
+    color: var(--text-faint);
     font-weight: 600;
 }
 
@@ -3478,7 +3534,7 @@ body.has-tenant-bg {
 
 .hh-count {
     font-size: 11px;
-    color: #888;
+    color: var(--text-faint);
 }
 
 .hh-day-body {
@@ -3489,16 +3545,16 @@ body.has-tenant-bg {
 }
 
 .hh-ex {
-    background: #fafafa;
+    background: var(--surface-3);
     border-radius: 8px;
     padding: 9px 11px;
-    border-left: 3px solid #e0e0e0;
+    border-left: 3px solid var(--border);
 }
 
 .hh-ex-name {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
     margin-bottom: 4px;
     line-height: 1.3;
 }
@@ -3540,7 +3596,7 @@ body.has-tenant-bg {
 .hh-fb-failed { background: #FFEBEE; color: #C62828; }
 
 .hh-ex-skipped {
-    color: #999;
+    color: var(--text-faint);
     font-style: italic;
     font-weight: 500;
 }
@@ -3548,7 +3604,7 @@ body.has-tenant-bg {
 .hh-ex-plan {
     display: block;
     font-size: 11px;
-    color: #999;
+    color: var(--text-faint);
     margin-top: 3px;
 }
 
@@ -3579,7 +3635,7 @@ body.has-tenant-bg {
     position: relative;
     width: 100%;
     max-width: 520px;
-    background: white;
+    background: var(--surface);
     border-radius: 18px 18px 0 0;
     padding: 18px 16px max(18px, env(safe-area-inset-bottom));
     box-shadow: 0 -8px 30px rgba(0,0,0,0.22);
@@ -3602,7 +3658,7 @@ body.has-tenant-bg {
 
 .ex-add-type-subtitle {
     font-size: 13px;
-    color: #888;
+    color: var(--text-faint);
     margin-top: 2px;
 }
 
@@ -3611,7 +3667,7 @@ body.has-tenant-bg {
     align-items: center;
     gap: 14px;
     padding: 14px 16px;
-    background: #f5f5f7;
+    background: var(--surface-2);
     border: 2px solid transparent;
     border-radius: 14px;
     cursor: pointer;
@@ -3632,7 +3688,7 @@ body.has-tenant-bg {
     flex-shrink: 0;
     width: 48px;
     height: 48px;
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -3662,12 +3718,12 @@ body.has-tenant-bg {
     padding: 12px;
     font-size: 14px;
     font-weight: 600;
-    color: #999;
+    color: var(--text-faint);
     cursor: pointer;
     border-radius: 10px;
 }
 
-.ex-add-type-cancel:hover { background: #f5f5f7; color: #555; }
+.ex-add-type-cancel:hover { background: var(--surface-2); color: #555; }
 
 @media (min-width: 900px) {
     .ex-add-type-modal { align-items: center; }
@@ -3697,7 +3753,7 @@ body.has-tenant-bg {
     position: relative;
     width: 100%;
     max-width: 520px;
-    background: white;
+    background: var(--surface);
     border-radius: 18px 18px 0 0;
     max-height: 92vh;
     display: flex;
@@ -3717,7 +3773,7 @@ body.has-tenant-bg {
     justify-content: space-between;
     gap: 8px;
     padding: 14px 18px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-soft);
 }
 
 .ex-editor-title {
@@ -3734,7 +3790,7 @@ body.has-tenant-bg {
     background: transparent;
     border: none;
     font-size: 22px;
-    color: #999;
+    color: var(--text-faint);
     cursor: pointer;
     padding: 0;
     width: 32px;
@@ -3743,7 +3799,7 @@ body.has-tenant-bg {
     transition: all 0.15s ease;
 }
 
-.ex-editor-close:hover { background: #f5f5f7; color: #555; }
+.ex-editor-close:hover { background: var(--surface-2); color: #555; }
 
 .ex-editor-body {
     padding: 16px 18px 8px;
@@ -3770,9 +3826,9 @@ body.has-tenant-bg {
 }
 
 .add-day-chip {
-    border: 1px solid #e0e0e0;
-    background: white;
-    color: #666;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
     border-radius: 20px;
     padding: 8px 14px;
     font-size: 13px;
@@ -3789,7 +3845,7 @@ body.has-tenant-bg {
 .ex-editor-label {
     display: block;
     font-size: 11px;
-    color: #888;
+    color: var(--text-faint);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -3798,7 +3854,7 @@ body.has-tenant-bg {
 
 .ex-editor-hint {
     font-size: 12px;
-    color: #999;
+    color: var(--text-faint);
     margin-top: 6px;
     line-height: 1.4;
 }
@@ -3808,11 +3864,11 @@ body.has-tenant-bg {
     width: 100%;
     padding: 10px 12px;
     border-radius: 10px;
-    border: 1px solid #e0e0e0;
-    background: #fafafa;
+    border: 1px solid var(--border);
+    background: var(--surface-3);
     font-size: 15px;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--text);
     outline: none;
     transition: all 0.15s ease;
     box-sizing: border-box;
@@ -3823,7 +3879,7 @@ body.has-tenant-bg {
 
 .ex-editor-input:focus,
 .ex-editor-textarea:focus {
-    background: white;
+    background: var(--surface);
     border-color: var(--color-primary);
 }
 
@@ -3854,17 +3910,17 @@ body.has-tenant-bg {
 .ex-editor-history-hint.hidden { display: none; }
 
 .ex-editor-history-hint.ex-hint-empty {
-    background: #f5f5f7;
+    background: var(--surface-2);
     border-left-color: #bdbdbd;
-    color: #666;
+    color: var(--text-muted);
     font-weight: 500;
     font-style: italic;
 }
 
 .ex-editor-history-hint.ex-hint-loading {
-    background: #f5f5f7;
+    background: var(--surface-2);
     border-left-color: #bdbdbd;
-    color: #888;
+    color: var(--text-faint);
     font-weight: 500;
     font-style: italic;
 }
@@ -3872,9 +3928,9 @@ body.has-tenant-bg {
 /* ── Выпадающая библиотека упражнений под полем «Название» ── */
 .ex-library-panel {
     margin-top: 6px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     border-radius: 12px;
-    background: white;
+    background: var(--surface);
     overflow: hidden;
     max-height: 320px;
     display: flex;
@@ -3886,13 +3942,13 @@ body.has-tenant-bg {
     gap: 4px;
     padding: 8px;
     overflow-x: auto;
-    border-bottom: 1px solid #f0f0f0;
-    background: #fafafa;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--surface-3);
 }
 
 .ex-lib-tab {
-    background: white;
-    border: 1px solid #e0e0e0;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 16px;
     padding: 5px 12px;
     font-size: 12px;
@@ -3928,22 +3984,22 @@ body.has-tenant-bg {
 }
 
 .ex-lib-item:hover, .ex-lib-item:active {
-    background: #f5f5f7;
+    background: var(--surface-2);
 }
 
 .ex-lib-item + .ex-lib-item {
-    border-top: 1px solid #f5f5f7;
+    border-top: 1px solid var(--border-soft);
 }
 
 .ex-lib-item-name {
     font-size: 14px;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--text);
 }
 
 .ex-lib-item-group {
     font-size: 11px;
-    color: #888;
+    color: var(--text-faint);
     margin-top: 2px;
 }
 
@@ -3952,14 +4008,14 @@ body.has-tenant-bg {
     padding: 20px 12px;
     text-align: center;
     font-size: 13px;
-    color: #999;
+    color: var(--text-faint);
 }
 
 .ex-editor-actions {
     display: flex;
     gap: 8px;
     padding: 12px 18px 18px;
-    border-top: 1px solid #f0f0f0;
+    border-top: 1px solid var(--border-soft);
     padding-bottom: max(18px, env(safe-area-inset-bottom));
 }
 
@@ -3991,7 +4047,7 @@ body.has-tenant-bg {
 /* На десктопе карточка клиента — по центру, ограничена по ширине */
 @media (min-width: 900px) {
     .client-card-screen {
-        background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary) 200px, #f5f5f7 200px);
+        background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary) 200px, var(--surface-2) 200px);
     }
     .cc-header,
     .cc-tabs,
@@ -4012,7 +4068,7 @@ body.has-tenant-bg {
 }
 
 .latest-card {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 16px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -4021,13 +4077,13 @@ body.has-tenant-bg {
 .latest-card-title {
     font-size: 16px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
     margin-bottom: 4px;
 }
 
 .latest-card-date {
     font-size: 12px;
-    color: #999;
+    color: var(--text-faint);
     margin-bottom: 12px;
 }
 
@@ -4038,7 +4094,7 @@ body.has-tenant-bg {
 }
 
 .latest-item {
-    background: #f5f5f5;
+    background: var(--surface-2);
     border-radius: 10px;
     padding: 12px 6px;
     text-align: center;
@@ -4053,7 +4109,7 @@ body.has-tenant-bg {
 
 .latest-item-label {
     font-size: 10px;
-    color: #666;
+    color: var(--text-muted);
     font-weight: 600;
     text-transform: uppercase;
 }
@@ -4073,7 +4129,7 @@ body.has-tenant-bg {
 }
 
 .diff-neutral {
-    color: #999;
+    color: var(--text-faint);
 }
 
 /* ===== Полные замеры в статистике тренера (не только вес) ===== */
@@ -4085,7 +4141,7 @@ body.has-tenant-bg {
     margin-top: 10px;
 }
 .stats-meas-item {
-    background: #f5f5f5;
+    background: var(--surface-2);
     border-radius: 8px;
     padding: 8px 4px;
     text-align: center;
@@ -4097,7 +4153,7 @@ body.has-tenant-bg {
 }
 .stats-meas-item-label {
     font-size: 9px;
-    color: #888;
+    color: var(--text-faint);
     font-weight: 600;
     text-transform: uppercase;
     margin-top: 2px;
@@ -4106,12 +4162,12 @@ body.has-tenant-bg {
     font-size: 10px;
     font-weight: 600;
     margin-left: 3px;
-    color: #999;
+    color: var(--text-faint);
 }
 
 /* Фото прогресса — хиро-секция вкладки «Замеры», первое что видит клиент */
 .photo-progress-section {
-    background: white;
+    background: var(--surface);
     margin: 12px 8px;
     padding: 16px;
     border-radius: 12px;
@@ -4121,7 +4177,7 @@ body.has-tenant-bg {
 .photo-progress-empty {
     text-align: center;
     padding: 24px 12px;
-    color: #999;
+    color: var(--text-faint);
     font-size: 13px;
     line-height: 1.6;
 }
@@ -4142,7 +4198,7 @@ body.has-tenant-bg {
     flex: 1;
     max-width: 220px;
     text-align: center;
-    background: #f5f5f7;
+    background: var(--surface-2);
     border-radius: 14px;
     padding: 10px;
 }
@@ -4163,7 +4219,7 @@ body.has-tenant-bg {
 .photo-progress-date {
     font-size: 12px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
 }
 
 .photo-progress-weight {
@@ -4184,7 +4240,7 @@ body.has-tenant-bg {
 
 .photo-progress-extra {
     font-size: 10px;
-    color: #999;
+    color: var(--text-faint);
     font-weight: 600;
     margin-top: 6px;
 }
@@ -4192,25 +4248,25 @@ body.has-tenant-bg {
 .photo-progress-gap {
     text-align: center;
     font-size: 12px;
-    color: #888;
+    color: var(--text-faint);
     font-weight: 600;
     margin-top: 10px;
 }
 
 .photo-progress-gap .diff-up { color: #E53935; }
 .photo-progress-gap .diff-down { color: #43A047; }
-.photo-progress-gap .diff-neutral { color: #999; }
+.photo-progress-gap .diff-neutral { color: var(--text-faint); }
 
 .photo-progress-hint {
     text-align: center;
     font-size: 11px;
-    color: #999;
+    color: var(--text-faint);
     margin-top: 10px;
 }
 
 /* Гайд «Как правильно делать замеры» — самое первое на вкладке */
 .meas-guide-section {
-    background: white;
+    background: var(--surface);
     margin: 12px 8px;
     padding: 16px;
     border-radius: 12px;
@@ -4227,7 +4283,7 @@ body.has-tenant-bg {
 
 /* Measurements Form */
 .meas-form-section {
-    background: white;
+    background: var(--surface);
     margin: 12px 8px;
     padding: 16px;
     border-radius: 12px;
@@ -4258,18 +4314,18 @@ body.has-tenant-bg {
 .meas-input-label {
     font-size: 12px;
     font-weight: 600;
-    color: #666;
+    color: var(--text-muted);
     margin-bottom: 4px;
 }
 
 .meas-input {
-    background: #f5f5f5;
-    border: 2px solid #e0e0e0;
+    background: var(--surface-2);
+    border: 2px solid var(--border);
     border-radius: 10px;
     padding: 12px;
     font-size: 16px;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--text);
     text-align: center;
     transition: all 0.3s ease;
     width: 100%;
@@ -4280,7 +4336,7 @@ body.has-tenant-bg {
 .meas-input:focus {
     outline: none;
     border-color: #E53935;
-    background: #fff;
+    background: var(--surface);
     box-shadow: 0 0 0 4px rgba(229, 57, 53, 0.1);
 }
 
@@ -4305,7 +4361,7 @@ body.has-tenant-bg {
     aspect-ratio: 3/4;
     border: 2px dashed #d8d8d8;
     border-radius: 12px;
-    background: #f5f5f7;
+    background: var(--surface-2);
     background-size: cover;
     background-position: center;
     display: flex;
@@ -4322,7 +4378,7 @@ body.has-tenant-bg {
 .meas-photo-slot-label {
     font-size: 10px;
     font-weight: 600;
-    color: #888;
+    color: var(--text-faint);
     text-transform: uppercase;
 }
 
@@ -4390,7 +4446,7 @@ body.has-tenant-bg {
 
 /* Measurements History */
 .measurements-history {
-    background: white;
+    background: var(--surface);
     margin: 12px 8px;
     padding: 16px;
     border-radius: 12px;
@@ -4405,7 +4461,7 @@ body.has-tenant-bg {
 }
 
 .measurement-row {
-    background: #f5f5f5;
+    background: var(--surface-2);
     border-radius: 10px;
     padding: 12px;
     animation: fadeInUp 0.4s ease backwards;
@@ -4446,7 +4502,7 @@ body.has-tenant-bg {
 
 .measurement-row-label {
     font-size: 9px;
-    color: #999;
+    color: var(--text-faint);
     text-transform: uppercase;
     font-weight: 600;
 }
@@ -4454,7 +4510,7 @@ body.has-tenant-bg {
 .measurement-row-value {
     font-size: 14px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text);
 }
 
 /* ====================================================== */
@@ -4487,7 +4543,7 @@ body.has-tenant-bg {
 }
 
 .home-card {
-    background: white;
+    background: var(--surface);
     border-radius: 16px;
     padding: 18px 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -4511,7 +4567,7 @@ body.has-tenant-bg {
 }
 
 .home-dot {
-    background: #f5f5f7;
+    background: var(--surface-2);
     border: 1.5px solid #e5e5e5;
     border-radius: 14px;
     padding: 12px 8px;
@@ -4538,7 +4594,7 @@ body.has-tenant-bg {
 }
 
 .home-dot.partial {
-    background: linear-gradient(135deg, #FFF8E1, #ffffff);
+    background: linear-gradient(135deg, #FFF8E1, var(--surface));
     border-color: #FFB74D;
 }
 
@@ -4588,7 +4644,7 @@ body.has-tenant-bg {
 }
 
 .home-info-card {
-    background: white;
+    background: var(--surface);
     border-radius: 16px;
     padding: 14px 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -4602,7 +4658,7 @@ body.has-tenant-bg {
 
 .home-info-label {
     font-size: 11px;
-    color: #888;
+    color: var(--text-faint);
     text-transform: uppercase;
     letter-spacing: 0.3px;
     font-weight: 600;
@@ -4617,7 +4673,7 @@ body.has-tenant-bg {
 
 .home-info-sub {
     font-size: 11px;
-    color: #666;
+    color: var(--text-muted);
     line-height: 1.3;
     min-height: 14px;
 }
@@ -4651,7 +4707,7 @@ body.has-tenant-bg {
 .rpe-feedback-btn.rpe-set {
     border-style: solid;
     border-width: 2px;
-    background: #fff;
+    background: var(--surface);
     color: #1e293b;
 }
 .rpe-feedback-btn.rpe-set.rpe-easy   { border-color: #22c55e; background: #f0fdf4; }
@@ -4679,7 +4735,7 @@ body.has-tenant-bg {
     position: relative;
     width: 100%;
     max-width: 460px;
-    background: #ffffff;
+    background: var(--surface);
     border-radius: 18px 18px 0 0;
     padding: 18px 16px 24px;
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
@@ -4720,7 +4776,7 @@ body.has-tenant-bg {
     margin-bottom: 8px;
     border-radius: 12px;
     border: 2px solid #e2e8f0;
-    background: #ffffff;
+    background: var(--surface);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -4828,23 +4884,23 @@ body.has-tenant-bg {
     gap: 8px;
 }
 .mp-macro-card {
-    background: white;
+    background: var(--surface);
     border-radius: 10px;
     padding: 10px 4px;
     text-align: center;
     box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 .mp-macro-value { font-size: 17px; font-weight: 700; color: var(--color-primary); }
-.mp-macro-label { font-size: 11px; color: #888; margin-top: 2px; }
+.mp-macro-label { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
 
 .mp-meal-summary-item {
-    background: white;
+    background: var(--surface);
     border-radius: 10px;
     padding: 10px 12px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 .mp-meal-summary-name { font-weight: 700; font-size: 14px; color: var(--color-primary); }
-.mp-meal-summary-meta { font-size: 12px; color: #888; margin-top: 2px; }
+.mp-meal-summary-meta { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
 .mp-meal-summary-desc { font-size: 13px; color: #555; margin-top: 4px; }
 .mp-notes-summary {
     background: #f5f6fa;
@@ -4856,8 +4912,8 @@ body.has-tenant-bg {
 }
 
 .mp-meal-block {
-    background: #fafafa;
-    border: 1px solid #eee;
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
     border-radius: 10px;
     padding: 10px;
     margin-bottom: 10px;
