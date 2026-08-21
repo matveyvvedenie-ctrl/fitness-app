@@ -1180,6 +1180,19 @@ var NEW_API_ACTIONS = {
             }, 200);
         }); });
     },
+    setTrainerLogo: function(nativeFetch, params, init) {
+        var body = {};
+        try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
+        var path = '/admin/trainers/' + encodeURIComponent(params.get('targetTrainerId') || '') +
+            '/logo?asChatId=' + encodeURIComponent(_myChatId());
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(body)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse(data, 200);
+        }); });
+    },
     setTrainerTheme: function(nativeFetch, params) {
         var asChatId = encodeURIComponent(_myChatId());
         var path = '/admin/trainers/' + encodeURIComponent(params.get('targetTrainerId') || '') +
@@ -1316,12 +1329,24 @@ function applyTenantTheme(theme) {
     // Фирменный фон мини-аппа (лейбл/лого тренера) — тот же themeLogo, что
     // раньше приходил с бэкенда, но нигде не выводился. Опционально: без
     // него — как раньше, обычный светло-серый фон.
-    if (theme.logo) {
-        document.body.style.setProperty('--tenant-bg-image', 'url("' + String(theme.logo).replace(/"/g, '') + '")');
-        document.body.classList.add('has-tenant-bg');
-    } else {
-        document.body.classList.remove('has-tenant-bg');
+    // Баннер тренера. Раньше это был ФОН страницы: картинка висела по
+    // центру сверху, а содержимое ехало прямо по ней — при широком лейбле
+    // с лицом получалась каша. Теперь это обычная картинка в шапке: занимает
+    // свою высоту, вкладки идут сразу под ней.
+    var banner = document.getElementById('tenant-banner');
+    if (banner) {
+        var img = banner.querySelector('img');
+        if (theme.logo) {
+            img.src = String(theme.logo);
+            banner.classList.remove('hidden');
+        } else {
+            img.removeAttribute('src');
+            banner.classList.add('hidden');
+        }
     }
+    // Тёмный фон страницы под баннером оставляем и без картинки — он часть
+    // тёмной темы, а не свойство баннера.
+    document.body.classList.toggle('has-tenant-bg', !!theme.logo);
 }
 
 // ── Кто этот человек и к какому тренеру он относится (2026-08-20) ──────────
@@ -2789,6 +2814,10 @@ function renderSuperAdminTrainers(trainers) {
                 '</div>' +
                 '<div class="superadmin-trainer-actions">' +
                     '<button class="superadmin-pay-btn" onclick="openTrainerPaymentModal(\'' + t.trainerId + '\', \'' + name.replace(/'/g, "\\'") + '\')">💰 Оплата</button>' +
+                    '<button class="superadmin-toggle-btn" onclick="pickTrainerLogo(\'' + t.trainerId + '\')">' +
+                        (t.themeLogo ? '🖼 Сменить баннер' : '🖼 Баннер') +
+                    '</button>' +
+                    (t.themeLogo ? '<button class="superadmin-toggle-btn" onclick="removeTrainerLogo(\'' + t.trainerId + '\')">✕ Убрать баннер</button>' : '') +
                     '<button class="superadmin-toggle-btn" onclick="toggleTrainerTheme(\'' + t.trainerId + '\', \'' +
                         (t.themeMode === 'dark' ? '' : 'dark') + '\')">' +
                         (t.themeMode === 'dark' ? '☀️ Светлая' : '🌙 Тёмная') +
@@ -2804,6 +2833,47 @@ function renderSuperAdminTrainers(trainers) {
 }
 
 var currentPaymentTrainer = null;
+
+// Баннер тренера — картинка в шапке мини-аппа. Файл сжимаем прямо в
+// браузере (как фото упражнений) и кладём в базу: диск у приложения
+// временный, файлы на нём не переживают выкатку.
+function pickTrainerLogo(trainerId) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = function() {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        // Баннер широкий и невысокий, поэтому сторона больше, чем у фото
+        // упражнений — иначе надпись на нём становится нечитаемой.
+        _compressImageFile(file, 1600, 0.85, function(res) {
+            _sendTrainerLogo(trainerId, { logoBase64: res.base64, logoMime: res.mime }, 'Баннер обновлён');
+        }, function(err) { tg.showAlert(err); });
+    };
+    input.click();
+}
+
+function removeTrainerLogo(trainerId) {
+    tgConfirm('Убрать баннер у этого тренера?').then(function(ok) {
+        if (ok) _sendTrainerLogo(trainerId, { remove: true }, 'Баннер убран');
+    });
+}
+
+async function _sendTrainerLogo(trainerId, payload, okText) {
+    try {
+        var url = APPS_SCRIPT_URL + '?action=setTrainerLogo&targetTrainerId=' + encodeURIComponent(trainerId);
+        var resp = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        var data = await resp.json();
+        if (!data.success) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadSuperAdminTrainers();
+        tg.showAlert('✅ ' + okText + '. Тренеру и его клиентам нужно закрыть и открыть мини-апп заново.');
+    } catch (e) {
+        tg.showAlert('Ошибка соединения');
+    }
+}
 
 // Переключить тему тенанта: светлая (как у всех) или тёмная целиком.
 // Акцент для тёмной ставим красный сразу — светлый синий по умолчанию на
