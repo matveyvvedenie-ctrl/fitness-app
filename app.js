@@ -1312,6 +1312,22 @@ function _darkenHex(hex, amount) {
     } catch (_) { return hex; }
 }
 
+// Баннер тренера виден только на первой вкладке — см. обработчик
+// переключения вкладок. Держим признак отдельно: сам факт «у тренера есть
+// баннер» не меняется при переходах, меняется только показ.
+var _tenantHasBanner = false;
+
+function _activeTabName() {
+    var active = document.querySelector('.tab-btn.active');
+    return active ? active.dataset.tab : 'home';
+}
+
+function _syncTenantBanner(tabName) {
+    var banner = document.getElementById('tenant-banner');
+    if (!banner) return;
+    banner.classList.toggle('hidden', !(_tenantHasBanner && tabName === 'home'));
+}
+
 function applyTenantTheme(theme) {
     if (!theme) return;
     if (theme.primary) {
@@ -1338,11 +1354,11 @@ function applyTenantTheme(theme) {
         var img = banner.querySelector('img');
         if (theme.logo) {
             img.src = String(theme.logo);
-            banner.classList.remove('hidden');
         } else {
             img.removeAttribute('src');
-            banner.classList.add('hidden');
         }
+        _tenantHasBanner = !!theme.logo;
+        _syncTenantBanner(_activeTabName());
     }
     // Тёмный фон страницы под баннером оставляем и без картинки — он часть
     // тёмной темы, а не свойство баннера.
@@ -2320,6 +2336,10 @@ function initializeTabs() {
             btn.classList.add('active');
             document.querySelectorAll('.tab-content').forEach(function(content) { content.classList.remove('active'); });
             document.getElementById(tabName + '-tab').classList.add('active');
+            // Баннер тренера показываем только на первой вкладке: на
+            // остальных он съедал бы пол-экрана, а там нужен сам список.
+            // На них вкладки уезжают наверх, как было раньше.
+            _syncTenantBanner(tabName);
             if (tabName === 'progress') loadProgressData();
             if (tabName === 'measurements') loadMeasurementsData();
             if (tabName === 'admin') { loadAdminClients(); loadDashboardData(); }

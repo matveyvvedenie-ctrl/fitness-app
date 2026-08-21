@@ -80,16 +80,20 @@ body.has-tenant-bg {
    чёрный на телефоне даёт резкие границы карточек и «проваленные» тени.
    Чёрным остаётся только фон страницы — на нём лежит баннер тренера. */
 body.theme-dark {
-    --page-bg: #0a0b0d;
-    --surface: #16181c;
-    --surface-2: #101216;
-    --surface-3: #1b1e23;
-    --surface-4: #23262c;
-    --border: #2b2f36;
-    --border-soft: #21242a;
-    --text: #f0f2f4;
-    --text-muted: #a4aab4;
-    --text-faint: #7b828d;
+    /* Чистый чёрный фон страницы, как на фирменном баннере, и НЕЙТРАЛЬНЫЕ
+       тёмно-серые карточки — без синего уклона, который давал ощущение
+       «серости» вместо чёрного. Карточки чуть светлее фона, чтобы читались
+       как отдельные блоки, но не превращались в серые прямоугольники. */
+    --page-bg: #000000;
+    --surface: #141416;
+    --surface-2: #0b0b0c;
+    --surface-3: #1a1a1d;
+    --surface-4: #232326;
+    --border: #2a2a2e;
+    --border-soft: #1e1e21;
+    --text: #f2f2f3;
+    --text-muted: #9a9aa0;
+    --text-faint: #6e6e75;
 
     /* Подсветки — тёмные версии тех же оттенков, текст наоборот светлее:
        на чёрном исходные тёмно-зелёный и тёмно-красный не читаются. */
@@ -118,6 +122,35 @@ body.theme-dark .cc-day-block,
 body.theme-dark .cc-exercise {
     box-shadow: none;
     border: 1px solid var(--border);
+}
+
+/* В тёмной теме кнопки действий приводим к фирменному акценту: зелёная
+   «Сохранить», синяя «Написать», оранжевая «Видео» на чёрном выбивались из
+   стиля и выглядели как чужие элементы. Смысл кнопки от цвета не зависит —
+   он написан на самой кнопке. Состояния «сохраняется/сохранено» оставляем
+   отличимыми: они меняют не оттенок, а насыщенность. */
+body.theme-dark .admin-new-client-btn,
+body.theme-dark .save-btn,
+body.theme-dark .video-btn,
+body.theme-dark .msg-client-btn,
+body.theme-dark .food-log-btn,
+body.theme-dark .cc-action-notify {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+body.theme-dark .save-btn.saving {
+    background: var(--surface-4);
+    color: var(--text-muted);
+}
+
+body.theme-dark .save-btn.success {
+    background: var(--fg-success);
+    color: #0b0b0c;
+}
+
+body.theme-dark .exercise-photo {
+    background: var(--surface-3);
 }
 
 /* Баннер тренера в шапке. Ширина во всю страницу, высота — своя,
@@ -620,8 +653,12 @@ body.theme-dark .cc-exercise {
 
 /* Tabs — верхняя навигация */
 .tabs {
+    /* Растянуты по всей ширине: колонок ровно столько, сколько видимых
+       вкладок, поэтому у клиента с четырьмя и у тренера с шестью полоса
+       одинаково занимает всю строку, без пустого хвоста справа. */
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     background: var(--surface);
     border-bottom: 2px solid var(--border);
     position: sticky;
@@ -634,17 +671,38 @@ body.theme-dark .cc-exercise {
 }
 
 .tab-btn {
+    /* Иконка сверху, подпись под ней — так помещается больше вкладок и
+       подписи не обрезаются. */
     background: var(--surface);
     border: none;
-    padding: 14px 6px;
-    font-size: 14px;
+    padding: 9px 2px 7px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--text-faint);
     cursor: pointer;
     border-bottom: 3px solid transparent;
     transition: all 0.2s ease;
-    line-height: 1.2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    line-height: 1.15;
     text-align: center;
+    min-width: 0;
+}
+
+.tab-ico {
+    font-size: 19px;
+    line-height: 1;
+}
+
+.tab-lbl {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .tab-btn.active {
@@ -826,25 +884,11 @@ body.theme-dark .cc-exercise {
     font-size: 14px;
 }
 
-/* 5-column tabs when admin is visible (trainer view) */
-.tabs.tabs-5 {
-    grid-template-columns: repeat(5, 1fr);
-}
-
-.tabs.tabs-5 .tab-btn {
-    font-size: 11px;
-    padding: 12px 2px;
-}
-
-/* 6-column tabs — только у Matvey, когда сверх обычной админки видна ещё и
-   супер-админка (список всех тренеров) */
-.tabs.tabs-6 {
-    grid-template-columns: repeat(6, 1fr);
-}
-
+/* Классы tabs-5/tabs-6 больше не задают число колонок — оно считается само
+   по видимым вкладкам (см. grid-auto-flow выше). У шести вкладок остаётся
+   только подпись помельче, чтобы длинные слова влезали. */
 .tabs.tabs-6 .tab-btn {
     font-size: 10px;
-    padding: 12px 2px;
 }
 
 .superadmin-trainer-row {

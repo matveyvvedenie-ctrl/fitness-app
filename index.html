@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260821b">
+    <link rel="stylesheet" href="style.css?v=20260821c">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -87,12 +87,12 @@
 
         <!-- Tabs -->
         <div class="tabs" id="tabs-container">
-            <button class="tab-btn active" data-tab="home">🏠 Главная</button>
-            <button class="tab-btn" data-tab="workout">💪 Тренировка</button>
-            <button class="tab-btn" data-tab="progress">📊 Прогресс</button>
-            <button class="tab-btn" data-tab="measurements">📏 Замеры</button>
-            <button class="tab-btn hidden" data-tab="admin" id="admin-tab-btn">👑 Админ <span class="tab-badge hidden" id="admin-badge">0</span></button>
-            <button class="tab-btn hidden" data-tab="superadmin" id="superadmin-tab-btn">🛠 Тренеры</button>
+            <button class="tab-btn active" data-tab="home"><span class="tab-ico">🏠</span><span class="tab-lbl">Главная</span></button>
+            <button class="tab-btn" data-tab="workout"><span class="tab-ico">💪</span><span class="tab-lbl">Тренировка</span></button>
+            <button class="tab-btn" data-tab="progress"><span class="tab-ico">📊</span><span class="tab-lbl">Прогресс</span></button>
+            <button class="tab-btn" data-tab="measurements"><span class="tab-ico">📏</span><span class="tab-lbl">Замеры</span></button>
+            <button class="tab-btn hidden" data-tab="admin" id="admin-tab-btn"><span class="tab-ico">👑</span><span class="tab-lbl">Админ</span><span class="tab-badge hidden" id="admin-badge">0</span></button>
+            <button class="tab-btn hidden" data-tab="superadmin" id="superadmin-tab-btn"><span class="tab-ico">🛠</span><span class="tab-lbl">Тренеры</span></button>
         </div>
 
         <!-- Home Tab -->
@@ -1637,6 +1637,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260820e" defer></script>
+    <script src="app.js?v=20260820f" defer></script>
 </body>
 </html>
