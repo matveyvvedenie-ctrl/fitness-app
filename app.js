@@ -4248,11 +4248,20 @@ async function toggleArchiveClient(chatId, archived) {
 // ========== КАРТОЧКА КЛИЕНТА (Фаза 2A: просмотр программы) ==========
 
 var currentClientCard = null;
+// Дни, которые тренер только что создал, но ещё не наполнил упражнениями.
+// В новой схеме день — не отдельная сущность, а просто подпись на упражнении
+// (см. addClientDay в NEW_API_ACTIONS), поэтому пустой день бэкенду негде
+// хранить и в ответе программы его не будет. Держим такие дни здесь, чтобы
+// они всё-таки отрисовались и в них было куда нажать «+ Добавить упражнение».
+// Живут до перезагрузки страницы или до перехода к другому клиенту — ровно
+// столько, сколько нужно, чтобы довести день до первого упражнения.
+var pendingEmptyDays = [];
 
 function openClientCard(chatId) {
     var client = adminClients.find(function(c) { return c.chatId === chatId; });
     if (!client) return;
     currentClientCard = client;
+    pendingEmptyDays = [];
 
     document.getElementById('cc-name').textContent = client.name || 'Клиент';
     document.getElementById('cc-meta').textContent =
@@ -4298,6 +4307,7 @@ function _doCloseClientCard() {
     screen.classList.add('hidden');
     document.body.classList.remove('no-scroll');
     currentClientCard = null;
+    pendingEmptyDays = [];
 }
 
 function switchClientCardTab(tabName) {
@@ -4993,7 +5003,14 @@ async function splitGroup(firstRowIndex) {
 
 function renderClientProgram(data) {
     var container = document.getElementById('cc-program-container');
-    var days = data.days || [];
+    var days = (data.days || []).slice();
+    // Дни, созданные только что и ещё пустые, бэкенд не вернёт — добавляем их
+    // сами. Если в день уже успели положить упражнение, он придёт с бэкенда,
+    // и дубликат тут не появится.
+    pendingEmptyDays.forEach(function(name) {
+        var already = days.some(function(d) { return (d.day || '') === name; });
+        if (!already) days.push({ day: name, exercises: [] });
+    });
     // Заполняем кэш rowIndex → упражнение, чтобы редактор мог быстро взять данные
     currentProgramExercisesByRow = {};
     days.forEach(function(day) {
@@ -5084,7 +5101,7 @@ function renderClientProgram(data) {
                 '<button class="cc-day-menu-btn" onclick="showDayActionsDialog(\'' + safeDay + '\')" title="Действия с днём">⋯</button>' +
             '</div>' +
             '<div class="cc-day-exercises" data-day-name="' + safeDay + '">' +
-                (groupsHtml || '<div class="no-data">Нет упражнений</div>') +
+                (groupsHtml || '<div class="no-data">Пока пусто — день сохранится, когда добавишь первое упражнение</div>') +
             '</div>' +
             '<button class="cc-add-ex-btn" onclick="showAddTypeDialog(\'' + safeDay + '\')">+ Добавить упражнение</button>' +
         '</div>';
@@ -7161,6 +7178,7 @@ async function submitAddDay() {
             return;
         }
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        if (pendingEmptyDays.indexOf(dayName) === -1) pendingEmptyDays.push(dayName);
         closeAddDayModal();
         await loadClientProgram(currentClientCard.sheetName);
     } catch (error) {
