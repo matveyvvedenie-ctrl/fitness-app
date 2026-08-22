@@ -147,23 +147,12 @@ body.theme-dark .cc-exercise {
    он написан на самой кнопке. Состояния «сохраняется/сохранено» оставляем
    отличимыми: они меняют не оттенок, а насыщенность. */
 body.theme-dark .admin-new-client-btn,
-body.theme-dark .save-btn,
 body.theme-dark .video-btn,
 body.theme-dark .msg-client-btn,
 body.theme-dark .food-log-btn,
 body.theme-dark .cc-action-notify {
     background: var(--color-primary);
     color: #fff;
-}
-
-body.theme-dark .save-btn.saving {
-    background: var(--surface-4);
-    color: var(--text-muted);
-}
-
-body.theme-dark .save-btn.success {
-    background: var(--fg-success);
-    color: #0b0b0c;
 }
 
 body.theme-dark .exercise-photo {
@@ -255,6 +244,49 @@ body.theme-dark .add-day-chip.active,
 body.theme-dark .ex-lib-tab.active,
 body.theme-dark .prof-radio:has(input:checked) {
     background: var(--grad-red-chip);
+}
+
+/* Две главные кнопки — «Начать тренировку» и «Сохранить результаты» —
+   сделаны по отдельному образцу: чёрная середина и красное свечение,
+   идущее от краёв внутрь.
+
+   Это ВНУТРЕННЯЯ тень, а не градиент. Градиент пришлось бы подгонять под
+   каждый размер: у «Начать» кнопка широкая и низкая, у «Сохранить» —
+   узкая и с сильным скруглением, и один и тот же радиальный градиент
+   выглядел бы на них по-разному. Тень же всегда идёт ровно по контуру,
+   какой бы ни была форма. */
+body.theme-dark .home-start-btn,
+body.theme-dark .save-btn {
+    background: #08080a;
+    color: #fff;
+    border: 1px solid rgba(229, 57, 53, 0.55);
+    box-shadow:
+        inset 0 0 30px -4px var(--color-primary),
+        inset 0 0 8px -2px var(--color-primary),
+        0 0 22px rgba(229, 57, 53, 0.30);
+}
+
+body.theme-dark .home-start-btn:active,
+body.theme-dark .save-btn:active {
+    box-shadow:
+        inset 0 0 22px -4px var(--color-primary),
+        0 0 12px rgba(229, 57, 53, 0.25);
+}
+
+/* Пока сохраняется/сохранено — свечение меняет цвет, чтобы состояние
+   читалось без чтения текста. */
+body.theme-dark .save-btn.saving {
+    background: #08080a;
+    color: var(--text-muted);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 0 26px -6px var(--text-faint);
+}
+
+body.theme-dark .save-btn.success {
+    background: #08080a;
+    color: #fff;
+    border-color: rgba(110, 220, 140, 0.5);
+    box-shadow: inset 0 0 30px -4px var(--fg-success), 0 0 18px rgba(110, 220, 140, 0.25);
 }
 
 /* Баннер тренера в шапке. Ширина во всю страницу, высота — своя,
