@@ -105,6 +105,23 @@ body.theme-dark {
     --fg-danger:    #ff8078;
     --fg-warning:   #f0b429;
     --fg-info:      #6cb6ff;
+
+    /* Три красно-чёрных градиента вместо плоской заливки — по образцам,
+       которые прислал Matvey. Все строятся из акцента тренера, поэтому у
+       другого тренера с тёмной темой получится тот же приём в его цвете.
+
+       panel — крупные шапки: уходит в чёрный по диагонали, как на первом
+               образце. На большой площади плоский красный выглядит дёшево.
+       btn   — кнопки: разгон слева направо со светлым краем, чтобы кнопка
+               читалась выпуклой.
+       chip  — мелочь (значки, точки, полоски прогресса): короткий переход,
+               на паре десятков пикселей длинный градиент не виден вовсе. */
+    --grad-red-panel: linear-gradient(135deg,
+        var(--surface) 0%, var(--color-primary-dark) 62%, var(--color-primary) 100%);
+    --grad-red-btn: linear-gradient(100deg,
+        var(--color-primary-dark) 0%, var(--color-primary) 72%, var(--color-primary) 100%);
+    --grad-red-chip: linear-gradient(160deg,
+        var(--color-primary) 0%, var(--color-primary-dark) 100%);
 }
 
 /* Поля ввода в тёмной теме браузер по умолчанию рисует светлыми — говорим
@@ -189,6 +206,55 @@ body.theme-dark .home-start-btn {
 
 body.theme-dark .home-start-btn:active {
     box-shadow: 0 0 14px rgba(229, 57, 53, 0.35), 0 3px 10px rgba(0, 0, 0, 0.6);
+}
+
+/* Красные элементы по всем вкладкам — на градиенты (см. токены выше). */
+body.theme-dark .header,
+body.theme-dark .day-header,
+body.theme-dark .dashboard-header,
+body.theme-dark .cc-header,
+body.theme-dark .ex-stat-header,
+body.theme-dark .admin-clients-table th {
+    background: var(--grad-red-panel);
+}
+
+body.theme-dark .day-collapsible:active {
+    background: var(--grad-red-chip);
+}
+
+body.theme-dark .admin-new-client-btn,
+body.theme-dark .save-btn,
+body.theme-dark .video-btn,
+body.theme-dark .msg-client-btn,
+body.theme-dark .food-log-btn,
+body.theme-dark .cc-action-notify,
+body.theme-dark .cc-action-week,
+body.theme-dark .cc-add-day-btn,
+body.theme-dark .admin-card-btn-primary,
+body.theme-dark .nc-btn-primary,
+body.theme-dark .notes-save-btn,
+body.theme-dark .ex-editor-btn-save,
+body.theme-dark .meas-save-btn,
+body.theme-dark .superadmin-toggle-btn {
+    background: var(--grad-red-btn);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+body.theme-dark .tab-badge,
+body.theme-dark .cc-ex-num,
+body.theme-dark .cc-ex-suplabel,
+body.theme-dark .home-dot.full,
+body.theme-dark .photo-progress-badge,
+body.theme-dark .stats-photo-check,
+body.theme-dark .progress-fill,
+body.theme-dark .stats-consistency-fill.cc-fill-low,
+body.theme-dark .filter-btn.active,
+body.theme-dark .admin-filter-btn.active,
+body.theme-dark .add-day-chip.active,
+body.theme-dark .ex-lib-tab.active,
+body.theme-dark .prof-radio:has(input:checked) {
+    background: var(--grad-red-chip);
 }
 
 /* Баннер тренера в шапке. Ширина во всю страницу, высота — своя,
