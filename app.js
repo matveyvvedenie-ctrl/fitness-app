@@ -2229,20 +2229,34 @@ document.getElementById('save-btn').addEventListener('click', async function() {
             var url = APPS_SCRIPT_URL + '?action=write&chatId=' + chatId + '&completionPercent=' + completionPercent;
             var data = null;
             var lastError = '';
+            // Дошла ли уже первая часть длинного запроса — чтобы повтор её не
+            // отправлял ещё раз (см. ниже).
+            var savedBatch1 = false;
             for (var attempt = 0; attempt < 3; attempt++) {
                 try {
                     var encoded = encodeURIComponent(JSON.stringify(exercisesToSave));
                     var fullUrl = url + '&exercises=' + encoded;
                     var response;
                     if (fullUrl.length > 7500) {
-                        // Split into 2 batches if URL too long
+                        // Длинный запрос не влезает в адрес — шлём двумя частями.
+                        //
+                        // 2026-08-22: раньше при повторе после сбоя обе части
+                        // отправлялись заново — даже та, что уже дошла. У клиента
+                        // с 10 упражнениями в истории оказывалось 20: одна и та
+                        // же тренировка записана дважды (реальный случай,
+                        // Александр, 21 августа). Запоминаем, какая часть уже
+                        // прошла, и повторяем только непрошедшую.
                         var half = Math.ceil(exercisesToSave.length / 2);
-                        var batch1 = exercisesToSave.slice(0, half);
-                        var batch2 = exercisesToSave.slice(half);
-                        var url1 = url + '&exercises=' + encodeURIComponent(JSON.stringify(batch1));
-                        var url2 = url + '&exercises=' + encodeURIComponent(JSON.stringify(batch2));
-                        response = await fetch(url1);
-                        await response.text();
+                        if (!savedBatch1) {
+                            var url1 = url + '&exercises=' + encodeURIComponent(JSON.stringify(exercisesToSave.slice(0, half)));
+                            response = await fetch(url1);
+                            var t1 = await response.text();
+                            var d1 = null;
+                            try { d1 = JSON.parse(t1); } catch (_) { d1 = null; }
+                            if (!(d1 && d1.success)) throw new Error((d1 && d1.error) || 'Первая часть не сохранилась');
+                            savedBatch1 = true;
+                        }
+                        var url2 = url + '&exercises=' + encodeURIComponent(JSON.stringify(exercisesToSave.slice(half)));
                         response = await fetch(url2);
                     } else {
                         response = await fetch(fullUrl);
