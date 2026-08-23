@@ -1337,7 +1337,12 @@ function applyTenantTheme(theme) {
     }
     // Тёмная тема тенанта целиком (не только акцент). Всё переключение —
     // один класс на body, дальше работают переменные в style.css.
-    document.body.classList.toggle('theme-dark', theme.mode === 'dark');
+    // Тем теперь три, поэтому не переключатель «тёмная да/нет», а выбор
+    // одного класса из списка: иначе при смене темы у тренера на теле
+    // остался бы висеть класс прошлой.
+    ['theme-dark', 'theme-sand'].forEach(function(cls) {
+        document.body.classList.toggle(cls, ('theme-' + theme.mode) === cls);
+    });
     if (theme.displayName) {
         var titleEl = document.querySelector('title');
         if (titleEl) titleEl.textContent = theme.displayName;
@@ -2852,9 +2857,8 @@ function renderSuperAdminTrainers(trainers) {
                         (t.themeLogo ? '🖼 Сменить баннер' : '🖼 Баннер') +
                     '</button>' +
                     (t.themeLogo ? '<button class="superadmin-toggle-btn" onclick="removeTrainerLogo(\'' + t.trainerId + '\')">✕ Убрать баннер</button>' : '') +
-                    '<button class="superadmin-toggle-btn" onclick="toggleTrainerTheme(\'' + t.trainerId + '\', \'' +
-                        (t.themeMode === 'dark' ? '' : 'dark') + '\')">' +
-                        (t.themeMode === 'dark' ? '☀️ Светлая' : '🌙 Тёмная') +
+                    '<button class="superadmin-toggle-btn" onclick="cycleTrainerTheme(\'' + t.trainerId + '\', \'' + (t.themeMode || '') + '\')">' +
+                        THEME_LABELS[t.themeMode || ''] +
                     '</button>' +
                     '<button class="superadmin-toggle-btn' + (isDisabled ? ' is-disabled' : '') +
                         '" onclick="toggleTrainerStatus(\'' + t.trainerId + '\', \'' + (isDisabled ? 'active' : 'disabled') + '\')">' +
@@ -2909,26 +2913,31 @@ async function _sendTrainerLogo(trainerId, payload, okText) {
     }
 }
 
-// Переключить тему тенанта: светлая (как у всех) или тёмная целиком.
-// Акцент для тёмной ставим красный сразу — светлый синий по умолчанию на
-// чёрном фоне выглядит грязно, а отдельного поля для цвета в списке нет.
-async function toggleTrainerTheme(trainerId, mode) {
-    var ok = await tgConfirm(mode === 'dark'
-        ? 'Включить тёмную тему у этого тренера?'
-        : 'Вернуть светлую тему?');
+// Темы тенанта. Порядок в списке — порядок перебора по кнопке в
+// супер-админке: каждое нажатие переводит тренера к следующей.
+var THEME_ORDER = ['', 'dark', 'sand'];
+var THEME_LABELS = { '': '🎨 Светлая', 'dark': '🎨 Тёмная', 'sand': '🎨 Бежевая' };
+// Акцент, который ставится вместе с темой. У тёмной он яркий (иначе на
+// чёрном заголовки не читаются), у бежевой — почти чёрный: там главная
+// кнопка тёмная, а не цветная.
+var THEME_ACCENTS = { '': '', 'dark': '#e53935', 'sand': '#2a2521' };
+
+async function cycleTrainerTheme(trainerId, currentMode) {
+    var next = THEME_ORDER[(THEME_ORDER.indexOf(currentMode || '') + 1) % THEME_ORDER.length];
+    var ok = await tgConfirm('Переключить тему тренера на «' +
+        THEME_LABELS[next].replace('🎨 ', '') + '»?');
     if (!ok) return;
     try {
         var qs = 'action=setTrainerTheme&targetTrainerId=' + encodeURIComponent(trainerId) +
-            '&themeMode=' + encodeURIComponent(mode) +
-            (mode === 'dark' ? '&themePrimary=' + encodeURIComponent('#e53935') : '');
+            '&themeMode=' + encodeURIComponent(next) +
+            (THEME_ACCENTS[next] ? '&themePrimary=' + encodeURIComponent(THEME_ACCENTS[next]) : '');
         var resp = await fetch(APPS_SCRIPT_URL + '?' + qs);
         var data = await resp.json();
         if (!data.success) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         await loadSuperAdminTrainers();
-        tg.showAlert(mode === 'dark'
-            ? '🌙 Тёмная тема включена. Тренеру и его клиентам нужно закрыть и открыть мини-апп заново.'
-            : '☀️ Светлая тема возвращена.');
+        tg.showAlert('Тема: ' + THEME_LABELS[next].replace('🎨 ', '') +
+            '. Тренеру и его клиентам нужно закрыть и открыть мини-апп заново.');
     } catch (e) {
         tg.showAlert('Ошибка соединения');
     }

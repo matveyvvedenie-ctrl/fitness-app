@@ -17,6 +17,11 @@
     --text: #1a1a1a;
     --text-muted: #666666;
     --text-faint: #999999;
+    /* Цвет крупных цифр-акцентов (рекорд, вес, RPE). Отдельно от
+       --color-primary: у базовой темы фирменный цвет тёмно-синий, а цифры
+       исторически красные — менять их заодно было бы неожиданной правкой
+       чужой темы. */
+    --accent-text: #E53935;
 
     /* Смысловые пары «подсветка + текст»: выполнено, ошибка, внимание,
        справка. Держим их отдельно от нейтральных поверхностей — в тёмной
@@ -105,6 +110,7 @@ body.theme-dark {
     --fg-danger:    #ff8078;
     --fg-warning:   #f0b429;
     --fg-info:      #6cb6ff;
+    --accent-text:  var(--color-primary);
 
     /* Три красно-чёрных градиента вместо плоской заливки — по образцам,
        которые прислал Matvey. Все строятся из акцента тренера, поэтому у
@@ -195,6 +201,119 @@ body.theme-dark .home-start-btn {
 
 body.theme-dark .home-start-btn:active {
     box-shadow: 0 0 14px rgba(229, 57, 53, 0.35), 0 3px 10px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Бежевая тема тенанта (ANNA LUMEN) ───────────────────────────────────
+   Третья тема, не «светлая с другим акцентом»: у неё другой характер —
+   тёплый небелый фон, мягкие бежевые карточки, почти чёрный текст и
+   ПОЧТИ ЧЁРНАЯ главная кнопка вместо цветной. Поэтому акцент здесь тёмный,
+   а не яркий, как у двух других тем.
+
+   Шрифт с засечками — системный (Georgia на iPhone, Noto Serif на
+   Android), а не подгружаемый: шрифт с чужого сервера в России может
+   долго тянуться или не прийти вовсе, и тогда надписи прыгнут. Системный
+   рисуется мгновенно и всегда. */
+body.theme-sand {
+    --page-bg: #f6f1ea;
+    --surface: #fffdfa;
+    --surface-2: #f1eae0;
+    --surface-3: #faf6f0;
+    --surface-4: #e8dfd2;
+    --border: #e3d9ca;
+    --border-soft: #efe7dc;
+    --text: #2a2521;
+    --text-muted: #6f655a;
+    --text-faint: #9c9082;
+
+    --color-primary: #2a2521;
+    --color-primary-dark: #171310;
+
+    --tint-success: #eaf0e6;
+    --tint-danger:  #f6e9e6;
+    --tint-warning: #f6efdf;
+    --tint-info:    #e9eef3;
+    --fg-success:   #4c6b45;
+    --fg-danger:    #9c4a3c;
+    --fg-warning:   #8a6a2f;
+    --fg-info:      #4a6076;
+    --accent-text:  var(--color-primary);
+}
+
+/* Заголовки — засечным шрифтом, как в макете. Обычный текст и цифры
+   оставляем обычным: засечки в мелких подписях и в таблицах читаются
+   хуже, а тут важнее разборчивость. */
+body.theme-sand .home-greet,
+body.theme-sand .home-card-title,
+body.theme-sand .stat-value,
+body.theme-sand h1,
+body.theme-sand h2,
+body.theme-sand h3 {
+    font-family: Georgia, 'Noto Serif', 'Times New Roman', serif;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+/* Мелкие подписи вразрядку заглавными — характерный приём этого макета. */
+body.theme-sand .stat-label {
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+/* Приветствие: мягкий бежевый блок, а не заливка акцентом. Текст тёмный,
+   поэтому белый по умолчанию тут переопределяем. */
+body.theme-sand .home-hero {
+    background: linear-gradient(120deg, #efe6d8 0%, #e7dccb 100%);
+    color: var(--text);
+    box-shadow: none;
+    border: 1px solid var(--border);
+}
+
+body.theme-sand .home-hero .home-subtitle {
+    color: var(--text-muted);
+}
+
+/* Главная кнопка — почти чёрная, как в макете, без свечения. */
+body.theme-sand .home-start-btn,
+body.theme-sand .save-btn {
+    background: linear-gradient(120deg, #2f2924 0%, #191512 100%);
+    color: #fff;
+    border: none;
+    box-shadow: 0 6px 18px rgba(42, 37, 33, 0.22);
+}
+
+/* Шапки и кнопки действий — тёмные, в одном характере с главной кнопкой.
+   Ярких цветных заливок в этой теме нет вовсе. */
+body.theme-sand .header,
+body.theme-sand .day-header,
+body.theme-sand .dashboard-header,
+body.theme-sand .cc-header,
+body.theme-sand .ex-stat-header {
+    background: linear-gradient(120deg, #332d27 0%, #1d1815 100%);
+    color: #fff;
+}
+
+body.theme-sand .admin-new-client-btn,
+body.theme-sand .msg-client-btn,
+body.theme-sand .video-btn,
+body.theme-sand .food-log-btn,
+body.theme-sand .cc-action-notify,
+body.theme-sand .cc-action-week,
+body.theme-sand .cc-add-day-btn,
+body.theme-sand .admin-card-btn-primary,
+body.theme-sand .nc-btn-primary,
+body.theme-sand .notes-save-btn,
+body.theme-sand .ex-editor-btn-save,
+body.theme-sand .meas-save-btn,
+body.theme-sand .superadmin-toggle-btn {
+    background: linear-gradient(120deg, #3a332c 0%, #221c18 100%);
+    color: #fff;
+    border: none;
+}
+
+body.theme-sand .tab-btn.active {
+    color: var(--text);
+    border-bottom-color: var(--text);
+    background: var(--surface);
 }
 
 /* Красные элементы по всем вкладкам — на градиенты (см. токены выше). */
@@ -642,7 +761,7 @@ body.theme-dark .save-btn.success {
 }
 
 .param-value.plan { color: var(--fg-info); }
-.param-value.rpe { color: #E53935; }
+.param-value.rpe { color: var(--accent-text); }
 
 /* Video Button */
 .video-btn {
@@ -896,7 +1015,7 @@ body.theme-dark .save-btn.success {
 .stat-value {
     font-size: 24px;
     font-weight: 700;
-    color: #E53935;
+    color: var(--accent-text);
     margin-bottom: 4px;
 }
 
@@ -1004,7 +1123,7 @@ body.theme-dark .save-btn.success {
 .record-weight {
     font-size: 18px;
     font-weight: 700;
-    color: #E53935;
+    color: var(--accent-text);
     margin-left: 8px;
 }
 
@@ -4320,7 +4439,7 @@ body.theme-dark .save-btn.success {
 .latest-item-value {
     font-size: 20px;
     font-weight: 700;
-    color: #E53935;
+    color: var(--accent-text);
     margin-bottom: 2px;
 }
 
@@ -4442,7 +4561,7 @@ body.theme-dark .save-btn.success {
 .photo-progress-weight {
     font-size: 15px;
     font-weight: 700;
-    color: #E53935;
+    color: var(--accent-text);
     margin-bottom: 8px;
 }
 
@@ -4687,7 +4806,7 @@ body.theme-dark .save-btn.success {
 .measurement-row-date {
     font-size: 13px;
     font-weight: 700;
-    color: #E53935;
+    color: var(--accent-text);
     margin-bottom: 8px;
 }
 
@@ -4884,7 +5003,7 @@ body.theme-dark .save-btn.success {
 .home-info-value {
     font-size: 22px;
     font-weight: 800;
-    color: #E53935;
+    color: var(--accent-text);
     margin: 4px 0 2px;
 }
 
