@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260822b">
+    <link rel="stylesheet" href="style.css?v=20260823a">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -28,6 +28,44 @@
          chart.js/Sortable.js (cdn.jsdelivr.net) — на всякий случай тоже
          убрали внешнюю зависимость, раз уж нашли реальный кейс, когда
          сторонний CDN недоступен на конкретной сети. -->
+    <script>
+    /* Самообновление страницы.
+       Версия в ?v= у app.js/style.css спасает от старого КОДА, но не от
+       старого index.html — а именно он эти версии и несёт. Встроенные
+       браузеры VK и Telegram держат его сутками, и человек продолжает
+       видеть прежний интерфейс, хотя всё давно выкачено (случалось не раз).
+
+       Поэтому при загрузке спрашиваем у сервера version.txt в обход кэша и
+       сверяем с версией, зашитой в этот самый файл. Разошлись — значит у нас
+       на руках устаревший index.html, перезагружаемся с новым адресом (кэш
+       ключуется по полному адресу, поэтому придёт свежая копия).
+
+       Осторожности: запрос к серверу не влияет на отрисовку (ошибка сети —
+       просто ничего не делаем); адрес запуска VK сохраняем целиком, иначе
+       потеряются параметры входа и подпись; повтор защищён отметкой в
+       sessionStorage, чтобы не зациклиться, если сервер отдаёт старое. */
+    (function () {
+        try {
+            var tag = document.querySelector('script[src^="app.js?v="]');
+            var built = tag ? tag.getAttribute('src').split('v=')[1] : '';
+            if (!built || sessionStorage.getItem('freshCheck') === built) return;
+            fetch('version.txt?t=' + Date.now(), { cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.text() : ''; })
+                .then(function (latest) {
+                    latest = (latest || '').trim();
+                    if (!latest || latest === built) {
+                        sessionStorage.setItem('freshCheck', built);
+                        return;
+                    }
+                    if (sessionStorage.getItem('freshCheck') === latest) return;
+                    sessionStorage.setItem('freshCheck', latest);
+                    var q = location.search ? location.search + '&fresh=' : '?fresh=';
+                    location.replace(location.pathname + q + encodeURIComponent(latest));
+                })
+                .catch(function () {});
+        } catch (_) {}
+    })();
+    </script>
     <script src="vendor/telegram-web-app.js" defer></script>
     <script src="vendor/vk-bridge.min.js" defer></script>
     <script src="vendor/chart.umd.min.js" defer></script>
@@ -1638,6 +1676,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260820i" defer></script>
+    <script src="app.js?v=20260823a" defer></script>
 </body>
 </html>
