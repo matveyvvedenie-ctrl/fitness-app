@@ -1226,6 +1226,31 @@ var NEW_API_ACTIONS = {
     // main.py) — отдельным точечным PATCH сразу следом; если он вдруг не
     // удастся, тренер всё равно уже создан и виден в списке, токен можно
     // будет доставить позже через ту же форму (create_trainer — upsert).
+    // 2026-08-23. Демо было ПОСЛЕДНИМ действием, уходившим в Apps Script —
+    // и из-за этого создавало тренера, которого новый бэкенд не знает: в
+    // мини-аппе он открывался с «Тренер не найден». Причём форма открывается
+    // именно на демо, так что напороться было проще простого (и напоролись).
+    // Теперь демо — обычный тренер со статусом demo и сроком жизни; своей
+    // VK-группы у него нет, поэтому идентификатор придумываем сами, как это
+    // делал старый код.
+    createDemoTrainer: function(nativeFetch, params) {
+        var asChatId = encodeURIComponent(_myChatId());
+        var rnd = Math.random().toString(16).slice(2, 10);
+        var trainerId = 'demo_' + rnd;
+        var body = {
+            trainerId: trainerId, displayName: params.get('displayName') || 'Демо',
+            vkGroupId: '', status: 'demo',
+            trainerChatId: params.get('trainerChatId') || '',
+            demoHours: parseInt(params.get('demoHours') || '48', 10)
+        };
+        return nativeFetch(NEW_API_BASE + '/admin/trainers?asChatId=' + asChatId, {
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(body)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({ success: true, trainerId: trainerId }, 200);
+        }); });
+    },
     createTrainer: function(nativeFetch, params) {
         var asChatId = encodeURIComponent(_myChatId());
         var vkGroupId = params.get('vkGroupId') || '';
@@ -2833,8 +2858,11 @@ function renderSuperAdminTrainers(trainers) {
         var sheetLink = t.spreadsheetId
             ? ('<a class="superadmin-sheet-link" href="https://docs.google.com/spreadsheets/d/' + t.spreadsheetId + '" target="_blank" onclick="event.stopPropagation()">📊 Таблица</a>')
             : '';
-        var openAsBtn = t.vkGroupId
-            ? ('<button class="superadmin-openas-btn" onclick="openAsTrainer(\'' + t.vkGroupId + '\')">🔎 Открыть как тренер</button>')
+        // У демо своей VK-группы нет — открываем по его собственному
+        // идентификатору, мини-апп принимает и такой (см. _newApiTrainerId).
+        var openAsId = t.vkGroupId || t.trainerId;
+        var openAsBtn = openAsId
+            ? ('<button class="superadmin-openas-btn" onclick="openAsTrainer(\'' + openAsId + '\')">🔎 Открыть как тренер</button>')
             : '';
         var p = t.payment;
         var paymentLabel = p ? (SUPERADMIN_PAYMENT_LABELS[p.status] || p.status) : 'Нет оплат';
@@ -3027,7 +3055,10 @@ function openNewTrainerForm() {
     document.getElementById('nt-demo-chatid').value = '';
     document.getElementById('nt-color').value = '';
     document.getElementById('nt-vktoken').value = '';
-    document.getElementById('nt-status').value = 'demo';
+    // Открываем на «боевом»: обычных тренеров заводят почти всегда, а демо
+    // редко. Раньше форма открывалась на демо, и было легко не заметить, что
+    // группа с токеном, которые ты только что вписал, никуда не пойдут.
+    document.getElementById('nt-status').value = 'active';
     updateNewTrainerFormMode();
     document.getElementById('new-trainer-modal').classList.remove('hidden');
     document.body.classList.add('no-scroll');
