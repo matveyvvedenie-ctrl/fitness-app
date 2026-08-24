@@ -126,7 +126,6 @@ var NEW_API_KEY = '72bdc5e9073da1309592590508c0098bcaad8139c82aeafa77438c2ed46f7
 // зеркально прежней railway-проблеме). Если у Ромы опять не откроется —
 // сразу откатить обратно на {} и разбираться заново с нуля, не
 // предполагать что причина та же самая.
-var NEW_API_PILOT_TRAINERS = {'240703996': true}; // Роман
 
 // ── Фаза 5 (2026-08-15, см. MIGRATION_PLAN.md) ──────────────────────────────
 // Matvey — тенант ПО УМОЛЧАНИЮ в старой системе (_resolveTenant('') в
@@ -155,7 +154,6 @@ var NEW_API_PILOT_TRAINERS = {'240703996': true}; // Роман
 // в теории может привести к ЛЮБОМУ тренеру, а не только к Matvey — гадать
 // на фронте не будем, оставляем такой запуск на старом бэкенде как есть.
 var NEW_API_DEFAULT_TENANT_TRAINER_ID = '739299264'; // Matvey, см. DEFAULT_TRAINER_CHAT_ID в apps_script.js
-var NEW_API_DEFAULT_TENANT_PILOT = true; // 2026-08-16 (повторно) — 3 подтверждённых бага (фото/история/статусы Тренерской, все из-за непереехавшей exercise_history) исправлены и проверены на реальных данных, см. MIGRATION_PLAN.md
 
 // 2026-08-20. Тенант, УЗНАННЫЙ по самому человеку (см. resolveTenantForVkUser
 // ниже) — для запусков во VK БЕЗ vk_group_id в ссылке. Отдельная переменная,
@@ -166,22 +164,39 @@ var NEW_API_DEFAULT_TENANT_PILOT = true; // 2026-08-16 (повторно) — 3 
 var NEW_API_RESOLVED_TRAINER_ID = '';
 
 function _newApiTrainerId() {
-    // Явно узнанный тенант важнее любых догадок ниже.
+    // Какому тренеру принадлежит то, что мы сейчас читаем и пишем.
+    //
+    // 2026-08-24. Раньше здесь был список «пилотных» тренеров: на новый
+    // бэкенд пускали только тех, кто в нём перечислен, остальные шли в старый
+    // Apps Script. Список остался с этапа переезда, когда на новой базе жил
+    // один Роман. Переезд давно закончен, а список — нет: Анну завели,
+    // запись в базе появилась, а мини-апп продолжал спрашивать про неё
+    // старую систему и получал «Тренер не найден». Каждый следующий тренер
+    // ломался бы точно так же в день создания.
+    //
+    // Теперь наоборот: тенант из ссылки работает со своей записью в базе,
+    // никаких списков. Особые случаи ниже — только про то, как узнать
+    // ДЕФОЛТНОГО тенанта (Matvey), у которого id не совпадает с VK-группой.
+
+    // Явно узнанный тенант важнее любых догадок (см. resolveTenantForVkUser).
     if (NEW_API_RESOLVED_TRAINER_ID) return NEW_API_RESOLVED_TRAINER_ID;
-    if (NEW_API_PILOT_TRAINERS[CURRENT_TRAINER_ID]) return CURRENT_TRAINER_ID;
-    if (NEW_API_DEFAULT_TENANT_PILOT && !CURRENT_TRAINER_ID && !vkLaunchUserId) return NEW_API_DEFAULT_TENANT_TRAINER_ID;
-    // 2026-08-19: вход через собственную VK-группу Matvey (matpavbot) — тоже
-    // дефолт-тенант, просто с другим "паспортом" (подпись VK вместо Telegram,
-    // см. _newApiHeaders ниже и vk_auth.py на бэкенде).
-    if (NEW_API_DEFAULT_TENANT_PILOT && CURRENT_TRAINER_ID === MATVEY_VK_GROUP_ID) return NEW_API_DEFAULT_TENANT_TRAINER_ID;
-    // Прямая ссылка вида ?vk_user_id=458191089 БЕЗ vk_group_id — раньше
-    // сознательно не трогали (резолвинг по chatId в теории мог привести к
-    // ЛЮБОМУ тренеру, гадать на фронте не хотели, см. комментарий выше по
-    // файлу). Но конкретно ЭТОТ VK ID — уже давно известная константа
-    // (TRAINER_VK_CHAT_ID, "это точно Matvey"), тут ничего не гадаем.
-    if (NEW_API_DEFAULT_TENANT_PILOT && !CURRENT_TRAINER_ID && vkLaunchUserId === '458191089') {
+
+    // Собственная VK-группа Matvey — тот же дефолт-тенант, просто вход с
+    // другим «паспортом»: подпись VK вместо Telegram. Его id в базе —
+    // Telegram-id, а не номер группы, см. gotcha_trainer_id_vs_vk_group_id.
+    if (CURRENT_TRAINER_ID === MATVEY_VK_GROUP_ID) return NEW_API_DEFAULT_TENANT_TRAINER_ID;
+
+    // Любой другой тренер из ссылки — работает со своей записью.
+    if (CURRENT_TRAINER_ID) return CURRENT_TRAINER_ID;
+
+    // Тенанта в ссылке нет. Telegram — там всегда Matvey (бот у площадки
+    // один). Его же личная VK-ссылка без группы — тоже он.
+    if (!vkLaunchUserId || vkLaunchUserId === TRAINER_VK_CHAT_ID.replace('vk_', '')) {
         return NEW_API_DEFAULT_TENANT_TRAINER_ID;
     }
+
+    // Остаётся VK-запуск без группы у кого-то другого: кто это, здесь не
+    // угадать — тенанта определит резолвер по самому человеку.
     return '';
 }
 
