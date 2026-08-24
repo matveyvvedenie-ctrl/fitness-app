@@ -89,7 +89,6 @@ function _fetchWithRetry(nativeFetch, input, init, retriesLeft) {
 // как раньше — НИКАКИХ изменений для любого другого trainerId, в том числе
 // для Matvey по умолчанию (без trainerId вообще): action просто не найдётся
 // в NEW_API_ACTIONS, код пойдёт по старому пути ниже, 1-в-1 как было.
-// Откат — убрать id из NEW_API_PILOT_TRAINERS, без передеплоя бэкенда.
 //
 // NEW_API_KEY виден любому, кто откроет исходник страницы — это браузер, не
 // сервер, спрятать его тут физически нельзя. Не настоящий секрет, а тот же
@@ -130,9 +129,7 @@ var NEW_API_KEY = '72bdc5e9073da1309592590508c0098bcaad8139c82aeafa77438c2ed46f7
 // ── Фаза 5 (2026-08-15, см. MIGRATION_PLAN.md) ──────────────────────────────
 // Matvey — тенант ПО УМОЛЧАНИЮ в старой системе (_resolveTenant('') в
 // apps_script.js), у него в принципе НЕТ trainerId — поэтому CURRENT_TRAINER_ID
-// для него ВСЕГДА пустая строка, и NEW_API_PILOT_TRAINERS[''] никогда не
 // сработает (в отличие от Романа, у которого trainerId есть в ссылке).
-// НЕЛЬЗЯ просто дописать '': true в NEW_API_PILOT_TRAINERS и переиспользовать
 // CURRENT_TRAINER_ID как есть — эта же переменная used для трейлинга
 // ?trainerId=... к запросам в СТАРЫЙ Apps Script (см. ниже, isAppsScript-ветка);
 // если её подменить на 739299264, apps_script.js._resolveTenant('739299264')
