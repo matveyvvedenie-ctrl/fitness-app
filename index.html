@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260824c">
+    <link rel="stylesheet" href="style.css?v=20260825a">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -1630,45 +1630,6 @@
         </div>
     </div>
 
-    <!-- Модалка RPE-фидбэка после упражнения -->
-    <div id="rpe-modal" class="rpe-modal hidden">
-        <div class="rpe-modal-backdrop" onclick="closeRpeModal()"></div>
-        <div class="rpe-modal-content">
-            <div class="rpe-modal-title">Как было упражнение?</div>
-            <div class="rpe-modal-exname" id="rpe-modal-exname">—</div>
-            <div class="rpe-modal-summary" id="rpe-modal-summary"></div>
-            <button class="rpe-btn rpe-easy" onclick="setRpeFeedback('easy')">
-                <span class="rpe-btn-emoji">😌</span>
-                <span class="rpe-btn-text">
-                    <strong>Легко</strong>
-                    <small>мог сделать ещё 3-4 повтора</small>
-                </span>
-            </button>
-            <button class="rpe-btn rpe-normal" onclick="setRpeFeedback('normal')">
-                <span class="rpe-btn-emoji">💪</span>
-                <span class="rpe-btn-text">
-                    <strong>Норм</strong>
-                    <small>мог ещё 1-2 повтора</small>
-                </span>
-            </button>
-            <button class="rpe-btn rpe-hard" onclick="setRpeFeedback('hard')">
-                <span class="rpe-btn-emoji">🔥</span>
-                <span class="rpe-btn-text">
-                    <strong>Тяжело</strong>
-                    <small>на пределе</small>
-                </span>
-            </button>
-            <button class="rpe-btn rpe-failed" onclick="setRpeFeedback('failed')">
-                <span class="rpe-btn-emoji">❌</span>
-                <span class="rpe-btn-text">
-                    <strong>Не вытянул</strong>
-                    <small>не докрутил план</small>
-                </span>
-            </button>
-            <button class="rpe-skip-btn" onclick="closeRpeModal()">Пропустить</button>
-        </div>
-    </div>
-
     <!-- 2026-08-19: ?v= НЕ был поднят при коммите matpavbot-входа Matvey (6f6adb2,
          только app.js, без index.html) — встроенный браузер VK держал старый
          закэшированный app.js без этой логики, из-за чего _newApiTrainerId()
@@ -1676,6 +1637,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260824c" defer></script>
+    <script src="app.js?v=20260825a" defer></script>
 </body>
 </html>

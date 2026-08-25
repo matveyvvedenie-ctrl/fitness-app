@@ -244,6 +244,7 @@ body.theme-sand {
    хуже, а тут важнее разборчивость. */
 body.theme-sand .home-greet,
 body.theme-sand .home-card-title,
+body.theme-sand .exercise-name,
 body.theme-sand .stat-value,
 body.theme-sand h1,
 body.theme-sand h2,
@@ -316,6 +317,61 @@ body.theme-sand .tab-btn.active {
     background: var(--surface);
 }
 
+/* Остатки базовой красной темы, которые бежевая раньше не переопределяла:
+   полоса прогресса недели, точки выполненных дней и значок с числом на
+   вкладке. На тёплом фоне они читались как вставки из чужого макета. */
+body.theme-sand .progress-bar {
+    background: var(--surface-4);
+}
+
+body.theme-sand .progress-fill {
+    background: linear-gradient(90deg, #2f2924, #4a4139);
+}
+
+body.theme-sand .home-dot.full {
+    background: linear-gradient(135deg, #2f2924 0%, #191512 100%);
+    border-color: #2a2521;
+    box-shadow: none;
+}
+
+body.theme-sand .tab-badge {
+    background: var(--color-primary);
+}
+
+/* Поля факта и комментарий: ярко-зелёный и оранжевый из базовой темы
+   приглушаем до бежевой гаммы. Роли остаются различимы — введённое
+   по-прежнему зеленоватое, просто не кричит. */
+body.theme-sand .input-field {
+    border-color: #b9c9ae;
+}
+
+body.theme-sand .input-field::placeholder {
+    color: #a3b399;
+}
+
+body.theme-sand .input-field:focus,
+body.theme-sand .input-field.filled {
+    border-color: #7f9a74;
+}
+
+body.theme-sand .comment-field {
+    background: var(--surface-3);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+body.theme-sand .comment-field::placeholder {
+    color: var(--text-faint);
+}
+
+body.theme-sand .trainer-note {
+    border-left-color: #b08b3e;
+}
+
+body.theme-sand .exercise-photo {
+    background: var(--surface-2);
+}
+
 /* Красные элементы по всем вкладкам — на градиенты (см. токены выше). */
 body.theme-dark .header,
 body.theme-dark .day-header,
@@ -361,7 +417,8 @@ body.theme-dark .filter-btn.active,
 body.theme-dark .admin-filter-btn.active,
 body.theme-dark .add-day-chip.active,
 body.theme-dark .ex-lib-tab.active,
-body.theme-dark .prof-radio:has(input:checked) {
+body.theme-dark .prof-radio:has(input:checked),
+body.theme-dark .rpe-quick-btn.rpe-picked {
     background: var(--grad-red-chip);
 }
 
@@ -5027,36 +5084,65 @@ body.theme-dark .save-btn.success {
 /* Кнопка-индикатор фидбэка в карточке упражнения */
 .rpe-feedback-row {
     margin-top: 10px;
+    /* Ряд стоит ПЕРЕД полем комментария (см. createExerciseCard): оценку
+       ставят почти всегда, комментарий пишут редко — что чаще нужно, то и
+       ближе к цифрам, которые только что ввели. */
+    margin-bottom: 12px;
 }
-.rpe-feedback-btn {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px dashed #cbd5e1;
-    background: var(--surface-2);
-    color: var(--text-muted);
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+
+.rpe-quick-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
 }
-.rpe-feedback-btn:active {
-    transform: scale(0.98);
+
+.rpe-quick-btn {
+    min-height: 44px;
+    padding: 10px 6px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: all 0.15s ease;
 }
-.rpe-feedback-btn.rpe-set {
+
+.rpe-quick-btn:active {
+    transform: scale(0.97);
+}
+
+/* Выбранная — заливкой акцента тенанта, а не своим цветом на каждый вариант:
+   так одна и та же кнопка выглядит уместно и в бежевой теме, и в тёмной. */
+.rpe-quick-btn.rpe-picked {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.rpe-fail-btn {
+    width: 100%;
+    margin-top: 8px;
+    min-height: 40px;
+    padding: 9px;
+    border-radius: 8px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.rpe-fail-btn.rpe-picked {
     border-style: solid;
-    border-width: 2px;
-    background: var(--surface);
-    color: var(--text);
+    border-color: var(--fg-danger);
+    background: var(--tint-danger);
+    color: var(--fg-danger);
 }
-.rpe-feedback-btn.rpe-set.rpe-easy   { border-color: #22c55e; background: var(--tint-success); }
-.rpe-feedback-btn.rpe-set.rpe-normal { border-color: #3b82f6; background: var(--tint-info); }
-.rpe-feedback-btn.rpe-set.rpe-hard   { border-color: #f97316; background: var(--tint-warning); }
-.rpe-feedback-btn.rpe-set.rpe-failed { border-color: #ef4444; background: var(--tint-danger); }
 
 /* Модалка-оверлей */
 .rpe-modal {

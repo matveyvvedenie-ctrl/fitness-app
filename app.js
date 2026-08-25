@@ -1961,10 +1961,10 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
                 '<input type="number" inputmode="decimal" enterkeyhint="done" class="input-field" placeholder="Вес (кг)" value="' + (exercise.weightFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="weight" onchange="handleInput(this)">' +
                 '<input type="number" inputmode="numeric" enterkeyhint="done" class="input-field" placeholder="Повторения" value="' + (exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" onchange="handleInput(this)">' +
             '</div>' +
-            '<textarea class="comment-field" placeholder="Комментарий к упражнению (опционально)" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="comment" onchange="handleInput(this)">' + commentValue + '</textarea>' +
             '<div class="rpe-feedback-row" id="rpe-row-' + dayIndex + '-' + exIndex + '">' +
                 renderRpeButton(exercise, dayIndex, exIndex) +
             '</div>' +
+            '<textarea class="comment-field" placeholder="Комментарий к упражнению (опционально)" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="comment" onchange="handleInput(this)">' + commentValue + '</textarea>' +
         '</div>';
     return card;
 }
@@ -2052,7 +2052,7 @@ function getDisplayWeight(weightPlan) {
 // ─── RPE-фидбэк (после каждого упражнения, опционально) ───────────────
 var RPE_FEEDBACK_MAP = {
     easy:   { rpe: 5.5, emoji: '😌', label: 'Легко' },
-    normal: { rpe: 7.5, emoji: '💪', label: 'Норм' },
+    normal: { rpe: 7.5, emoji: '💪', label: 'В самый раз' },
     hard:   { rpe: 9,   emoji: '🔥', label: 'Тяжело' },
     failed: { rpe: 10,  emoji: '❌', label: 'Не вытянул' }
 };
@@ -2063,25 +2063,34 @@ var FAIL_REASON_LABELS = {
     stress:   'стресс',
     food:     'мало еды/энергии'
 };
-var rpeModalCtx = null;
+// Оценка ставится прямо в карточке: три подписи видны сразу, тап по любой
+// сохраняет ответ. Раньше здесь была одна кнопка-заглушка «+ Как было
+// упражнение?», а сам выбор жил в отдельной модалке — и она ещё и
+// открывалась сама, как только заполнены вес и повторы. Экран поверх
+// экрана ради трёх слов; теперь модалка осталась только у «Не вытянул»,
+// где действительно надо уточнить причину (она влияет на прогрессию весов).
+var RPE_QUICK_KINDS = ['easy', 'normal', 'hard'];
 
-// Рендер кнопки-индикатора фидбэка для карточки упражнения
 function renderRpeButton(exercise, dayIndex, exIndex) {
     var fb = exercise.feedback || '';
-    if (fb && RPE_FEEDBACK_MAP[fb]) {
-        var info = RPE_FEEDBACK_MAP[fb];
-        return '<button class="rpe-feedback-btn rpe-set rpe-' + fb + '" ' +
-               'onclick="openRpeModal(' + dayIndex + ',' + exIndex + ')">' +
-               info.emoji + ' ' + info.label + ' • тап чтобы изменить' +
-               '</button>';
+    var html = '<div class="rpe-quick-row">';
+    for (var i = 0; i < RPE_QUICK_KINDS.length; i++) {
+        var kind = RPE_QUICK_KINDS[i];
+        var info = RPE_FEEDBACK_MAP[kind];
+        html += '<button class="rpe-quick-btn rpe-' + kind + (fb === kind ? ' rpe-picked' : '') + '" ' +
+            'onclick="setRpeQuick(' + dayIndex + ',' + exIndex + ',\'' + kind + '\')">' +
+            info.emoji + ' ' + info.label +
+            '</button>';
     }
-    return '<button class="rpe-feedback-btn" ' +
-           'onclick="openRpeModal(' + dayIndex + ',' + exIndex + ')">' +
-           '+ Как было упражнение?' +
-           '</button>';
+    html += '</div>';
+    html += '<button class="rpe-fail-btn' + (fb === 'failed' ? ' rpe-picked' : '') + '" ' +
+        'onclick="setRpeQuick(' + dayIndex + ',' + exIndex + ',\'failed\')">' +
+        RPE_FEEDBACK_MAP.failed.emoji + ' ' + RPE_FEEDBACK_MAP.failed.label +
+        '</button>';
+    return html;
 }
 
-// Обновляет кнопку фидбэка в DOM после изменения
+// Обновляет кнопки фидбэка в DOM после изменения
 function refreshRpeButton(dayIndex, exIndex) {
     var container = document.getElementById('rpe-row-' + dayIndex + '-' + exIndex);
     if (!container) return;
@@ -2089,43 +2098,24 @@ function refreshRpeButton(dayIndex, exIndex) {
     container.innerHTML = renderRpeButton(ex, dayIndex, exIndex);
 }
 
-// Открыть модалку
-function openRpeModal(dayIndex, exIndex) {
-    var ex = workoutData[dayIndex].exercises[exIndex];
-    rpeModalCtx = { dayIndex: dayIndex, exIndex: exIndex };
-    document.getElementById('rpe-modal-exname').textContent = ex.exercise || '';
-    var wf = ex.weightFact || '—';
-    var rf = ex.repsFact || '—';
-    var sets = ex.sets || '?';
-    document.getElementById('rpe-modal-summary').textContent =
-        'Ты сделал: ' + wf + ' кг × ' + rf + ' × ' + sets + ' подх.';
-    document.getElementById('rpe-modal').classList.remove('hidden');
-    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-}
-
-// Закрыть без выбора (трактуется как "норм" при сохранении)
-function closeRpeModal() {
-    document.getElementById('rpe-modal').classList.add('hidden');
-    rpeModalCtx = null;
-}
-
-// Выбрать фидбэк → записать в exercise, обновить кнопку, закрыть модалку
-function setRpeFeedback(kind) {
-    if (!rpeModalCtx || !RPE_FEEDBACK_MAP[kind]) {
-        closeRpeModal();
-        return;
-    }
+function setRpeQuick(dayIndex, exIndex, kind) {
     var info = RPE_FEEDBACK_MAP[kind];
-    var ex = workoutData[rpeModalCtx.dayIndex].exercises[rpeModalCtx.exIndex];
-    ex.feedback = kind;
-    ex.factualRpe = info.rpe;
-    refreshRpeButton(rpeModalCtx.dayIndex, rpeModalCtx.exIndex);
-    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-    closeRpeModal();
-    // Если "Не вытянул" — попросить уточнить причину (для умной прогрессии)
-    if (kind === 'failed') {
-        openFailReasonModal(ex);
+    if (!info) return;
+    var ex = workoutData[dayIndex].exercises[exIndex];
+    if (ex.feedback === kind) {
+        // Повторный тап по выбранной — снять оценку. Кнопки стоят вплотную,
+        // промахнуться легко, а другого способа отменить ответ нет.
+        ex.feedback = '';
+        ex.factualRpe = '';
+        ex.failReason = '';
+    } else {
+        ex.feedback = kind;
+        ex.factualRpe = info.rpe;
+        if (kind !== 'failed') ex.failReason = '';
     }
+    refreshRpeButton(dayIndex, exIndex);
+    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    if (ex.feedback === 'failed') openFailReasonModal(ex);
 }
 
 // ─── Под-модалка причины провала ───────────────────────────────────────
@@ -2146,17 +2136,6 @@ function setFailReason(reason) {
     closeFailReasonModal();
 }
 
-// Автоматически предложить фидбэк когда упражнение становится completed
-function maybeAutoOpenRpe(dayIndex, exIndex) {
-    var ex = workoutData[dayIndex].exercises[exIndex];
-    if (!ex.completed) return;
-    if (ex.feedback) return; // уже оценил
-    if (ex._rpeAutoOpenedOnce) return; // не доставать повторно
-    ex._rpeAutoOpenedOnce = true;
-    // Лёгкая задержка — чтобы клавиатура успела скрыться
-    setTimeout(function() { openRpeModal(dayIndex, exIndex); }, 250);
-}
- 
 function handleInput(input) {
     var dayIndex = input.dataset.day;
     var exIndex = input.dataset.exercise;
@@ -2181,11 +2160,6 @@ function handleInput(input) {
         } else if (wasCompleted && !exercise.completed) {
             completedCount--;
             updateProgress(false);
-        }
-        // Модалка RPE — только когда заполнены ОБЕ ячейки (вес И повторы),
-        // чтобы не доставать после первого ввода
-        if (exercise.weightFact && exercise.repsFact) {
-            maybeAutoOpenRpe(parseInt(dayIndex), parseInt(exIndex));
         }
         // Обновляем счётчик дня в заголовке
         updateDayCounter(parseInt(dayIndex));
