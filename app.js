@@ -832,6 +832,37 @@ var NEW_API_ACTIONS = {
                 });
         });
     },
+    // Одно упражнение — кнопка «Сохранить» в редакторе (см. saveExerciseEdit,
+    // режим 'add'). 2026-08-25: этой ручки в списке НЕ БЫЛО, хотя bulk-версия
+    // (addClientExercises, ниже) была — из-за похожего имени пропажа не
+    // бросалась в глаза. Запрос молча уходил в старый Apps Script: тот про
+    // тренеров новой базы ничего не знает, а программа читается уже из
+    // Postgres — упражнение не появлялось нигде, кнопка «сохраняла» в пустоту.
+    // Найдено на Романе; ломалось у ВСЕХ тренеров, кто добавлял упражнения по
+    // одному, а не мастером «новый день» (тот всегда шёл через bulk).
+    addClientExercise: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program/exercises';
+            return nativeFetch(NEW_API_BASE + path, {
+                method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({
+                    day: params.get('dayName') || '',
+                    exercise: params.get('exercise') || '',
+                    sets: params.get('sets') || '',
+                    reps: params.get('reps') || '',
+                    weightPlan: params.get('weightPlan') || '',
+                    rpe: params.get('rpe') || '',
+                    note: params.get('note') || '',
+                    video: params.get('video') || ''
+                })
+            }).then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                return _fakeJsonResponse({ success: true, rowIndex: data.id }, 200);
+            }); });
+        });
+    },
     // Bulk (сет/трисет/несколько упражнений разом) — новый API умеет только
     // по одному, поэтому шлём N последовательных POST вместо одного bulk-запроса.
     addClientExercises: function(nativeFetch, params, init) {
