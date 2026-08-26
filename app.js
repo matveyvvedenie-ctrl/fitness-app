@@ -1727,6 +1727,23 @@ document.addEventListener('DOMContentLoaded', init);
 var clientName = '';
 var weekTitle = '';
 
+// «Load failed» (Safari/VK WebView) и «Failed to fetch» (Chrome) — это не
+// ответ сервера, а оборванное соединение: сервер о таком запросе даже не
+// узнаёт. Отличаем их от настоящих ошибок, где повтор бессмысленен.
+function _isNetworkError(error) {
+    var m = (error && error.message) || '';
+    return /load failed|failed to fetch|networkerror|network request failed|таймаут/i.test(m);
+}
+
+function _humanErrorText(error) {
+    var m = (error && error.message) || 'неизвестная ошибка';
+    if (_isNetworkError(error)) {
+        return 'Не получилось связаться с сервером — похоже, пропала связь. ' +
+               'Проверь интернет и открой мини-апп заново.';
+    }
+    return m;
+}
+
 async function init() {
     console.log('Init started...');
     try {
@@ -1819,10 +1836,23 @@ async function init() {
             renderVkAccessRequest();
             return;
         }
+        // Обрыв соединения на старте — самая частая беда во встроенном
+        // браузере VK: связь в зале рвётся, запрос умирает, человек видит
+        // красный экран с непонятным «Load failed» и идёт перезаходить
+        // вручную. Один автоматический повтор снимает почти все такие случаи;
+        // повторяем ровно раз, чтобы не крутиться вечно при реальной поломке.
+        if (_isNetworkError(error) && !window.__initRetriedOnce) {
+            window.__initRetriedOnce = true;
+            window.__appInitSettled = false;
+            document.getElementById('loading').innerHTML =
+                '<div style="padding:20px;text-align:center;color:#666;">Связь оборвалась — пробую ещё раз…</div>';
+            setTimeout(init, 1200);
+            return;
+        }
         document.getElementById('loading').innerHTML =
             '<div style="color: red; padding: 20px; text-align: center;">' +
             '<h3>Ошибка загрузки</h3>' +
-            '<p>' + error.message + '</p>' +
+            '<p>' + _humanErrorText(error) + '</p>' +
             '<button onclick="location.reload()" style="padding: 10px 20px; margin-top: 10px;">Перезагрузить</button>' +
             '</div>';
     }
