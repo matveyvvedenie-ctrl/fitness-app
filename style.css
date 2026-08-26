@@ -1954,6 +1954,14 @@ body.theme-dark .save-btn.success {
     color: var(--fg-success);
 }
 
+/* Удаление — только у архивных карточек (см. renderAdminClients). Красным
+   не заливаем: кнопка стоит в одном ряду с «Вернуть», и заливка сделала бы
+   её самой заметной в карточке — а она самая необратимая. */
+.admin-card-btn-delete {
+    background: var(--tint-danger);
+    color: var(--fg-danger);
+}
+
 .admin-card-archived {
     opacity: 0.75;
 }

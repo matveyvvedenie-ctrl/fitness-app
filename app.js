@@ -4042,7 +4042,7 @@ async function _doSendReport(chatId, clientName) {
 }
 
 async function deleteClientCompletely(chatId, clientName) {
-    var msg = 'Удалить клиента «' + clientName + '» из системы?\n\nЛисты с программой и данными остаются (на случай восстановления), но клиент потеряет доступ к боту.';
+    var msg = 'Удалить клиента «' + clientName + '» из системы?\n\nОн пропадёт из всех списков и потеряет доступ к боту и мини-аппу. Программа, история и замеры физически остаются в базе — на случай, если понадобится восстановить.';
     var confirmed = await tgConfirm(msg);
     if (!confirmed) return;
     try {
@@ -4205,8 +4205,15 @@ function renderAdminClients() {
                 ? '<span class="admin-card-badge admin-badge-archived">📦 В архиве</span>' : '';
             var importantBadge = c.hasImportantNote
                 ? '<span class="admin-card-badge admin-badge-important">⚠️ Есть заметка</span>' : '';
+            // Удаление показываем ТОЛЬКО у архивных: архив — это и есть шаг
+            // «клиент больше не занимается», и дальше его либо возвращают,
+            // либо убирают совсем. У активного клиента корзина рядом с
+            // «Открыть» — приглашение к случайному тапу. Раньше удалить можно
+            // было лишь из раздела «Финансы», куда архивные не попадают
+            // вовсе — то есть архив не разгребался никак.
             var archiveBtn = isArchived
-                ? '<button class="admin-card-btn admin-card-btn-restore" onclick="toggleArchiveClient(\'' + c.chatId + '\', false)">↩️ Вернуть</button>'
+                ? '<button class="admin-card-btn admin-card-btn-restore" onclick="toggleArchiveClient(\'' + c.chatId + '\', false)">↩️ Вернуть</button>' +
+                  '<button class="admin-card-btn admin-card-btn-delete" onclick="deleteClientCompletely(\'' + c.chatId + '\', \'' + safeName + '\')">🗑 Удалить</button>'
                 : '<button class="admin-card-btn admin-card-btn-archive" onclick="toggleArchiveClient(\'' + c.chatId + '\', true)">📦 В архив</button>';
             return '<div class="admin-client-card ' + info.klass + (isArchived ? ' admin-card-archived' : '') + '" data-chat="' + (c.chatId || '') + '">' +
                 '<div class="admin-card-top">' +
@@ -4247,7 +4254,8 @@ function renderAdminClients() {
             var safeName = (c.name || '').replace(/'/g, "\\'");
             var isArchived = c.archived === true;
             var archiveAction = isArchived
-                ? '<button class="admin-row-btn" title="Вернуть из архива" onclick="toggleArchiveClient(\'' + c.chatId + '\', false)">↩️</button>'
+                ? '<button class="admin-row-btn" title="Вернуть из архива" onclick="toggleArchiveClient(\'' + c.chatId + '\', false)">↩️</button>' +
+                  '<button class="admin-row-btn" title="Удалить клиента" onclick="deleteClientCompletely(\'' + c.chatId + '\', \'' + safeName + '\')">🗑</button>'
                 : '<button class="admin-row-btn" title="В архив" onclick="toggleArchiveClient(\'' + c.chatId + '\', true)">📦</button>';
             return '<tr class="' + info.klass + (isArchived ? ' admin-row-archived' : '') + '">' +
                 '<td><span class="admin-row-status">' + info.icon + '</span><span class="admin-row-status-label">' + info.label + '</span></td>' +
