@@ -4763,18 +4763,35 @@ function handleMpTargetChange(field) {
     };
 }
 
+// Пропорциональный пересчёт удобен, когда тренер двигает дневную цель и хочет,
+// чтобы приёмы поехали следом. Но если цифру в приёме вписали РУКАМИ — её
+// трогать нельзя: именно так и выглядела жалоба «вписываю КБЖУ, а оно не
+// сохраняется» — значения молча перемасштабировались под цель. Поле, которого
+// человек коснулся, дальше считается его собственным.
 function _scaleMealFields(calRatio, proteinRatio) {
     document.querySelectorAll('.mp-meal-block').forEach(function(block) {
-        if (calRatio) {
-            var calInput = block.querySelector('[data-mp="calories"]');
-            var calVal = parseFloat(calInput.value) || 0;
-            if (calVal) calInput.value = Math.round(calVal * calRatio);
-        }
-        if (proteinRatio) {
-            var protInput = block.querySelector('[data-mp="protein"]');
-            var protVal = parseFloat(protInput.value) || 0;
-            if (protVal) protInput.value = Math.round(protVal * proteinRatio);
-        }
+        var scale = function(field, ratio) {
+            if (!ratio) return;
+            var input = block.querySelector('[data-mp="' + field + '"]');
+            if (!input || input.dataset.manual === '1') return;
+            var val = parseFloat(input.value) || 0;
+            if (val) input.value = Math.round(val * ratio);
+        };
+        scale('calories', calRatio);
+        scale('protein', proteinRatio);
+    });
+}
+
+// Помечаем поле как заполненное вручную. Слушатель один на весь список —
+// блоки добавляются и удаляются на ходу, вешать на каждый вход отдельно
+// значило бы не забыть сделать это в трёх местах.
+function initMealPlanManualGuard() {
+    var list = document.getElementById('mp-meals-list');
+    if (!list || list.dataset.guarded === '1') return;
+    list.dataset.guarded = '1';
+    list.addEventListener('input', function(e) {
+        var t = e.target;
+        if (t && t.dataset && t.dataset.mp) t.dataset.manual = '1';
     });
 }
 
@@ -4843,28 +4860,73 @@ function openMealPlanEditor() {
         carbs: (d && d.target_carbs) || 0
     };
     initMealPlanAutoCalc();
+    initMealPlanManualGuard();
 
     var meals = (d && d.meals && d.meals.length) ? d.meals : MEAL_PLAN_DEFAULT_MEALS;
     var list = document.getElementById('mp-meals-list');
-    list.innerHTML = meals.map(function(meal, i) {
-        return '<div class="mp-meal-block">' +
-            '<div class="mp-meal-block-title">Приём пищи ' + (i + 1) + '</div>' +
-            '<div class="mp-meal-row">' +
-                '<input type="text" class="ex-editor-input" data-mp="name" placeholder="Название" value="' + (meal.name || '').replace(/"/g, '&quot;') + '">' +
-                '<input type="text" class="ex-editor-input" data-mp="time" placeholder="Время" value="' + (meal.time || '').replace(/"/g, '&quot;') + '">' +
-            '</div>' +
-            '<div class="mp-meal-row">' +
-                '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="calories" placeholder="Калории" value="' + (meal.total_calories || '') + '">' +
-                '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="protein" placeholder="Белки, г" value="' + (meal.total_protein || '') + '">' +
-            '</div>' +
-            '<textarea class="ex-editor-textarea" data-mp="desc" rows="2" placeholder="Состав (например: Овсянка 80г, банан 1шт)">' +
-                (meal.foods ? _mealFoodsToText(meal.foods) : '') +
-            '</textarea>' +
-        '</div>';
-    }).join('');
+    list.innerHTML = meals.map(_mealBlockHtml).join('');
+    _renumberMealBlocks();
 
     document.getElementById('mp-editor-modal').classList.remove('hidden');
     document.body.classList.add('no-scroll');
+}
+
+// Приём пищи: КБЖУ целиком, а не только калории и белки. Жиры с углеводами
+// раньше в форме отсутствовали и уходили на сервер нулями — тренер вписывал
+// цифры в план, а обратно получал прочерки (жалоба Анны «КБЖУ не
+// сохраняется»). Хранилище тут ни при чём: meals лежит в JSONB, лишние поля
+// принимает без всякой миграции.
+function _mealBlockHtml(meal) {
+    meal = meal || {};
+    var esc = function(v) { return String(v == null ? '' : v).replace(/"/g, '&quot;'); };
+    return '<div class="mp-meal-block">' +
+        '<div class="mp-meal-block-head">' +
+            '<div class="mp-meal-block-title"></div>' +
+            '<button type="button" class="mp-meal-del" onclick="removeMealBlock(this)" title="Убрать приём пищи">✕</button>' +
+        '</div>' +
+        '<div class="mp-meal-row">' +
+            '<input type="text" class="ex-editor-input" data-mp="name" placeholder="Название" value="' + esc(meal.name) + '">' +
+            '<input type="text" class="ex-editor-input" data-mp="time" placeholder="Время" value="' + esc(meal.time) + '">' +
+        '</div>' +
+        '<div class="mp-meal-row">' +
+            '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="calories" placeholder="Калории" value="' + esc(meal.total_calories || '') + '">' +
+            '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="protein" placeholder="Белки, г" value="' + esc(meal.total_protein || '') + '">' +
+        '</div>' +
+        '<div class="mp-meal-row">' +
+            '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="fats" placeholder="Жиры, г" value="' + esc(meal.total_fats || '') + '">' +
+            '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="carbs" placeholder="Углеводы, г" value="' + esc(meal.total_carbs || '') + '">' +
+        '</div>' +
+        '<textarea class="ex-editor-textarea" data-mp="desc" rows="2" placeholder="Состав (например: Овсянка 80г, банан 1шт)">' +
+            (meal.foods ? _mealFoodsToText(meal.foods) : '') +
+        '</textarea>' +
+    '</div>';
+}
+
+// Нумерация — не в разметке блока, иначе после добавления или удаления
+// приёма подписи разъезжаются («Приём пищи 2, 4, 5»).
+function _renumberMealBlocks() {
+    document.querySelectorAll('#mp-meals-list .mp-meal-block').forEach(function(block, i) {
+        block.querySelector('.mp-meal-block-title').textContent = 'Приём пищи ' + (i + 1);
+    });
+}
+
+// Приёмов бывает и шесть: при инсулинорезистентности едят чаще, и жёсткие
+// четыре блока такому клиенту просто не подходят (просьба Анны).
+function addMealBlock() {
+    var list = document.getElementById('mp-meals-list');
+    list.insertAdjacentHTML('beforeend', _mealBlockHtml({}));
+    _renumberMealBlocks();
+    var added = list.lastElementChild;
+    if (added) {
+        added.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        added.querySelector('[data-mp="name"]').focus();
+    }
+}
+
+function removeMealBlock(btn) {
+    var block = btn.closest('.mp-meal-block');
+    if (block) block.remove();
+    _renumberMealBlocks();
 }
 
 function closeMealPlanEditor() {
@@ -4885,14 +4947,18 @@ async function saveMealPlanFromEditor() {
         var time = block.querySelector('[data-mp="time"]').value.trim();
         var calories = parseInt(block.querySelector('[data-mp="calories"]').value, 10) || 0;
         var protein = parseInt(block.querySelector('[data-mp="protein"]').value, 10) || 0;
+        var fats = parseInt(block.querySelector('[data-mp="fats"]').value, 10) || 0;
+        var carbs = parseInt(block.querySelector('[data-mp="carbs"]').value, 10) || 0;
         var desc = block.querySelector('[data-mp="desc"]').value.trim();
         if (!name && !calories && !desc) return; // полностью пустой блок — пропускаем
         meals.push({
             name: name || 'Приём пищи',
             time: time,
-            foods: desc ? [{ name: desc, grams: 0, calories: calories, protein: protein, fats: 0, carbs: 0 }] : [],
+            foods: desc ? [{ name: desc, grams: 0, calories: calories, protein: protein, fats: fats, carbs: carbs }] : [],
             total_calories: calories,
-            total_protein: protein
+            total_protein: protein,
+            total_fats: fats,
+            total_carbs: carbs
         });
     });
 

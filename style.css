@@ -5386,6 +5386,44 @@ body.theme-dark .save-btn.success {
     padding: 10px;
     margin-bottom: 10px;
 }
+.mp-meal-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.mp-meal-del {
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 15px;
+    line-height: 1;
+    padding: 6px 8px;
+    cursor: pointer;
+}
+
+.mp-meal-del:active {
+    color: var(--fg-danger);
+}
+
+.mp-add-meal-btn {
+    width: 100%;
+    min-height: 44px;
+    margin: 4px 0 14px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.mp-add-meal-btn:active {
+    transform: scale(0.99);
+}
+
 .mp-meal-block-title { font-weight: 700; font-size: 13px; color: var(--color-primary); margin-bottom: 6px; }
 .mp-meal-row { display: flex; gap: 8px; margin-bottom: 6px; }
 .mp-meal-row .ex-editor-input { margin-bottom: 0; }
