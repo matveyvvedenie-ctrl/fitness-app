@@ -401,7 +401,8 @@ var NEW_API_ACTIONS = {
     },
     getMealPlanForClient: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
-        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
+            '/meal-plan?dayType=' + encodeURIComponent(params.get('dayType') || 'workout');
         return _newApiCall(nativeFetch, path).then(function(res) {
             if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Клиент не найден' }, 200);
             return _fakeJsonResponse(res.data, 200);
@@ -618,7 +619,8 @@ var NEW_API_ACTIONS = {
             var payload = {
                 target_calories: plan.target_calories || 0, target_protein: plan.target_protein || 0,
                 target_fats: plan.target_fats || 0, target_carbs: plan.target_carbs || 0,
-                meals: plan.meals || [], notes: plan.notes || ''
+                meals: plan.meals || [], notes: plan.notes || '',
+                dayType: plan.dayType || 'workout'
             };
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan';
             return nativeFetch(NEW_API_BASE + path, {
@@ -4803,28 +4805,84 @@ function _mealFoodsToText(foods) {
     }).join(', ');
 }
 
+// Планов у клиента два: тренировочный день и день без тренировки —
+// калорийность в них разная. Второй заводить необязательно: пока он пустой,
+// переключателя нет вовсе и всё выглядит как раньше, с одним планом.
+var MEAL_DAY_TYPES = [
+    { key: 'workout', label: '🏋 Тренировочный день' },
+    { key: 'rest',    label: '😌 День без тренировки' }
+];
+var currentMealPlanByDay = { workout: null, rest: null };
+var mealPlanViewDay = 'workout';
+
+function _mealDayLabel(key) {
+    var t = MEAL_DAY_TYPES.filter(function(d) { return d.key === key; })[0];
+    return t ? t.label : key;
+}
+
+function _fetchMealPlanForDay(chatId, dayType) {
+    return fetch(APPS_SCRIPT_URL + '?action=getMealPlanForClient&targetChatId=' +
+            encodeURIComponent(chatId) + '&dayType=' + encodeURIComponent(dayType))
+        .then(function(r) { return r.json(); })
+        .catch(function() { return { error: 'network' }; });
+}
+
 async function loadClientMealPlan(chatId) {
     var box = document.getElementById('mp-summary');
     box.innerHTML = '<div class="no-data">Загрузка плана питания...</div>';
     currentMealPlanData = null;
+    currentMealPlanByDay = { workout: null, rest: null };
     try {
-        var resp = await fetch(APPS_SCRIPT_URL + '?action=getMealPlanForClient&targetChatId=' + encodeURIComponent(chatId));
-        var data = await resp.json();
-        if (data.error) { box.innerHTML = '<div class="no-data">Не удалось загрузить ❌</div>'; return; }
-        if (!data.exists) {
+        var both = await Promise.all([
+            _fetchMealPlanForDay(chatId, 'workout'),
+            _fetchMealPlanForDay(chatId, 'rest')
+        ]);
+        if (both[0] && both[0].error && both[1] && both[1].error) {
+            box.innerHTML = '<div class="no-data">Не удалось загрузить ❌</div>';
+            return;
+        }
+        currentMealPlanByDay.workout = (both[0] && both[0].exists) ? both[0] : null;
+        currentMealPlanByDay.rest = (both[1] && both[1].exists) ? both[1] : null;
+        if (!currentMealPlanByDay.workout && !currentMealPlanByDay.rest) {
             box.innerHTML = '<div class="no-data">Плана питания пока нет — составь вручную или сгенерируй через ИИ</div>';
             return;
         }
-        currentMealPlanData = data;
-        renderMealPlanSummary(data);
+        // Открываем на том дне, который заполнен: у большинства тренеров
+        // второго плана не будет никогда, и упираться в пустую вкладку глупо.
+        mealPlanViewDay = currentMealPlanByDay.workout ? 'workout' : 'rest';
+        renderMealPlanView();
     } catch (e) {
         console.error('loadClientMealPlan failed:', e);
         box.innerHTML = '<div class="no-data">Не удалось загрузить ❌</div>';
     }
 }
 
-function renderMealPlanSummary(data) {
+function switchMealPlanDay(dayType) {
+    mealPlanViewDay = dayType;
+    renderMealPlanView();
+}
+
+function renderMealPlanView() {
     var box = document.getElementById('mp-summary');
+    var hasBoth = !!(currentMealPlanByDay.workout && currentMealPlanByDay.rest);
+    var head = '';
+    if (hasBoth) {
+        head = '<div class="mp-day-switch">' + MEAL_DAY_TYPES.map(function(d) {
+            return '<button type="button" class="mp-day-btn' + (d.key === mealPlanViewDay ? ' active' : '') +
+                '" onclick="switchMealPlanDay(\'' + d.key + '\')">' + d.label + '</button>';
+        }).join('') + '</div>';
+    }
+    var data = currentMealPlanByDay[mealPlanViewDay];
+    currentMealPlanData = data;
+    if (!data) {
+        box.innerHTML = head + '<div class="no-data">Для этого дня плана пока нет</div>';
+        return;
+    }
+    box.innerHTML = head + (hasBoth ? '' : '<div class="mp-day-tag">' + _mealDayLabel(mealPlanViewDay) + '</div>') +
+        renderMealPlanSummary(data);
+}
+
+function renderMealPlanSummary(data) {
     var html = '<div class="mp-macro-grid">' +
         '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_calories || 0) + '</div><div class="mp-macro-label">ккал</div></div>' +
         '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_protein || 0) + '</div><div class="mp-macro-label">белки</div></div>' +
@@ -4836,22 +4894,29 @@ function renderMealPlanSummary(data) {
             '<div class="mp-meal-summary-name">' + (meal.name || 'Приём пищи') + '</div>' +
             '<div class="mp-meal-summary-meta">' + (meal.time || '') +
                 (meal.total_calories ? ' · ' + meal.total_calories + ' ккал' : '') +
-                (meal.total_protein ? ' · Б: ' + meal.total_protein + 'г' : '') + '</div>' +
+                (meal.total_protein ? ' · Б: ' + meal.total_protein + 'г' : '') +
+                (meal.total_fats ? ' · Ж: ' + meal.total_fats + 'г' : '') +
+                (meal.total_carbs ? ' · У: ' + meal.total_carbs + 'г' : '') + '</div>' +
             (meal.foods && meal.foods.length ? '<div class="mp-meal-summary-desc">' + _mealFoodsToText(meal.foods) + '</div>' : '') +
         '</div>';
     });
     if (data.notes) {
         html += '<div class="mp-notes-summary">💬 ' + data.notes + '</div>';
     }
-    box.innerHTML = html;
+    // Возвращаем разметку, а не пишем в DOM: над ней ещё встаёт переключатель
+    // дня (см. renderMealPlanView), и собирать страницу должен кто-то один.
+    html += '<div class="mp-macro-hint">Показаны цифры за день · ' + _mealDayLabel(data.dayType || 'workout') + '</div>';
+    return html;
 }
 
-function openMealPlanEditor() {
-    var d = currentMealPlanData;
-    document.getElementById('mp-calories').value = d ? d.target_calories : '';
-    document.getElementById('mp-protein').value = d ? d.target_protein : '';
-    document.getElementById('mp-fats').value = d ? d.target_fats : '';
-    document.getElementById('mp-carbs').value = d ? d.target_carbs : '';
+var mpEditorDay = 'workout';
+var mpEditorDrafts = { workout: null, rest: null };
+
+function _fillMealPlanForm(d) {
+    document.getElementById('mp-calories').value = d ? (d.target_calories || '') : '';
+    document.getElementById('mp-protein').value = d ? (d.target_protein || '') : '';
+    document.getElementById('mp-fats').value = d ? (d.target_fats || '') : '';
+    document.getElementById('mp-carbs').value = d ? (d.target_carbs || '') : '';
     document.getElementById('mp-notes').value = d ? (d.notes || '') : '';
     mpTargetsPrev = {
         calories: (d && d.target_calories) || 0,
@@ -4859,13 +4924,406 @@ function openMealPlanEditor() {
         fats: (d && d.target_fats) || 0,
         carbs: (d && d.target_carbs) || 0
     };
-    initMealPlanAutoCalc();
-    initMealPlanManualGuard();
-
     var meals = (d && d.meals && d.meals.length) ? d.meals : MEAL_PLAN_DEFAULT_MEALS;
     var list = document.getElementById('mp-meals-list');
     list.innerHTML = meals.map(_mealBlockHtml).join('');
     _renumberMealBlocks();
+}
+
+// Всё, что сейчас в форме — как объект плана. Нужна и при сохранении, и при
+// переключении дня: иначе набранное в тренировочном дне терялось бы, стоило
+// заглянуть во второй.
+function _collectMealPlanForm() {
+    var meals = [];
+    document.querySelectorAll('#mp-meals-list .mp-meal-block').forEach(function(block) {
+        var val = function(f) { return block.querySelector('[data-mp="' + f + '"]').value.trim(); };
+        var num = function(f) { return parseInt(val(f), 10) || 0; };
+        var name = val('name');
+        var calories = num('calories');
+        var desc = val('desc');
+        if (!name && !calories && !desc) return;
+        meals.push({
+            name: name || 'Приём пищи',
+            time: val('time'),
+            foods: desc ? [{ name: desc, grams: 0, calories: calories, protein: num('protein'), fats: num('fats'), carbs: num('carbs') }] : [],
+            total_calories: calories,
+            total_protein: num('protein'),
+            total_fats: num('fats'),
+            total_carbs: num('carbs')
+        });
+    });
+    return {
+        target_calories: parseInt(document.getElementById('mp-calories').value, 10) || 0,
+        target_protein: parseInt(document.getElementById('mp-protein').value, 10) || 0,
+        target_fats: parseInt(document.getElementById('mp-fats').value, 10) || 0,
+        target_carbs: parseInt(document.getElementById('mp-carbs').value, 10) || 0,
+        meals: meals,
+        notes: document.getElementById('mp-notes').value.trim()
+    };
+}
+
+// Пустой день не сохраняем: иначе у клиента, которому второй план не нужен,
+// в базе появлялся бы план-пустышка, а в мини-аппе — вкладка ни с чем.
+function _mealPlanIsEmpty(plan) {
+    return !plan || (!plan.target_calories && !plan.notes && !(plan.meals || []).length);
+}
+
+function _renderMealPlanEditorTabs() {
+    var box = document.getElementById('mp-editor-tabs');
+    if (!box) return;
+    box.innerHTML = MEAL_DAY_TYPES.map(function(d) {
+        var filled = !_mealPlanIsEmpty(mpEditorDrafts[d.key]) ? ' filled' : '';
+        return '<button type="button" class="mp-day-btn' + (d.key === mpEditorDay ? ' active' : '') + filled +
+            '" onclick="switchMealPlanEditorDay(\'' + d.key + '\')">' + d.label + '</button>';
+    }).join('');
+}
+
+function switchMealPlanEditorDay(dayType) {
+    if (dayType === mpEditorDay) return;
+    mpEditorDrafts[mpEditorDay] = _collectMealPlanForm();
+    mpEditorDay = dayType;
+    _fillMealPlanForm(mpEditorDrafts[dayType]);
+    _renderMealPlanEditorTabs();
+}
+
+function openMealPlanEditor() {
+    mpEditorDrafts = {
+        workout: currentMealPlanByDay.workout,
+        rest: currentMealPlanByDay.rest
+    };
+    mpEditorDay = mealPlanViewDay || 'workout';
+    initMealPlanAutoCalc();
+    initMealPlanManualGuard();
+    _renderMealPlanEditorTabs();
+    _fillMealPlanForm(mpEditorDrafts[mpEditorDay]);
+
+    document.getElementById('mp-editor-modal').classList.remove('hidden');
+    document.body.classList.add('no-scroll');
+}
+
+// Приём пищи: КБЖУ целиком, а не только калории и белки. Жиры с углеводами
+// раньше в форме отсутствовали и уходили на сервер нулями — тренер вписывал
+// цифры в план, а обратно получал прочерки (жалоба Анны «КБЖУ не
+// сохраняется»). Хранилище тут ни при чём: meals лежит в JSONB, лишние поля
+// принимает без всякой миграции.
+function _mealBlockHtml(meal) {
+    meal = meal || {};
+    var esc = function(v) { return String(v == null ? '' : v).replace(/"/g, '&quot;'); };
+    return '<div class="mp-meal-block">' +
+        '<div class="mp-meal-block-head">' +
+            '<div class="mp-meal-block-title"></div>' +
+            '<button type="button" class="mp-meal-del" onclick="removeMealBlock(this)" title="Убрать приём пищи">✕</button>' +
+        '</div>' +
+        '<div class="mp-meal-row">' +
+            '<input type="text" class="ex-editor-input" data-mp="name" placeholder="Название" value="' + esc(meal.name) + '">' +
+            '<input type="text" class="ex-editor-input" data-mp="time" placeholder="Время" value="' + esc(meal.time) + '">' +
+        '</div>' +
+        '<div class="mp-meal-row">' +
+            '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="calories" placeholder="Калории" value="' + esc(meal.total_calories || '') + '">' +
+            '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="protein" placeholder="Белки, г" value="' + esc(meal.total_protein || '') + '">' +
+        '</div>' +
+        '<div class="mp-meal-row">' +
+            '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="fats" placeholder="Жиры, г" value="' + esc(meal.total_fats || '') + '">' +
+            '<input type="number" inputmode="numeric" class="ex-editor-input" data-mp="carbs" placeholder="Углеводы, г" value="' + esc(meal.total_carbs || '') + '">' +
+        '</div>' +
+        '<textarea class="ex-editor-textarea" data-mp="desc" rows="2" placeholder="Состав (например: Овсянка 80г, банан 1шт)">' +
+            (meal.foods ? _mealFoodsToText(meal.foods) : '') +
+        '</textarea>' +
+    '</div>';
+}
+
+// Нумерация — не в разметке блока, иначе после добавления или удаления
+// приёма подписи разъезжаются («Приём пищи 2, 4, 5»).
+function _renumberMealBlocks() {
+    document.querySelectorAll('#mp-meals-list .mp-meal-block').forEach(function(block, i) {
+        block.querySelector('.mp-meal-block-title').textContent = 'Приём пищи ' + (i + 1);
+    });
+}
+
+// Приёмов бывает и шесть: при инсулинорезистентности едят чаще, и жёсткие
+// четыре блока такому клиенту просто не подходят (просьба Анны).
+function addMealBlock() {
+    var list = document.getElementById('mp-meals-list');
+    list.insertAdjacentHTML('beforeend', _mealBlockHtml({}));
+    _renumberMealBlocks();
+    var added = list.lastElementChild;
+    if (added) {
+        added.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        added.querySelector('[data-mp="name"]').focus();
+    }
+}
+
+function removeMealBlock(btn) {
+    var block = btn.closest('.mp-meal-block');
+    if (block) block.remove();
+    _renumberMealBlocks();
+}
+
+function closeMealPlanEditor() {
+    document.getElementById('mp-editor-modal').classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+}
+
+async function saveMealPlanFromEditor() {
+    if (!currentClientCard) return;
+    var btn = document.getElementById('mp-save-btn');
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+
+    mpEditorDrafts[mpEditorDay] = _collectMealPlanForm();
+
+    // Сохраняем оба дня одним действием: тренер мог поправить тренировочный,
+    // переключиться на выходной и нажать «Сохранить» там — ожидание, что
+    // сохранилось всё, а не только видимая вкладка.
+    var toSave = MEAL_DAY_TYPES.map(function(d) { return d.key; }).filter(function(key) {
+        var draft = mpEditorDrafts[key];
+        if (_mealPlanIsEmpty(draft)) return false;
+        return true;
+    });
+
+    if (!toSave.length) {
+        tg.showAlert('Нечего сохранять — заполни цели или приёмы пищи');
+        btn.disabled = false;
+        btn.textContent = origText;
+        return;
+    }
+
+    try {
+        var myChatId = _myChatId();
+        for (var i = 0; i < toSave.length; i++) {
+            var dayType = toSave[i];
+            var plan = mpEditorDrafts[dayType];
+            plan.dayType = dayType;
+            var resp = await fetch(APPS_SCRIPT_URL + '?action=saveMealPlan&chatId=' + encodeURIComponent(myChatId), {
+                method: 'POST',
+                body: JSON.stringify({
+                    client_name: currentClientCard.name,
+                    plan: plan,
+                    client_data: { weight: '', height: '', age: '', goal: '', allergies: '' }
+                })
+            });
+            var data = await resp.json();
+            if (!data.success) {
+                tg.showAlert('Ошибка (' + _mealDayLabel(dayType) + '): ' + (data.error || 'не удалось сохранить'));
+                btn.disabled = false;
+                btn.textContent = origText;
+                return;
+            }
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        closeMealPlanEditor();
+        btn.disabled = false;
+        btn.textContent = origText;
+        await loadClientMealPlan(currentClientCard.chatId);
+        tg.showAlert('✅ План питания сохранён');
+    } catch (e) {
+        console.error('saveMealPlanFromEditor error:', e);
+        tg.showAlert('Ошибка соединения ❌');
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+
+// Собирает читаемое "Состав" из foods[] (для показа/редактирования одной строкой) —
+// AI присылает продукты по отдельности, а для ручного ввода это одна строка текста.
+function _mealFoodsToText(foods) {
+    return (foods || []).map(function(f) {
+        return f.name + (f.grams ? ' (' + f.grams + 'г)' : '');
+    }).join(', ');
+}
+
+// Планов у клиента два: тренировочный день и день без тренировки —
+// калорийность в них разная. Второй заводить необязательно: пока он пустой,
+// переключателя нет вовсе и всё выглядит как раньше, с одним планом.
+var MEAL_DAY_TYPES = [
+    { key: 'workout', label: '🏋 Тренировочный день' },
+    { key: 'rest',    label: '😌 День без тренировки' }
+];
+var currentMealPlanByDay = { workout: null, rest: null };
+var mealPlanViewDay = 'workout';
+
+function _mealDayLabel(key) {
+    var t = MEAL_DAY_TYPES.filter(function(d) { return d.key === key; })[0];
+    return t ? t.label : key;
+}
+
+function _fetchMealPlanForDay(chatId, dayType) {
+    return fetch(APPS_SCRIPT_URL + '?action=getMealPlanForClient&targetChatId=' +
+            encodeURIComponent(chatId) + '&dayType=' + encodeURIComponent(dayType))
+        .then(function(r) { return r.json(); })
+        .catch(function() { return { error: 'network' }; });
+}
+
+async function loadClientMealPlan(chatId) {
+    var box = document.getElementById('mp-summary');
+    box.innerHTML = '<div class="no-data">Загрузка плана питания...</div>';
+    currentMealPlanData = null;
+    currentMealPlanByDay = { workout: null, rest: null };
+    try {
+        var both = await Promise.all([
+            _fetchMealPlanForDay(chatId, 'workout'),
+            _fetchMealPlanForDay(chatId, 'rest')
+        ]);
+        if (both[0] && both[0].error && both[1] && both[1].error) {
+            box.innerHTML = '<div class="no-data">Не удалось загрузить ❌</div>';
+            return;
+        }
+        currentMealPlanByDay.workout = (both[0] && both[0].exists) ? both[0] : null;
+        currentMealPlanByDay.rest = (both[1] && both[1].exists) ? both[1] : null;
+        if (!currentMealPlanByDay.workout && !currentMealPlanByDay.rest) {
+            box.innerHTML = '<div class="no-data">Плана питания пока нет — составь вручную или сгенерируй через ИИ</div>';
+            return;
+        }
+        // Открываем на том дне, который заполнен: у большинства тренеров
+        // второго плана не будет никогда, и упираться в пустую вкладку глупо.
+        mealPlanViewDay = currentMealPlanByDay.workout ? 'workout' : 'rest';
+        renderMealPlanView();
+    } catch (e) {
+        console.error('loadClientMealPlan failed:', e);
+        box.innerHTML = '<div class="no-data">Не удалось загрузить ❌</div>';
+    }
+}
+
+function switchMealPlanDay(dayType) {
+    mealPlanViewDay = dayType;
+    renderMealPlanView();
+}
+
+function renderMealPlanView() {
+    var box = document.getElementById('mp-summary');
+    var hasBoth = !!(currentMealPlanByDay.workout && currentMealPlanByDay.rest);
+    var head = '';
+    if (hasBoth) {
+        head = '<div class="mp-day-switch">' + MEAL_DAY_TYPES.map(function(d) {
+            return '<button type="button" class="mp-day-btn' + (d.key === mealPlanViewDay ? ' active' : '') +
+                '" onclick="switchMealPlanDay(\'' + d.key + '\')">' + d.label + '</button>';
+        }).join('') + '</div>';
+    }
+    var data = currentMealPlanByDay[mealPlanViewDay];
+    currentMealPlanData = data;
+    if (!data) {
+        box.innerHTML = head + '<div class="no-data">Для этого дня плана пока нет</div>';
+        return;
+    }
+    box.innerHTML = head + (hasBoth ? '' : '<div class="mp-day-tag">' + _mealDayLabel(mealPlanViewDay) + '</div>') +
+        renderMealPlanSummary(data);
+}
+
+function renderMealPlanSummary(data) {
+    var html = '<div class="mp-macro-grid">' +
+        '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_calories || 0) + '</div><div class="mp-macro-label">ккал</div></div>' +
+        '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_protein || 0) + '</div><div class="mp-macro-label">белки</div></div>' +
+        '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_fats || 0) + '</div><div class="mp-macro-label">жиры</div></div>' +
+        '<div class="mp-macro-card"><div class="mp-macro-value">' + (data.target_carbs || 0) + '</div><div class="mp-macro-label">углеводы</div></div>' +
+    '</div>';
+    (data.meals || []).forEach(function(meal) {
+        html += '<div class="mp-meal-summary-item">' +
+            '<div class="mp-meal-summary-name">' + (meal.name || 'Приём пищи') + '</div>' +
+            '<div class="mp-meal-summary-meta">' + (meal.time || '') +
+                (meal.total_calories ? ' · ' + meal.total_calories + ' ккал' : '') +
+                (meal.total_protein ? ' · Б: ' + meal.total_protein + 'г' : '') +
+                (meal.total_fats ? ' · Ж: ' + meal.total_fats + 'г' : '') +
+                (meal.total_carbs ? ' · У: ' + meal.total_carbs + 'г' : '') + '</div>' +
+            (meal.foods && meal.foods.length ? '<div class="mp-meal-summary-desc">' + _mealFoodsToText(meal.foods) + '</div>' : '') +
+        '</div>';
+    });
+    if (data.notes) {
+        html += '<div class="mp-notes-summary">💬 ' + data.notes + '</div>';
+    }
+    // Возвращаем разметку, а не пишем в DOM: над ней ещё встаёт переключатель
+    // дня (см. renderMealPlanView), и собирать страницу должен кто-то один.
+    html += '<div class="mp-macro-hint">Показаны цифры за день · ' + _mealDayLabel(data.dayType || 'workout') + '</div>';
+    return html;
+}
+
+var mpEditorDay = 'workout';
+var mpEditorDrafts = { workout: null, rest: null };
+
+function _fillMealPlanForm(d) {
+    document.getElementById('mp-calories').value = d ? (d.target_calories || '') : '';
+    document.getElementById('mp-protein').value = d ? (d.target_protein || '') : '';
+    document.getElementById('mp-fats').value = d ? (d.target_fats || '') : '';
+    document.getElementById('mp-carbs').value = d ? (d.target_carbs || '') : '';
+    document.getElementById('mp-notes').value = d ? (d.notes || '') : '';
+    mpTargetsPrev = {
+        calories: (d && d.target_calories) || 0,
+        protein: (d && d.target_protein) || 0,
+        fats: (d && d.target_fats) || 0,
+        carbs: (d && d.target_carbs) || 0
+    };
+    var meals = (d && d.meals && d.meals.length) ? d.meals : MEAL_PLAN_DEFAULT_MEALS;
+    var list = document.getElementById('mp-meals-list');
+    list.innerHTML = meals.map(_mealBlockHtml).join('');
+    _renumberMealBlocks();
+}
+
+// Всё, что сейчас в форме — как объект плана. Нужна и при сохранении, и при
+// переключении дня: иначе набранное в тренировочном дне терялось бы, стоило
+// заглянуть во второй.
+function _collectMealPlanForm() {
+    var meals = [];
+    document.querySelectorAll('#mp-meals-list .mp-meal-block').forEach(function(block) {
+        var val = function(f) { return block.querySelector('[data-mp="' + f + '"]').value.trim(); };
+        var num = function(f) { return parseInt(val(f), 10) || 0; };
+        var name = val('name');
+        var calories = num('calories');
+        var desc = val('desc');
+        if (!name && !calories && !desc) return;
+        meals.push({
+            name: name || 'Приём пищи',
+            time: val('time'),
+            foods: desc ? [{ name: desc, grams: 0, calories: calories, protein: num('protein'), fats: num('fats'), carbs: num('carbs') }] : [],
+            total_calories: calories,
+            total_protein: num('protein'),
+            total_fats: num('fats'),
+            total_carbs: num('carbs')
+        });
+    });
+    return {
+        target_calories: parseInt(document.getElementById('mp-calories').value, 10) || 0,
+        target_protein: parseInt(document.getElementById('mp-protein').value, 10) || 0,
+        target_fats: parseInt(document.getElementById('mp-fats').value, 10) || 0,
+        target_carbs: parseInt(document.getElementById('mp-carbs').value, 10) || 0,
+        meals: meals,
+        notes: document.getElementById('mp-notes').value.trim()
+    };
+}
+
+// Пустой день не сохраняем: иначе у клиента, которому второй план не нужен,
+// в базе появлялся бы план-пустышка, а в мини-аппе — вкладка ни с чем.
+function _mealPlanIsEmpty(plan) {
+    return !plan || (!plan.target_calories && !plan.notes && !(plan.meals || []).length);
+}
+
+function _renderMealPlanEditorTabs() {
+    var box = document.getElementById('mp-editor-tabs');
+    if (!box) return;
+    box.innerHTML = MEAL_DAY_TYPES.map(function(d) {
+        var filled = !_mealPlanIsEmpty(mpEditorDrafts[d.key]) ? ' filled' : '';
+        return '<button type="button" class="mp-day-btn' + (d.key === mpEditorDay ? ' active' : '') + filled +
+            '" onclick="switchMealPlanEditorDay(\'' + d.key + '\')">' + d.label + '</button>';
+    }).join('');
+}
+
+function switchMealPlanEditorDay(dayType) {
+    if (dayType === mpEditorDay) return;
+    mpEditorDrafts[mpEditorDay] = _collectMealPlanForm();
+    mpEditorDay = dayType;
+    _fillMealPlanForm(mpEditorDrafts[dayType]);
+    _renderMealPlanEditorTabs();
+}
+
+function openMealPlanEditor() {
+    mpEditorDrafts = {
+        workout: currentMealPlanByDay.workout,
+        rest: currentMealPlanByDay.rest
+    };
+    mpEditorDay = mealPlanViewDay || 'workout';
+    initMealPlanAutoCalc();
+    initMealPlanManualGuard();
+    _renderMealPlanEditorTabs();
+    _fillMealPlanForm(mpEditorDrafts[mpEditorDay]);
 
     document.getElementById('mp-editor-modal').classList.remove('hidden');
     document.body.classList.add('no-scroll');

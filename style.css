@@ -5386,6 +5386,54 @@ body.theme-dark .save-btn.success {
     padding: 10px;
     margin-bottom: 10px;
 }
+/* Переключатель «тренировочный день / день без тренировки»: у клиента два
+   плана питания с разной калорийностью. Появляется только когда второй план
+   реально заведён — тренеру, которому он не нужен, ничего не мешает. */
+.mp-day-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.mp-day-btn {
+    min-height: 44px;
+    padding: 10px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.mp-day-btn.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+/* Точка у дня, который уже заполнен — видно, где есть план, не переключаясь. */
+.mp-day-btn.filled:not(.active)::after {
+    content: ' •';
+    color: var(--fg-success);
+}
+
+.mp-day-tag,
+.mp-macro-hint {
+    font-size: 11px;
+    color: var(--text-faint);
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.mp-macro-hint {
+    margin: 10px 0 0;
+    text-align: center;
+}
+
 .mp-meal-block-head {
     display: flex;
     align-items: center;
