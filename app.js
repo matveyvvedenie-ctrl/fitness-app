@@ -72,6 +72,23 @@ function _withTimeout(promise, ms) {
                      function(e) { clearTimeout(timer); reject(e); });
     });
 }
+// Сколько ждать ответа. 15 секунд хватает обычному запросу к базе, но не
+// действию, где по мобильной сети уезжает пара фотографий или где на той
+// стороне работает ИИ: загрузка упражнения с двумя снимками из зала со
+// слабым сигналом упиралась в этот лимит и выглядела как «ошибка
+// соединения», хотя запрос был жив. Для таких действий срок отдельный.
+var SLOW_ACTIONS = {
+    saveExerciseMedia: 90000,      // два фото уходят на сервер
+    generateMealPlanAI: 90000,     // на той стороне думает модель
+    saveMeasurements: 60000,       // фото прогресса
+    sendMonthlyReportToClient: 30000
+};
+var DEFAULT_ACTION_TIMEOUT = 15000;
+
+function _actionTimeout(action) {
+    return SLOW_ACTIONS[action] || DEFAULT_ACTION_TIMEOUT;
+}
+
 function _fetchWithRetry(nativeFetch, input, init, retriesLeft) {
     return _withTimeout(nativeFetch(input, init), 15000).catch(function(err) {
         if (retriesLeft <= 0) throw err;
@@ -1358,7 +1375,7 @@ var _PROFILE_KEYS = ['gender', 'age', 'height', 'weight', 'goal', 'level', 'freq
                     // a function" вместо аккуратной обработки ошибки. Нашли
                     // 2026-08-16 при тестировании фикса telegram-web-app.js
                     // (см. index.html) в обычном браузере без контекста.
-                    if (result) return _withTimeout(Promise.resolve(result), 15000);
+                    if (result) return _withTimeout(Promise.resolve(result), _actionTimeout(params.get('action')));
                 }
             }
             return _fetchWithRetry(nativeFetch, input, init, 2);
@@ -3713,7 +3730,7 @@ async function saveExerciseMediaEntry() {
         tg.showAlert('✅ Сохранено');
     } catch (e) {
         console.error('saveExerciseMediaEntry error:', e);
-        tg.showAlert('Ошибка соединения ❌');
+        tg.showAlert('Не удалось сохранить ❌\n\n' + ((e && e.message) || 'нет связи с сервером'));
         btn.disabled = false;
         btn.textContent = origText;
     }
