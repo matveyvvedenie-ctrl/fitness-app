@@ -46,6 +46,20 @@ html, body {
     overflow-x: hidden;
     max-width: 100vw;
     width: 100%;
+    /* Горизонтальный жест не должен уводить страницу вбок — на iOS это и
+       выглядит как «съехало и не листается вниз». */
+    overscroll-behavior-x: none;
+}
+
+/* Названия упражнений и дней приходят от тренера: «Пресс 3*макс + Кардио
+   20-25 мин», иногда одним длинным словом без пробелов. Такое слово раздвигает
+   колонку и утаскивает вбок весь экран — переносим по буквам, вид страницы
+   важнее целостности слова. */
+.exercise-name,
+.cc-ex-name,
+.cc-day-title,
+.day-title {
+    overflow-wrap: anywhere;
 }
 
 body {
@@ -2137,6 +2151,14 @@ body.theme-dark .save-btn.success {
     background: var(--surface-2);
     z-index: 1000;
     overflow-y: auto;
+    /* overflow-x обязателен явно: задан только overflow-y, и браузер по
+       спецификации превращает вторую ось из visible в auto — то есть экран
+       можно утащить вбок пальцем, и он там залипает (жалоба «съезжает всё,
+       вкладки обрезаны слева»). Достаточно одного лишнего пикселя внутри.
+       overscroll-behavior — чтобы жест не уходил в прокрутку страницы под
+       карточкой. */
+    overflow-x: hidden;
+    overscroll-behavior: contain;
     animation: ccSlideIn 0.22s ease;
 }
 
@@ -4213,6 +4235,15 @@ body.theme-dark .save-btn.success {
     padding: 16px 18px 8px;
     overflow-y: auto;
     flex: 1;
+    /* Без min-height: 0 flex-элемент не сжимается меньше своего содержимого —
+       и при открытой библиотеке упражнений (панель до 320px, переносится в
+       слот ниже) сумма header + body + панель + кнопки перерастала max-height
+       модалки: поля формы и список упражнений наезжали друг на друга. */
+    min-height: 0;
+}
+
+#ex-block-library-slot {
+    flex-shrink: 0;
 }
 
 .ex-editor-field { margin-bottom: 12px; }

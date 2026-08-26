@@ -1768,6 +1768,9 @@ async function init() {
             wellnessAsked = true;
             setTimeout(openWellnessModal, 400);
         }
+        // Позже опроса самочувствия: два системных окна подряд — перебор,
+        // а это разрешение ничего не блокирует и может подождать секунду.
+        setTimeout(maybeAskVkMessagesPermission, 1600);
     } catch (error) {
         console.error('ERROR:', error);
         // Любая ветка catch дальше сама покажет какой-то финальный экран
@@ -1828,6 +1831,39 @@ function renderVkAccessRequest() {
     } catch (_) { ping(''); }
 }
  
+// VK не даёт сообществу написать человеку первым: пока клиент сам не начал
+// диалог, ЛЮБОЕ уведомление от бота отклоняется с ошибкой 901 — и тренер
+// узнаёт об этом в лучшем случае через неделю («я ничего не получал»).
+// Мини-апп может спросить разрешение сам, одним системным окном: клиент
+// тапает «Разрешить» — и с этого момента до него доходят и уведомления об
+// обновлённой программе, и вечерние итоги, и напоминания об абонементе.
+//
+// Спрашиваем ОДИН раз на группу и только после того, как экран уже
+// загрузился: диалог поверх спиннера выглядит как навязчивая просьба
+// непонятно от кого. Отказ не запоминаем навсегда — переспросим через
+// неделю, вдруг человек просто торопился.
+var VK_MSGS_ASK_AGAIN_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
+function maybeAskVkMessagesPermission() {
+    if (!vkLaunchUserId || !window.vkBridge) return;
+    var groupId = new URLSearchParams(window.location.search).get('vk_group_id') || '';
+    if (!/^\d+$/.test(groupId)) return; // запуск без группы — не у кого просить
+    var key = 'vk_msgs_' + groupId;
+    var saved = '';
+    try { saved = localStorage.getItem(key) || ''; } catch (_) {}
+    if (saved === 'allowed') return;
+    if (saved && Date.now() - parseInt(saved, 10) < VK_MSGS_ASK_AGAIN_AFTER_MS) return;
+    try {
+        window.vkBridge.send('VKWebAppAllowMessagesFromGroup', { group_id: parseInt(groupId, 10), key: '' })
+            .then(function(data) {
+                try { localStorage.setItem(key, (data && data.result) ? 'allowed' : String(Date.now())); } catch (_) {}
+            })
+            .catch(function() {
+                try { localStorage.setItem(key, String(Date.now())); } catch (_) {}
+            });
+    } catch (_) {}
+}
+
 async function loadWorkoutData() {
     var chatId = _myChatId();
     var url = APPS_SCRIPT_URL + '?action=read&chatId=' + chatId;
@@ -2389,10 +2425,27 @@ function openVideo(url, urlVk) {
 var progressChart = null;
 var historyData = [];
  
+// Прокрутка страницы блокируется классом no-scroll, пока открыта модалка.
+// Если модалка закрылась нештатно (ошибка внутри обработчика, закрытие
+// системной кнопкой), класс остаётся — и страница «не листается вниз»,
+// хотя визуально ничего не открыто. Снимаем блокировку, если на экране
+// действительно не осталось ни одной видимой модалки.
+function releaseScrollLockIfNothingOpen() {
+    if (!document.body.classList.contains('no-scroll')) return;
+    var open = document.querySelector(
+        '.ex-editor-modal:not(.hidden), .rpe-modal:not(.hidden), .new-client-wizard:not(.hidden), ' +
+        '.client-card-screen:not(.hidden)'
+    );
+    if (!open) document.body.classList.remove('no-scroll');
+}
+
 function initializeTabs() {
     document.querySelectorAll('.tab-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var tabName = btn.dataset.tab;
+            // Переключение вкладок — момент, когда точно ничего не открыто:
+            // заодно снимаем блокировку прокрутки, если та где-то залипла.
+            releaseScrollLockIfNothingOpen();
             document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
             document.querySelectorAll('.tab-content').forEach(function(content) { content.classList.remove('active'); });
