@@ -3543,7 +3543,7 @@ var exerciseMediaSelectedGroup = ''; // выбранная группа мышц
 // Тот же список, что и KNOWN_MUSCLES (см. ниже, для фильтра библиотеки при
 // подборе упражнения клиенту) — держим отдельной переменной здесь, чтобы не
 // зависеть от порядка объявления в файле.
-var EXERCISE_MEDIA_GROUPS = ['Грудь', 'Спина', 'Плечи', 'Бицепс', 'Трицепс', 'Ноги', 'Ягодицы', 'Пресс', 'Икры', 'Предплечья', 'Домашняя тренировка'];
+var EXERCISE_MEDIA_GROUPS = ['Грудь', 'Спина', 'Плечи', 'Бицепс', 'Трицепс', 'Ноги', 'ЗПБ', 'Ягодицы', 'Пресс', 'Икры', 'Предплечья', 'Домашняя тренировка'];
 
 function initExerciseMediaLibrary() {
     var search = document.getElementById('ex-media-search');
@@ -7170,7 +7170,16 @@ var librarySearchText = '';
 // упражнения, а тренеру нужно отобрать «то, что можно делать дома» ровно
 // так же, как отбирают ноги или спину. Стоит последней — чтобы длинная
 // подпись не разрывала ряд коротких.
-var KNOWN_MUSCLES = ['грудь', 'спина', 'плечи', 'бицепс', 'трицепс', 'ноги', 'ягодицы', 'пресс', 'икры', 'предплечья', 'домашняя тренировка'];
+var KNOWN_MUSCLES = ['грудь', 'спина', 'плечи', 'бицепс', 'трицепс', 'ноги', 'зпб', 'ягодицы', 'пресс', 'икры', 'предплечья', 'домашняя тренировка'];
+
+// Подписи, которые нельзя получить простым «первая буква заглавная»:
+// аббревиатуру такой формулой превращает в «Зпб». Список нарочно короткий —
+// сюда попадает только то, что тренеры пишут сокращённо.
+var MUSCLE_LABELS = { 'зпб': 'ЗПБ' };
+
+function muscleLabel(m) {
+    return MUSCLE_LABELS[m] || (m.charAt(0).toUpperCase() + m.slice(1));
+}
 
 // Проверяет, относится ли упражнение к указанной мышце.
 // Только по полю group из листа «Упражнения» — никаких эвристик по названию.
@@ -7273,7 +7282,7 @@ function renderLibraryTabs() {
     }
     tabs.push({ key: 'all', label: 'Все' });
     muscles.forEach(function(m) {
-        tabs.push({ key: m, label: m.charAt(0).toUpperCase() + m.slice(1) });
+        tabs.push({ key: m, label: muscleLabel(m) });
     });
 
     tabsEl.innerHTML = tabs.map(function(t) {
@@ -7451,7 +7460,7 @@ var addDaySelectedWeekday = '';
 var addDaySelectedMuscles = [];
 
 function _capitalizeMuscle(m) {
-    return m.charAt(0).toUpperCase() + m.slice(1);
+    return muscleLabel(m);
 }
 
 function showAddDayDialog() {
