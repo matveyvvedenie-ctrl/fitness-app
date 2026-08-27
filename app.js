@@ -698,7 +698,8 @@ var NEW_API_ACTIONS = {
         var chatId = params.get('clientChatId') || params.get('chatId') || '';
         var payload = {
             amount: parseFloat(params.get('amount') || '0'), months: parseInt(params.get('months') || '1', 10),
-            comment: params.get('comment') || ''
+            comment: params.get('comment') || '',
+            date: params.get('date') || ''
         };
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/payments';
         return nativeFetch(NEW_API_BASE + path, {
@@ -4202,6 +4203,15 @@ function openPaymentModal(chatId, clientName) {
     document.getElementById('payment-amount').value = '';
     document.getElementById('payment-months').value = '1';
     document.getElementById('payment-comment').value = '';
+    // По умолчанию сегодня — как было раньше; менять нужно редко, но деньги
+    // нередко заносят не в тот день, когда их получили.
+    var dateInput = document.getElementById('payment-date');
+    if (dateInput) {
+        var now = new Date();
+        dateInput.value = now.getFullYear() + '-' +
+            String(now.getMonth() + 1).padStart(2, '0') + '-' +
+            String(now.getDate()).padStart(2, '0');
+    }
     var btn = document.getElementById('payment-save-btn');
     btn.disabled = false;
     btn.textContent = '💾 Записать';
@@ -4218,6 +4228,7 @@ async function savePaymentFromModal() {
     var amount = parseFloat(document.getElementById('payment-amount').value);
     var months = parseInt(document.getElementById('payment-months').value);
     var comment = document.getElementById('payment-comment').value.trim();
+    var paidOn = (document.getElementById('payment-date') || {}).value || '';
     if (!amount || amount <= 0) {
         tg.showAlert('Укажи сумму больше 0');
         return;
@@ -4235,7 +4246,8 @@ async function savePaymentFromModal() {
             '&clientName=' + encodeURIComponent(currentPaymentClient.name) +
             '&amount=' + encodeURIComponent(amount) +
             '&months=' + encodeURIComponent(months) +
-            '&comment=' + encodeURIComponent(comment);
+            '&comment=' + encodeURIComponent(comment) +
+            '&date=' + encodeURIComponent(paidOn);
         var resp = await fetch(url);
         var data = await resp.json();
         if (!data.success) {
