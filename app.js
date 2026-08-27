@@ -270,6 +270,23 @@ function _fetchNewApiWithRetry(nativeFetch, url, init, retriesLeft) {
     });
 }
 
+// Приводит дни истории к тому, что ждёт renderClientHistory: dateObj (эпоха
+// мс, дефолта нет — formatHistoryDate/daysAgoLabel без него дадут NaN), date
+// как "dd.MM.yyyy", feedback по RPE.
+function _formatHistoryDays(days) {
+    return (days || []).map(function(day) {
+        return {
+            date: _isoDateToRu(day.date), dateObj: Date.parse(day.date + 'T00:00:00'), key: day.date,
+            exercises: (day.exercises || []).map(function(ex) {
+                var out = {};
+                for (var k in ex) out[k] = ex[k];
+                out.feedback = _rpeToFeedback(ex.rpe);
+                return out;
+            })
+        };
+    });
+}
+
 function _newApiCall(nativeFetch, path) {
     // 2026-08-19: было 1 повтор (2 попытки всего) — по факту оказалось мало.
     // Прямые замеры (curl на /health, 20 запросов подряд) поймали 15% сырых
@@ -427,6 +444,19 @@ var NEW_API_ACTIONS = {
     },
     // Ключуются по имени клиента (см. _resolveChatIdByName выше) — единственная
     // причина, почему их не добавили в прошлый раз вместе с остальным read.
+    // История СВОЕЙ тренировки — для клиента. Отличие от getClientHistory
+    // одно: клиент знает свой chatId и не должен резолвить его по имени
+    // через список клиентов тенанта (чужие имена ему видеть незачем).
+    getSelfHistory: function(nativeFetch, params) {
+        var chatId = params.get('chatId') || '';
+        if (!chatId) return _fakeJsonResponse({ history: [] }, 200);
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) +
+            '/history?limit=' + encodeURIComponent(params.get('limit') || '60');
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            return _fakeJsonResponse({ history: _formatHistoryDays(res.data.history) }, 200);
+        });
+    },
     getClientHistory: function(nativeFetch, params) {
         var clientName = params.get('clientName') || '';
         var limit = params.get('limit') || '30';
@@ -436,21 +466,7 @@ var NEW_API_ACTIONS = {
                 '/history?limit=' + encodeURIComponent(limit);
             return _newApiCall(nativeFetch, path).then(function(res) {
                 if (!res.ok) return _fakeJsonResponse({ error: (res.data && res.data.detail) || 'Ошибка' }, 200);
-                // Реформатируем под то, что ждёт renderClientHistory: dateObj
-                // (эпоха мс, дефолта нет — формула в formatHistoryDate/daysAgoLabel
-                // упадёт в NaN без него), date как "dd.MM.yyyy", feedback по RPE.
-                var history = (res.data.history || []).map(function(day) {
-                    return {
-                        date: _isoDateToRu(day.date), dateObj: Date.parse(day.date + 'T00:00:00'), key: day.date,
-                        exercises: (day.exercises || []).map(function(ex) {
-                            var out = {};
-                            for (var k in ex) out[k] = ex[k];
-                            out.feedback = _rpeToFeedback(ex.rpe);
-                            return out;
-                        })
-                    };
-                });
-                return _fakeJsonResponse({ history: history }, 200);
+                return _fakeJsonResponse({ history: _formatHistoryDays(res.data.history) }, 200);
             });
         });
     },
@@ -2413,6 +2429,7 @@ document.getElementById('save-btn').addEventListener('click', async function() {
                 btn.classList.remove('saving');
                 btn.classList.add('success');
                 btn.textContent = '✅ Сохранено!';
+                selfHistoryLoaded = false;   // вкладка «История» перечитает свежие данные
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 setTimeout(function() {
                     var alertMsg = 'Сохранено ' + exercisesToSave.length + ' упражнений! ✅';
@@ -2489,7 +2506,46 @@ function releaseScrollLockIfNothingOpen() {
     if (!open) document.body.classList.remove('no-scroll');
 }
 
+// История СВОИХ тренировок — клиентская вкладка. Тренер ту же историю видит
+// в карточке клиента; рендер один и тот же, различается только контейнер и
+// то, чей chatId спрашиваем.
+var selfHistoryLoaded = false;
+
+async function loadSelfHistory(force) {
+    var container = document.getElementById('client-history-container');
+    if (!container) return;
+    if (selfHistoryLoaded && !force) return;
+    container.innerHTML = '<div class="no-data">Загрузка истории...</div>';
+    try {
+        var chatId = _myChatId();
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getSelfHistory&chatId=' + encodeURIComponent(chatId) + '&limit=60');
+        var data = await resp.json();
+        if (data.error) {
+            container.innerHTML = '<div class="no-data">Не удалось загрузить историю ❌</div>';
+            return;
+        }
+        selfHistoryLoaded = true;
+        renderClientHistory(data.history || [], 'client-history-container');
+    } catch (e) {
+        console.error('loadSelfHistory failed:', e);
+        container.innerHTML = '<div class="no-data">Не удалось загрузить историю ❌</div>';
+    }
+}
+
+// Подписи мельче, когда вкладок много: у клиента их пять, у тренера шесть,
+// у супер-админа семь — на телефоне «Тренировка» иначе обрезается.
+function _syncTabsDensity() {
+    var container = document.getElementById('tabs-container');
+    if (!container) return;
+    var visible = 0;
+    container.querySelectorAll('.tab-btn').forEach(function(b) {
+        if (!b.classList.contains('hidden')) visible++;
+    });
+    container.classList.toggle('tabs-6', visible >= 5);
+}
+
 function initializeTabs() {
+    _syncTabsDensity();
     document.querySelectorAll('.tab-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var tabName = btn.dataset.tab;
@@ -2505,6 +2561,7 @@ function initializeTabs() {
             // На них вкладки уезжают наверх, как было раньше.
             _syncTenantBanner(tabName);
             if (tabName === 'progress') loadProgressData();
+            if (tabName === 'history') loadSelfHistory();
             if (tabName === 'measurements') loadMeasurementsData();
             if (tabName === 'admin') { loadAdminClients(); loadDashboardData(); }
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -2856,7 +2913,7 @@ function initAdminTab() {
     var chatId = _myChatId();
     if (isTrainer(chatId)) {
         document.getElementById('admin-tab-btn').classList.remove('hidden');
-        document.getElementById('tabs-container').classList.add('tabs-5');
+        _syncTabsDensity();
         initFilters();
         initAdminClientsControls();
         initAdminSectionTabs();
@@ -2912,9 +2969,7 @@ function initSuperAdminTab() {
     var chatId = _myChatId();
     if (!isMatveySuperAdmin(chatId)) return;
     document.getElementById('superadmin-tab-btn').classList.remove('hidden');
-    var tabsContainer = document.getElementById('tabs-container');
-    tabsContainer.classList.remove('tabs-5');
-    tabsContainer.classList.add('tabs-6');
+    _syncTabsDensity();
     loadSuperAdminTrainers();
 
     // Открыт чужой тенант (?vk_group_id=...) — показываем баннер, чтобы не
@@ -5800,8 +5855,8 @@ function daysAgoLabel(dateObj) {
     return months + ' мес назад';
 }
 
-function renderClientHistory(history) {
-    var container = document.getElementById('cc-history-container');
+function renderClientHistory(history, containerId) {
+    var container = document.getElementById(containerId || 'cc-history-container');
     if (!container) return;
     if (!history || history.length === 0) {
         container.innerHTML = '<div class="no-data">📅 У клиента пока нет завершённых тренировок</div>';
