@@ -5395,6 +5395,18 @@ body.theme-dark .save-btn.success {
 /* Переключатель «тренировочный день / день без тренировки»: у клиента два
    плана питания с разной калорийностью. Появляется только когда второй план
    реально заведён — тренеру, которому он не нужен, ничего не мешает. */
+/* Отчёт по питанию внутри карточки клиента — отделён от плана, чтобы
+   «что назначено» и «что съедено» не читались как один список. */
+.cc-food-report {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.cc-food-report .section-title {
+    padding: 0 14px;
+}
+
 .mp-day-switch {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

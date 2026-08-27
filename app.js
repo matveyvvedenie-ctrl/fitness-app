@@ -3533,6 +3533,97 @@ function drawSparkline(canvas, data) {
 // суммарные цифры за сегодня.
 var FOOD_VERDICT_EMOJI = { excellent: '⭐⭐⭐⭐⭐', good: '⭐⭐⭐⭐', acceptable: '⭐⭐⭐', needs_adjustment: '⭐⭐', poor: '⭐' };
 
+// Дневник еды клиента по дням. Один рендер на два места: дриллдаун из
+// дашборда по питанию и вкладка «Питание» в карточке клиента — расходиться
+// им незачем.
+function renderFoodLogDays(days) {
+    return (days || []).map(function(day) {
+        var entriesHtml = (day.entries || []).map(function(e) {
+            var noteHtml = e.note ? '<div class="food-log-note">' + e.note + '</div>' : '';
+            return '<div class="food-log-entry">' +
+                '<div class="food-log-entry-head">' +
+                    '<span class="food-log-time">' + (e.time || '') + '</span>' +
+                    '<span>' + (e.mealType || '') + '</span>' +
+                    '<span>' + (FOOD_VERDICT_EMOJI[e.verdict] || '') + '</span>' +
+                '</div>' +
+                '<div class="food-log-macros">' +
+                    Math.round(e.calories) + ' ккал · Б' + Math.round(e.protein) + ' · Ж' + Math.round(e.fats) + ' · У' + Math.round(e.carbs) +
+                '</div>' +
+                noteHtml +
+            '</div>';
+        }).join('');
+        return '<div class="food-log-day">' +
+            '<div class="food-log-day-header">' +
+                '<span>' + day.date + '</span>' +
+                '<span>' + Math.round(day.totals.calories) + ' ккал · Б' + Math.round(day.totals.protein) + ' Ж' + Math.round(day.totals.fats) + ' У' + Math.round(day.totals.carbs) + '</span>' +
+            '</div>' +
+            entriesHtml +
+        '</div>';
+    }).join('');
+}
+
+// Среднее за период — по дням, где клиент вообще что-то записал: считать
+// вместе с молчаливыми днями значит показывать тренеру заниженную цифру и
+// пугать его на ровном месте.
+function _foodLogAverages(days) {
+    var filled = (days || []).filter(function(d) { return d.totals && d.totals.calories; });
+    if (!filled.length) return null;
+    var sum = filled.reduce(function(acc, d) {
+        acc.calories += d.totals.calories || 0;
+        acc.protein += d.totals.protein || 0;
+        acc.fats += d.totals.fats || 0;
+        acc.carbs += d.totals.carbs || 0;
+        return acc;
+    }, { calories: 0, protein: 0, fats: 0, carbs: 0 });
+    return {
+        days: filled.length,
+        calories: Math.round(sum.calories / filled.length),
+        protein: Math.round(sum.protein / filled.length),
+        fats: Math.round(sum.fats / filled.length),
+        carbs: Math.round(sum.carbs / filled.length)
+    };
+}
+
+var clientFoodLogDays = 14;
+
+function switchClientFoodLogPeriod(days) {
+    clientFoodLogDays = days;
+    if (currentClientCard) loadClientFoodLog(currentClientCard.chatId, true);
+}
+
+// Отчёт по питанию прямо в карточке клиента — рядом с планом. Раньше он был
+// только в общем дашборде: чтобы посмотреть, что ест ОДИН клиент, тренер шёл
+// в другой раздел, разворачивал сводку по всем и искал нужного.
+async function loadClientFoodLog(chatId, force) {
+    var box = document.getElementById('cc-food-log');
+    if (!box) return;
+    document.querySelectorAll('#cc-food-log-periods .admin-filter-btn').forEach(function(btn) {
+        btn.classList.toggle('active', parseInt(btn.dataset.days, 10) === clientFoodLogDays);
+    });
+    box.innerHTML = '<div class="no-data">Загрузка отчёта...</div>';
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getClientFoodEntries&chatId=' +
+            encodeURIComponent(chatId) + '&days=' + clientFoodLogDays);
+        var data = await resp.json();
+        if (data.error) { box.innerHTML = '<div class="no-data">' + data.error + '</div>'; return; }
+        if (!data.days || !data.days.length) {
+            box.innerHTML = '<div class="no-data">За этот период клиент ничего не записывал</div>';
+            return;
+        }
+        var avg = _foodLogAverages(data.days);
+        var avgHtml = avg ? ('<div class="mp-macro-grid">' +
+            '<div class="mp-macro-card"><div class="mp-macro-value">' + avg.calories + '</div><div class="mp-macro-label">ккал в день</div></div>' +
+            '<div class="mp-macro-card"><div class="mp-macro-value">' + avg.protein + '</div><div class="mp-macro-label">белки</div></div>' +
+            '<div class="mp-macro-card"><div class="mp-macro-value">' + avg.fats + '</div><div class="mp-macro-label">жиры</div></div>' +
+            '<div class="mp-macro-card"><div class="mp-macro-value">' + avg.carbs + '</div><div class="mp-macro-label">углеводы</div></div>' +
+            '</div><div class="mp-macro-hint">Среднее за ' + avg.days + ' дн. с записями</div>') : '';
+        box.innerHTML = avgHtml + renderFoodLogDays(data.days);
+    } catch (e) {
+        console.error('loadClientFoodLog failed:', e);
+        box.innerHTML = '<div class="no-data">Не удалось загрузить отчёт ❌</div>';
+    }
+}
+
 async function openFoodLogModal(chatId, name) {
     document.getElementById('food-log-title').textContent = '📋 Питание — ' + (name || 'Клиент');
     var body = document.getElementById('food-log-body');
@@ -3550,29 +3641,7 @@ async function openFoodLogModal(chatId, name) {
             body.innerHTML = '<div class="no-data">Нет записей питания за последние 14 дней</div>';
             return;
         }
-        body.innerHTML = data.days.map(function(day) {
-            var entriesHtml = day.entries.map(function(e) {
-                var noteHtml = e.note ? '<div class="food-log-note">' + e.note + '</div>' : '';
-                return '<div class="food-log-entry">' +
-                    '<div class="food-log-entry-head">' +
-                        '<span class="food-log-time">' + (e.time || '') + '</span>' +
-                        '<span>' + (e.mealType || '') + '</span>' +
-                        '<span>' + (FOOD_VERDICT_EMOJI[e.verdict] || '') + '</span>' +
-                    '</div>' +
-                    '<div class="food-log-macros">' +
-                        Math.round(e.calories) + ' ккал · Б' + Math.round(e.protein) + ' · Ж' + Math.round(e.fats) + ' · У' + Math.round(e.carbs) +
-                    '</div>' +
-                    noteHtml +
-                '</div>';
-            }).join('');
-            return '<div class="food-log-day">' +
-                '<div class="food-log-day-header">' +
-                    '<span>' + day.date + '</span>' +
-                    '<span>' + Math.round(day.totals.calories) + ' ккал · Б' + Math.round(day.totals.protein) + ' Ж' + Math.round(day.totals.fats) + ' У' + Math.round(day.totals.carbs) + '</span>' +
-                '</div>' +
-                entriesHtml +
-            '</div>';
-        }).join('');
+        body.innerHTML = renderFoodLogDays(data.days);
     } catch (error) {
         console.error('Food log error:', error);
         body.innerHTML = '<div class="no-data">Ошибка загрузки</div>';
@@ -4701,6 +4770,7 @@ function switchClientCardTab(tabName) {
     }
     if (tabName === 'nutrition' && currentClientCard) {
         loadClientMealPlan(currentClientCard.chatId);
+        loadClientFoodLog(currentClientCard.chatId);
     }
 }
 

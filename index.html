@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260827c">
+    <link rel="stylesheet" href="style.css?v=20260827d">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -1197,6 +1197,20 @@
                     <span class="cc-action-text">Сгенерировать через ИИ</span>
                 </button>
             </div>
+
+            <!-- Отчёт: что клиент реально ел. Тот же дневник, что в дашборде,
+                 только по одному клиенту и без похода в другой раздел. -->
+            <div class="cc-food-report">
+                <h3 class="section-title">📋 Что ел клиент</h3>
+                <div class="admin-filters" id="cc-food-log-periods">
+                    <button class="admin-filter-btn" data-days="7" onclick="switchClientFoodLogPeriod(7)">7 дней</button>
+                    <button class="admin-filter-btn active" data-days="14" onclick="switchClientFoodLogPeriod(14)">14 дней</button>
+                    <button class="admin-filter-btn" data-days="30" onclick="switchClientFoodLogPeriod(30)">30 дней</button>
+                </div>
+                <div id="cc-food-log">
+                    <div class="no-data">Загрузка отчёта...</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1672,6 +1686,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260827c" defer></script>
+    <script src="app.js?v=20260827d" defer></script>
 </body>
 </html>
