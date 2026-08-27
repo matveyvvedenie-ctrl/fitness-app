@@ -2963,6 +2963,12 @@ body.theme-dark .save-btn.success {
     margin-bottom: 8px;
 }
 
+/* Круговая — тот же блок, что суперсет, но своим цветом заголовка: в одном
+   дне их может быть несколько подряд, и одинаковые шапки сливаются. */
+.cc-circuit-header {
+    background: #00897B;
+}
+
 .cc-superset-body {
     background: var(--surface);
     border-radius: 10px;
