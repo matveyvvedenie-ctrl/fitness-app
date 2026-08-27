@@ -2359,6 +2359,168 @@ body.theme-dark .save-btn.success {
 .admin-section.active { display: block; }
 
 /* === Финансы — карточки клиентов === */
+/* ── Календарь оплат в разделе «Финансы» ────────────────────────────────
+   Список отвечает «кто должен», календарь — «когда». Один платит помесячно,
+   другой сразу за три месяца, третий на две недели: в списке это одинаковые
+   строки, а по дням разница видна сразу. */
+.pay-cal {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 12px;
+    margin: 12px 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.pay-cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.pay-cal-title {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.pay-cal-nav {
+    min-width: 44px;
+    min-height: 36px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pay-cal-weekdays,
+.pay-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.pay-cal-weekdays {
+    margin-bottom: 4px;
+}
+
+.pay-cal-weekdays span {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-faint);
+    text-transform: uppercase;
+}
+
+.pay-cal-cell {
+    min-height: 44px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 4px 2px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.pay-cal-empty {
+    background: transparent;
+    cursor: default;
+}
+
+.pay-cal-cell.has-events {
+    font-weight: 700;
+}
+
+.pay-cal-cell.is-today {
+    border-color: var(--color-primary);
+}
+
+.pay-cal-cell.is-selected {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.pay-cal-dots {
+    display: flex;
+    gap: 3px;
+    min-height: 6px;
+}
+
+.pay-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.pay-dot-in { background: #43A047; }
+.pay-dot-end { background: #FB8C00; }
+
+.pay-cal-legend {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.pay-cal-legend span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pay-cal-details {
+    margin-top: 10px;
+    border-top: 1px solid var(--border-soft);
+    padding-top: 10px;
+}
+
+.pay-cal-hint {
+    font-size: 12px;
+    color: var(--text-faint);
+    line-height: 1.4;
+}
+
+.pay-cal-day-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.pay-cal-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 13px;
+}
+
+.pay-cal-row:last-child {
+    border-bottom: none;
+}
+
+.pay-cal-name {
+    font-weight: 600;
+    flex-grow: 1;
+}
+
+.pay-cal-meta {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
 .finance-summary {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

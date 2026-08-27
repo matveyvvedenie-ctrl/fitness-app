@@ -668,6 +668,18 @@ var NEW_API_ACTIONS = {
     // Форма ответа отличается от старой (у нас lastPayment — вложенный объект,
     // раньше были плоские amount/endDate) — реформатируем под то, что ждут
     // renderFinanceSummary/renderFinanceList.
+    // Календарь оплат — платежи и окончания абонементов за месяц (см.
+    // payments_calendar в api/main.py). Отдельно от getFinances: та отдаёт
+    // только последний платёж клиента, а календарю нужны все за период.
+    getPaymentsCalendar: function(nativeFetch, params) {
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/payments-calendar' +
+            '?start=' + encodeURIComponent(params.get('start') || '') +
+            '&end=' + encodeURIComponent(params.get('end') || '');
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ payments: [], error: (res.data && res.data.detail) || 'Ошибка' }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
+    },
     getFinances: function(nativeFetch) {
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/finances';
         return _newApiCall(nativeFetch, path).then(function(res) {
@@ -3689,7 +3701,7 @@ function switchAdminSection(sectionName) {
     });
     var target = document.getElementById('admin-section-' + sectionName);
     if (target) target.classList.add('active');
-    if (sectionName === 'finances') loadFinances();
+    if (sectionName === 'finances') { loadFinances(); loadPaymentCalendar(); }
     if (sectionName === 'reports') loadMonthlyReports();
     if (sectionName === 'exercises') loadExerciseMediaLibrary();
 }
@@ -3926,6 +3938,143 @@ function _compressImageFile(file, maxDim, quality, callback, onError) {
 
 var financesData = []; // последний загруженный список из getFinances
 var allClientsForFinance = []; // полный список клиентов (включая без оплат) из getClients
+
+// ── Календарь оплат ──────────────────────────────────────────────────────
+// Список клиентов в «Финансах» отвечает на вопрос «кто сейчас должен», но не
+// показывает КОГДА: один платит помесячно, другой сразу за три месяца,
+// третий на две недели — и в списке это одинаковые строки. Календарь
+// раскладывает то же самое по дням: где оплата, где конец оплаченного срока.
+var payCalMonth = null;          // первое число показываемого месяца
+var payCalPayments = [];         // платежи, попавшие в этот месяц
+var payCalSelectedDay = '';
+
+var MONTH_NAMES_RU = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+function _isoDay(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function shiftPaymentMonth(delta) {
+    var base = payCalMonth || new Date();
+    payCalMonth = new Date(base.getFullYear(), base.getMonth() + delta, 1);
+    payCalSelectedDay = '';
+    loadPaymentCalendar();
+}
+
+async function loadPaymentCalendar() {
+    var grid = document.getElementById('pay-cal-grid');
+    if (!grid) return;
+    if (!payCalMonth) {
+        var now = new Date();
+        payCalMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    var first = payCalMonth;
+    var last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+    document.getElementById('pay-cal-title').textContent = MONTH_NAMES_RU[first.getMonth()] + ' ' + first.getFullYear();
+    grid.innerHTML = '<div class="no-data">Загрузка…</div>';
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getPaymentsCalendar' +
+            '&start=' + _isoDay(first) + '&end=' + _isoDay(last));
+        var data = await resp.json();
+        payCalPayments = (data && data.payments) || [];
+    } catch (e) {
+        console.error('loadPaymentCalendar failed:', e);
+        grid.innerHTML = '<div class="no-data">Не удалось загрузить календарь ❌</div>';
+        return;
+    }
+    renderPaymentCalendar();
+}
+
+function _payCalDayMap() {
+    var map = {};
+    var add = function(day, kind, payment) {
+        if (!day) return;
+        if (!map[day]) map[day] = { paid: [], ends: [] };
+        map[day][kind].push(payment);
+    };
+    payCalPayments.forEach(function(p) {
+        add(p.date, 'paid', p);
+        add(p.endDate, 'ends', p);
+    });
+    return map;
+}
+
+function renderPaymentCalendar() {
+    var grid = document.getElementById('pay-cal-grid');
+    if (!grid) return;
+    var first = payCalMonth;
+    var daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    // В России неделя начинается с понедельника, а getDay() считает от воскресенья.
+    var lead = (first.getDay() + 6) % 7;
+    var map = _payCalDayMap();
+    var todayIso = _isoDay(new Date());
+
+    var html = '';
+    for (var i = 0; i < lead; i++) html += '<div class="pay-cal-cell pay-cal-empty"></div>';
+    for (var d = 1; d <= daysInMonth; d++) {
+        var iso = _isoDay(new Date(first.getFullYear(), first.getMonth(), d));
+        var info = map[iso];
+        var dots = '';
+        if (info && info.paid.length) dots += '<i class="pay-dot pay-dot-in"></i>';
+        if (info && info.ends.length) dots += '<i class="pay-dot pay-dot-end"></i>';
+        var cls = 'pay-cal-cell';
+        if (iso === todayIso) cls += ' is-today';
+        if (iso === payCalSelectedDay) cls += ' is-selected';
+        if (info) cls += ' has-events';
+        html += '<button type="button" class="' + cls + '" onclick="selectPaymentDay(\'' + iso + '\')">' +
+            '<span class="pay-cal-num">' + d + '</span>' +
+            '<span class="pay-cal-dots">' + dots + '</span>' +
+        '</button>';
+    }
+    grid.innerHTML = html;
+    renderPaymentDayDetails();
+}
+
+function selectPaymentDay(iso) {
+    payCalSelectedDay = (payCalSelectedDay === iso) ? '' : iso;
+    renderPaymentCalendar();
+}
+
+function renderPaymentDayDetails() {
+    var box = document.getElementById('pay-cal-day-details');
+    if (!box) return;
+    if (!payCalSelectedDay) {
+        var paidCount = 0, endsCount = 0;
+        payCalPayments.forEach(function(p) {
+            if (p.date) paidCount++;
+            if (p.endDate) endsCount++;
+        });
+        box.innerHTML = payCalPayments.length
+            ? '<div class="pay-cal-hint">В этом месяце: ' + paidCount + ' оплат, у ' + endsCount +
+              ' клиентов заканчивается срок. Нажми на день — покажу кого.</div>'
+            : '<div class="pay-cal-hint">В этом месяце оплат нет</div>';
+        return;
+    }
+    var info = _payCalDayMap()[payCalSelectedDay];
+    var human = payCalSelectedDay.split('-').reverse().join('.');
+    if (!info) {
+        box.innerHTML = '<div class="pay-cal-hint">' + human + ' — ничего не запланировано</div>';
+        return;
+    }
+    var rows = '';
+    info.paid.forEach(function(p) {
+        rows += '<div class="pay-cal-row">' +
+            '<i class="pay-dot pay-dot-in"></i>' +
+            '<span class="pay-cal-name">' + p.name + '</span>' +
+            '<span class="pay-cal-meta">оплата ' + Math.round(p.amount) + ' ₽' +
+                (p.months ? ' · ' + p.months + ' мес.' : '') + '</span>' +
+        '</div>';
+    });
+    info.ends.forEach(function(p) {
+        rows += '<div class="pay-cal-row">' +
+            '<i class="pay-dot pay-dot-end"></i>' +
+            '<span class="pay-cal-name">' + p.name + '</span>' +
+            '<span class="pay-cal-meta">заканчивается абонемент</span>' +
+        '</div>';
+    });
+    box.innerHTML = '<div class="pay-cal-day-title">' + human + '</div>' + rows;
+}
 
 async function loadFinances() {
     var list = document.getElementById('finance-clients-list');
