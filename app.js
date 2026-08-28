@@ -5324,6 +5324,52 @@ function _collectMealPlanForm() {
 
 // Пустой день не сохраняем: иначе у клиента, которому второй план не нужен,
 // в базе появлялся бы план-пустышка, а в мини-аппе — вкладка ни с чем.
+// Пересчёт приёмов под изменённые цели дня. Появилось из живого случая:
+// ИИ выдал рацион, тренер поднял БЖУ — а приёмы пищи остались прежними, и
+// по граммовкам видно, что еды меньше, чем в целях. Считаем коэффициент по
+// калориям (сумма приёмов → цель) и применяем его ко всему: КБЖУ приёма и
+// граммовкам продуктов в составе.
+function _scaleGramsInText(text, ratio) {
+    // "Овсянка (60г), Яйца куриные (120г)" → те же продукты с новым весом.
+    // Трогаем только числа перед «г» в скобках: остальные цифры в названии
+    // («Творог 5%», «Хлеб 2 куска») — не вес, и менять их нельзя.
+    return (text || '').replace(/\((\d+(?:[.,]\d+)?)\s*г\)/gi, function(_, num) {
+        var v = parseFloat(String(num).replace(',', '.')) * ratio;
+        return '(' + (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10) + 'г)';
+    });
+}
+
+function recalcMealsToTargets() {
+    var targetCalories = parseInt(document.getElementById('mp-calories').value, 10) || 0;
+    if (!targetCalories) {
+        tg.showAlert('Сначала укажи калории на день');
+        return;
+    }
+    var blocks = Array.prototype.slice.call(document.querySelectorAll('#mp-meals-list .mp-meal-block'));
+    var sum = blocks.reduce(function(acc, b) {
+        return acc + (parseFloat(b.querySelector('[data-mp="calories"]').value) || 0);
+    }, 0);
+    if (!sum) {
+        tg.showAlert('Нечего пересчитывать: в приёмах пищи не проставлены калории');
+        return;
+    }
+    var ratio = targetCalories / sum;
+    blocks.forEach(function(block) {
+        ['calories', 'protein', 'fats', 'carbs'].forEach(function(field) {
+            var input = block.querySelector('[data-mp="' + field + '"]');
+            var val = parseFloat(input.value) || 0;
+            if (val) input.value = Math.round(val * ratio);
+        });
+        var desc = block.querySelector('[data-mp="desc"]');
+        if (desc && desc.value) desc.value = _scaleGramsInText(desc.value, ratio);
+    });
+    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    var pct = Math.round((ratio - 1) * 100);
+    tg.showAlert(pct === 0
+        ? 'Приёмы уже сходятся с целью'
+        : ('Порции ' + (pct > 0 ? 'увеличены' : 'уменьшены') + ' на ' + Math.abs(pct) + '% — проверь и сохрани'));
+}
+
 function _mealPlanIsEmpty(plan) {
     return !plan || (!plan.target_calories && !plan.notes && !(plan.meals || []).length);
 }
