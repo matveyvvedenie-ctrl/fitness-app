@@ -681,16 +681,21 @@ body.theme-dark .save-btn.success {
 }
 
 /* Day body (exercises container per day) */
+/* Свернуть день анимацией по max-height нельзя: у ограничения обязан быть
+   конкретный потолок, и всё, что выше, обрезается вместе с прокруткой.
+   Стояло 5000px — около семи карточек упражнений (у каждой два фото,
+   примерно 650px). День из двадцати упражнений обрывался на восьмом:
+   клиент видел 60–70% тренировки и не мог прокрутить дальше.
+
+   Поэтому сворачивание — через display, без потолка высоты. Плавное
+   схлопывание при этом теряется, но целая тренировка важнее анимации. */
 .day-body {
-    overflow: hidden;
-    max-height: 5000px;
-    transition: max-height 0.4s ease-in-out, opacity 0.3s ease;
     opacity: 1;
+    transition: opacity 0.25s ease;
 }
+
 .day-body.collapsed {
-    max-height: 0;
-    opacity: 0;
-    transition: max-height 0.35s ease-in-out, opacity 0.2s ease;
+    display: none;
 }
 
 @keyframes slideInLeft {
