@@ -5218,9 +5218,14 @@ async function loadClientMealPlan(chatId) {
             box.innerHTML = '<div class="no-data">Плана питания пока нет — составь вручную или сгенерируй через ИИ</div>';
             return;
         }
-        // Открываем на том дне, который заполнен: у большинства тренеров
-        // второго плана не будет никогда, и упираться в пустую вкладку глупо.
-        mealPlanViewDay = currentMealPlanByDay.workout ? 'workout' : 'rest';
+        // Остаёмся на том дне, который смотрели: иначе после сохранения плана
+        // для выходного экран прыгал на тренировочный, показывал ЕГО цифры, и
+        // это выглядело как «выходной день не сохранился». Если у выбранного
+        // дня плана нет — открываем заполненный, чтобы не упираться в пустую
+        // вкладку (у большинства тренеров второго плана не будет никогда).
+        if (!currentMealPlanByDay[mealPlanViewDay]) {
+            mealPlanViewDay = currentMealPlanByDay.workout ? 'workout' : 'rest';
+        }
         renderMealPlanView();
     } catch (e) {
         console.error('loadClientMealPlan failed:', e);
@@ -5545,8 +5550,12 @@ async function saveMealPlanFromEditor() {
         closeMealPlanEditor();
         btn.disabled = false;
         btn.textContent = origText;
+        // Показываем тот день, который только что правили.
+        mealPlanViewDay = mpEditorDay;
         await loadClientMealPlan(currentClientCard.chatId);
-        tg.showAlert('✅ План питания сохранён');
+        tg.showAlert(toSave.length > 1
+            ? '✅ Сохранены оба плана: тренировочный день и день без тренировки'
+            : ('✅ Сохранён план: ' + _mealDayLabel(toSave[0])));
     } catch (e) {
         console.error('saveMealPlanFromEditor error:', e);
         tg.showAlert('Ошибка соединения ❌');
