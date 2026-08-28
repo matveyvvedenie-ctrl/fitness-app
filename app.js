@@ -2017,7 +2017,12 @@ function renderWorkout() {
         var groups = groupExercises(day.exercises || []);
         var flatIndex = 0;
         groups.forEach(function(group) {
-            if (group.type === 'superset' || group.type === 'triset') {
+            // Связка (суперсет, трисет, круг) рисуется общим блоком со всеми
+            // своими упражнениями. Круг сюда не входил — и уходил в ветку
+            // ниже, где берётся ТОЛЬКО первое упражнение группы: у клиента
+            // круг из пяти движений превращался в одно, а тренировка
+            // выглядела наполовину короче, чем расписал тренер.
+            if (group.type === 'superset' || group.type === 'triset' || group.type === 'circuit') {
                 var wrap = document.createElement('div');
                 wrap.className = 'exercise-group-block';
                 var label = document.createElement('div');
