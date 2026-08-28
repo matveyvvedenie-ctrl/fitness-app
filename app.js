@@ -5058,6 +5058,24 @@ function initMealPlanAutoCalc() {
     });
 }
 
+// Поле дневной цели, которое тренер заполнил сам, автопересчёт больше не
+// трогает. Без этого получалось так: вписываешь 1900 ккал для выходного дня,
+// потом белки — и калории тут же заменяются суммой из формулы (600). Со
+// стороны это выглядит как «поле сбрасывается само».
+function initMealPlanTargetGuard() {
+    ['calories', 'protein', 'fats', 'carbs'].forEach(function(field) {
+        var el = document.getElementById('mp-' + field);
+        if (!el || el.dataset.guarded === '1') return;
+        el.dataset.guarded = '1';
+        el.addEventListener('input', function() { el.dataset.manual = '1'; });
+    });
+}
+
+function _mpTargetIsManual(field) {
+    var el = document.getElementById('mp-' + field);
+    return !!(el && el.dataset.manual === '1');
+}
+
 function handleMpTargetChange(field) {
     var prev = mpTargetsPrev || { calories: 0, protein: 0, fats: 0, carbs: 0 };
     var cur = {
@@ -5070,15 +5088,21 @@ function handleMpTargetChange(field) {
     if (field === 'calories') {
         var ratio = prev.calories > 0 ? cur.calories / prev.calories : null;
         if (ratio) {
-            document.getElementById('mp-protein').value = Math.round(prev.protein * ratio) || '';
-            document.getElementById('mp-fats').value = Math.round(prev.fats * ratio) || '';
-            document.getElementById('mp-carbs').value = Math.round(prev.carbs * ratio) || '';
+            ['protein', 'fats', 'carbs'].forEach(function(macro) {
+                if (_mpTargetIsManual(macro)) return;
+                document.getElementById('mp-' + macro).value = Math.round(prev[macro] * ratio) || '';
+            });
             _scaleMealFields(ratio, ratio);
         }
     } else {
-        // Белки/жиры/углеводы → калории считаем по формуле, а не пропорцией
+        // Белки/жиры/углеводы → калории считаем по формуле, а не пропорцией.
+        // Но только если калории не вписаны руками: там своя цифра от тренера.
         var newCalories = Math.round(cur.protein * 4 + cur.fats * 9 + cur.carbs * 4);
-        document.getElementById('mp-calories').value = newCalories || '';
+        if (!_mpTargetIsManual('calories')) {
+            document.getElementById('mp-calories').value = newCalories || '';
+        } else {
+            newCalories = cur.calories;
+        }
         var calRatio = prev.calories > 0 ? newCalories / prev.calories : null;
         var proteinRatio = (field === 'protein' && prev.protein > 0) ? cur.protein / prev.protein : null;
         _scaleMealFields(calRatio, proteinRatio);
@@ -5242,6 +5266,13 @@ var mpEditorDay = 'workout';
 var mpEditorDrafts = { workout: null, rest: null };
 
 function _fillMealPlanForm(d) {
+    // Пометки «вписано руками» принадлежат КОНКРЕТНОМУ дню: при переключении
+    // на другой план их надо снять, иначе автопересчёт замолчит и там, где
+    // тренер ничего не трогал.
+    ['calories', 'protein', 'fats', 'carbs'].forEach(function(field) {
+        var el = document.getElementById('mp-' + field);
+        if (el) delete el.dataset.manual;
+    });
     document.getElementById('mp-calories').value = d ? (d.target_calories || '') : '';
     document.getElementById('mp-protein').value = d ? (d.target_protein || '') : '';
     document.getElementById('mp-fats').value = d ? (d.target_fats || '') : '';
@@ -5328,6 +5359,7 @@ function openMealPlanEditor(seedPlan) {
     if (seedPlan) mpEditorDrafts[mpEditorDay] = seedPlan;
     initMealPlanAutoCalc();
     initMealPlanManualGuard();
+    initMealPlanTargetGuard();
     _renderMealPlanEditorTabs();
     _fillMealPlanForm(mpEditorDrafts[mpEditorDay]);
 
