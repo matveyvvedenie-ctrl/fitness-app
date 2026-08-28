@@ -79,6 +79,7 @@ function _withTimeout(promise, ms) {
 // соединения», хотя запрос был жив. Для таких действий срок отдельный.
 var SLOW_ACTIONS = {
     saveExerciseMedia: 90000,      // два фото уходят на сервер
+    addClientExercises: 120000,    // блок сохраняется по одному упражнению за раз
     generateMealPlanAI: 90000,     // на той стороне думает модель
     saveMeasurements: 60000,       // фото прогресса
     sendMonthlyReportToClient: 30000
@@ -941,6 +942,18 @@ var NEW_API_ACTIONS = {
             });
             return chain.then(function() {
                 if (firstError && savedCount === 0) return _fakeJsonResponse({ success: false, error: firstError }, 200);
+                // Частичный провал раньше отдавался как успех: из четырнадцати
+                // упражнений сохранялось восемь, тренер видел «готово», а в
+                // программе оказывалась половина дня. Теперь говорим прямо,
+                // сколько прошло — остальное тренер досоздаёт, а не ищет
+                // пропажу глазами.
+                if (firstError) {
+                    return _fakeJsonResponse({
+                        success: false,
+                        error: 'Сохранено ' + savedCount + ' из ' + exercises.length +
+                               ' — остальные не прошли: ' + firstError
+                    }, 200);
+                }
                 return _fakeJsonResponse({ success: true, saved: savedCount }, 200);
             });
         });
@@ -7957,7 +7970,7 @@ function showAddTypeDialog(dayName) {
 function askCircuitSize(dayName) {
     var box = document.getElementById('circuit-size-modal');
     var row = document.getElementById('circuit-size-row');
-    row.innerHTML = [4, 5, 6, 7, 8].map(function(n) {
+    row.innerHTML = [4, 5, 6, 7, 8, 10, 12, 14, 16].map(function(n) {
         return '<button type="button" class="add-day-chip" onclick="startCircuit(\'' +
             String(dayName || '').replace(/'/g, "\\'") + '\', ' + n + ')">' + n + '</button>';
     }).join('');
