@@ -5324,7 +5324,11 @@ function _collectMealPlanForm() {
         var name = val('name');
         var calories = num('calories');
         var desc = val('desc');
-        if (!name && !calories && !desc) return;
+        // Одно название без цифр и состава — не приём пищи, а подпись из
+        // заготовки формы. Раньше такие уходили на сервер, и клиенту в боте
+        // приходил список «Завтрак — 0 ккал, Обед — 0 ккал»: тренер задал
+        // только цели на день, а выглядело как недописанный план.
+        if (!calories && !desc) return;
         meals.push({
             name: name || 'Приём пищи',
             time: val('time'),
