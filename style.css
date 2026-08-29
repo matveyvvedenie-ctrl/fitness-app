@@ -3160,8 +3160,20 @@ body.theme-dark .save-btn.success {
 
 /* Круговая — тот же блок, что суперсет, но своим цветом заголовка: в одном
    дне их может быть несколько подряд, и одинаковые шапки сливаются. */
-.cc-circuit-header {
+/* Блоки с произвольным числом упражнений: круг, разминка, заминка. Цвет
+   шапки у каждого свой — в одном дне их бывает несколько подряд, и
+   одинаковые шапки сливаются в один список. */
+.cc-circuit-header,
+.cc-block-header-circuit {
     background: #00897B;
+}
+
+.cc-block-header-warmup {
+    background: #EF6C00;
+}
+
+.cc-block-header-cooldown {
+    background: #5E35B1;
 }
 
 .cc-superset-body {

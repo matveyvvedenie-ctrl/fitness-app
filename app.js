@@ -2022,12 +2022,14 @@ function renderWorkout() {
             // ниже, где берётся ТОЛЬКО первое упражнение группы: у клиента
             // круг из пяти движений превращался в одно, а тренировка
             // выглядела наполовину короче, чем расписал тренер.
-            if (group.type === 'superset' || group.type === 'triset' || group.type === 'circuit') {
+            if (group.type === 'superset' || group.type === 'triset' || blockTypeInfo(group.type)) {
                 var wrap = document.createElement('div');
                 wrap.className = 'exercise-group-block';
                 var label = document.createElement('div');
                 label.className = 'exercise-group-label';
-                label.textContent = group.type === 'circuit' ? ('🔄 Круговая · ' + group.exercises.length + ' упр.')
+                var blockInfo = blockTypeInfo(group.type);
+                label.textContent = blockInfo
+                    ? (blockInfo.label + ' · ' + group.exercises.length + ' упр.')
                     : (group.type === 'triset' ? '🔗 Трисет' : '🔗 Суперсет');
                 wrap.appendChild(label);
                 group.exercises.forEach(function(exercise) {
@@ -5689,14 +5691,37 @@ async function loadClientProgram(sheetName) {
 // префиксе не для красоты: у суперсета и трисета размер известен заранее, а
 // у круга — нет, и без него непонятно, где связка заканчивается и начинается
 // обычное упражнение.
-function circuitSize(ex) {
+// Блоки с произвольным числом упражнений: круг, разминка, заминка. Размер
+// пишется в самом префиксе («КРУГОВАЯ 5:»), потому что заранее он неизвестен —
+// в отличие от суперсета и трисета, где длина связки задана названием.
+var NUMBERED_BLOCKS = [
+    { type: 'circuit',  prefix: 'КРУГОВАЯ', re: /^кругова[яй]\s*(\d+)?\s*:/i, label: '🔄 Круговая',  short: 'Круговая',  defaultSize: 5 },
+    { type: 'warmup',   prefix: 'РАЗМИНКА', re: /^разминка\s*(\d+)?\s*:/i,     label: '🤸 Разминка',  short: 'Разминка',  defaultSize: 4 },
+    { type: 'cooldown', prefix: 'ЗАМИНКА',  re: /^заминка\s*(\d+)?\s*:/i,      label: '🧘 Заминка',   short: 'Заминка',   defaultSize: 4 }
+];
+
+function blockTypeInfo(type) {
+    return NUMBERED_BLOCKS.filter(function(b) { return b.type === type; })[0] || null;
+}
+
+// {type, size} у упражнения, открывающего блок, иначе null.
+function numberedBlockStart(ex) {
     var name = (ex && ex.exercise ? ex.exercise : '').toString().trim();
-    var m = /^кругова[яй]\s*(\d+)?\s*:/i.exec(name);
-    if (!m) return 0;
-    var n = parseInt(m[1], 10);
-    // Без числа (например, тренер написал префикс руками) — считаем кругом
-    // из четырёх: меньше уже трисет, который распознаётся отдельно.
-    return (n && n >= 2) ? n : 4;
+    for (var i = 0; i < NUMBERED_BLOCKS.length; i++) {
+        var b = NUMBERED_BLOCKS[i];
+        var m = b.re.exec(name);
+        if (!m) continue;
+        var n = parseInt(m[1], 10);
+        // Без числа (тренер написал префикс руками) — размер по умолчанию.
+        return { type: b.type, size: (n && n >= 2) ? n : b.defaultSize };
+    }
+    return null;
+}
+
+// Оставлено для совместимости с прежними вызовами.
+function circuitSize(ex) {
+    var start = numberedBlockStart(ex);
+    return (start && start.type === 'circuit') ? start.size : 0;
 }
 
 function isSupersetStart(ex) {
@@ -5712,6 +5737,8 @@ function isTrisetStart(ex) {
 function cleanExerciseName(name) {
     return (name || '').toString()
         .replace(/^\s*кругова[яй]\s*\d*\s*:\s*/i, '')
+        .replace(/^\s*разминка\s*\d*\s*:\s*/i, '')
+        .replace(/^\s*заминка\s*\d*\s*:\s*/i, '')
         .replace(/^\s*трисет\s*:\s*/i, '')
         .replace(/^\s*сет\s*:\s*/i, '')
         .trim();
@@ -5725,13 +5752,13 @@ function groupExercises(exercises) {
     var i = 0;
     while (i < exercises.length) {
         var ex = exercises[i];
-        var circuit = circuitSize(ex);
-        if (circuit && i + 1 < exercises.length) {
-            // Берём не больше, чем реально осталось в дне: упражнение из круга
+        var block = numberedBlockStart(ex);
+        if (block && i + 1 < exercises.length) {
+            // Берём не больше, чем реально осталось в дне: упражнение из блока
             // могли удалить, и уводить группировку за край списка нельзя.
-            var take = Math.min(circuit, exercises.length - i);
+            var take = Math.min(block.size, exercises.length - i);
             displayNum++;
-            groups.push({ type: 'circuit', exercises: exercises.slice(i, i + take), number: displayNum });
+            groups.push({ type: block.type, exercises: exercises.slice(i, i + take), number: displayNum });
             i += take;
         } else if (isTrisetStart(ex) && i + 2 < exercises.length) {
             displayNum++;
@@ -5975,20 +6002,22 @@ function renderClientProgram(data) {
                 actionsHtml = '<button class="cc-group-action-btn" onclick="mergeExercises(' + firstRowIdx + ', false)">🔗 Объединить со следующим</button>';
             } else if (group.type === 'superset' && nextGroup && nextGroup.type === 'single' && firstRowIdx) {
                 actionsHtml = '<button class="cc-group-action-btn" onclick="mergeExercises(' + firstRowIdx + ', true)">🔗+ Сделать трисет</button>';
-            } else if ((group.type === 'superset' || group.type === 'triset' || group.type === 'circuit') && firstRowIdx) {
+            } else if ((group.type === 'superset' || group.type === 'triset' || blockTypeInfo(group.type)) && firstRowIdx) {
                 actionsHtml = '<button class="cc-group-action-btn cc-group-action-split" onclick="splitGroup(' + firstRowIdx + ')">✂️ Разъединить</button>';
             }
-            if (group.type === 'circuit') {
+            var numbered = blockTypeInfo(group.type);
+            if (numbered) {
                 var circuitRowIdxs = group.exercises.map(function(ex) { return ex.rowIndex; }).filter(function(r) { return r; }).join(',');
                 var circuitBody = group.exercises.map(function(ex, idx) {
                     return (idx ? '<div class="cc-superset-divider"></div>' : '') +
                         renderExerciseRow(ex, String.fromCharCode(65 + idx));
                 }).join('');
-                return '<div class="cc-exercise cc-superset cc-circuit" data-row-indexes="' + circuitRowIdxs + '">' +
+                return '<div class="cc-exercise cc-superset cc-block-' + group.type + '" data-row-indexes="' + circuitRowIdxs + '">' +
                     '<div class="cc-drag-handle">⋮⋮</div>' +
                     '<div class="cc-ex-num">' + group.number + '</div>' +
                     '<div class="cc-ex-info">' +
-                        '<div class="cc-superset-header cc-circuit-header">Круговая · ' + group.exercises.length + ' упр.</div>' +
+                        '<div class="cc-superset-header cc-block-header cc-block-header-' + group.type + '">' +
+                            numbered.short + ' · ' + group.exercises.length + ' упр.</div>' +
                         '<div class="cc-superset-body">' + circuitBody + '</div>' +
                         actionsHtml +
                     '</div>' +
@@ -6083,6 +6112,13 @@ function initDayDragDrop() {
             dragClass: 'cc-sortable-drag',
             forceFallback: true, // надёжнее на iOS
             fallbackTolerance: 5,
+            // forceFallback перехватывает касания по всему элементу, и тап по
+            // кнопке внутри карточки уходил в несостоявшееся перетаскивание:
+            // карандаш «просто не нажимался» (жалоба Анны). Кнопки и поля
+            // исключаем из захвата, preventOnFilter: false — чтобы нажатие
+            // дошло до самой кнопки, а не было погашено.
+            filter: 'button, a, input, textarea, select',
+            preventOnFilter: false,
             onEnd: function(evt) {
                 if (evt.oldIndex === evt.newIndex) return; // ничего не изменилось
                 handleDayReorder(container);
@@ -7182,8 +7218,10 @@ function openExerciseEditor(rowIndex) {
 
     // Запоминаем префикс «СЕТ:»/«ТРИСЕТ:» — чтобы при сохранении не разрушить связку
     var rawName = (ex.exercise || '').toString();
-    var circuitMatch = /^\s*кругова[яй]\s*(\d*)\s*:/i.exec(rawName);
-    if (circuitMatch) currentEditingPrefix = 'КРУГОВАЯ ' + (circuitMatch[1] || '') + ': ';
+    var startedBlock = numberedBlockStart({ exercise: rawName });
+    if (startedBlock) {
+        currentEditingPrefix = blockTypeInfo(startedBlock.type).prefix + ' ' + startedBlock.size + ': ';
+    }
     else if (/^\s*трисет\s*:/i.test(rawName)) currentEditingPrefix = 'ТРИСЕТ: ';
     else if (/^\s*сет\s*:/i.test(rawName)) currentEditingPrefix = 'СЕТ: ';
     else currentEditingPrefix = '';
@@ -7985,15 +8023,25 @@ function showAddTypeDialog(dayName) {
 
 // Сколько упражнений в круге — спрашиваем сразу, до формы: от этого зависит,
 // сколько секций рисовать, а дорисовывать их на ходу в этой форме нечем.
-function askCircuitSize(dayName) {
+var pendingBlockType = 'circuit';
+
+function askBlockSize(dayName, type) {
+    pendingBlockType = type;
+    var info = blockTypeInfo(type) || blockTypeInfo('circuit');
     var box = document.getElementById('circuit-size-modal');
     var row = document.getElementById('circuit-size-row');
-    row.innerHTML = [4, 5, 6, 7, 8, 10, 12, 14, 16].map(function(n) {
+    row.innerHTML = [2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16].map(function(n) {
         return '<button type="button" class="add-day-chip" onclick="startCircuit(\'' +
             String(dayName || '').replace(/'/g, "\\'") + '\', ' + n + ')">' + n + '</button>';
     }).join('');
+    document.getElementById('circuit-size-title').textContent = 'Сколько упражнений: ' + info.short.toLowerCase() + '?';
     document.getElementById('circuit-size-subtitle').textContent = dayName ? ('в день: ' + dayName) : '';
     box.classList.remove('hidden');
+}
+
+// Старое имя — на случай вызова из закэшированной разметки.
+function askCircuitSize(dayName) {
+    askBlockSize(dayName, 'circuit');
 }
 
 function closeCircuitSizeModal() {
@@ -8002,7 +8050,7 @@ function closeCircuitSizeModal() {
 
 function startCircuit(dayName, count) {
     closeCircuitSizeModal();
-    openBlockModal(dayName, 'circuit', count);
+    openBlockModal(dayName, pendingBlockType, count);
 }
 
 function closeAddTypeDialog() {
@@ -8018,7 +8066,7 @@ function initAddTypeDialog() {
             if (type === 'single')        openAddExerciseModal(pendingAddDay);
             else if (type === 'superset') openBlockModal(pendingAddDay, 'superset');
             else if (type === 'triset')   openBlockModal(pendingAddDay, 'triset');
-            else if (type === 'circuit')  askCircuitSize(pendingAddDay);
+            else if (blockTypeInfo(type)) askBlockSize(pendingAddDay, type);
         });
     });
 }
@@ -8196,9 +8244,10 @@ function openBlockModal(dayName, type, circuitCount) {
     currentSetType = type; // 'superset' | 'triset' | 'circuit'
     // У круга размер задаёт тренер (обычно 5–6 упражнений), у остальных он
     // известен заранее.
-    var count = type === 'circuit' ? (circuitCount || 5) : (type === 'triset' ? 3 : 2);
+    var numbered = blockTypeInfo(type);
+    var count = numbered ? (circuitCount || numbered.defaultSize) : (type === 'triset' ? 3 : 2);
     currentCircuitCount = count;
-    var title = type === 'circuit' ? ('+ Круговая (' + count + ' упр.)')
+    var title = numbered ? ('+ ' + numbered.short + ' (' + count + ' упр.)')
         : (type === 'triset' ? '+ Новый трисет (3 упр.)' : '+ Новый суперсет (2 упр.)');
     document.getElementById('ex-block-title').textContent = title + (dayName ? ' · ' + dayName : '');
 
@@ -8293,7 +8342,8 @@ async function saveBlock() {
         if (i === 0) {
             // У круга в префикс уходит и размер — по нему потом восстанавливается
             // граница связки (см. circuitSize).
-            var prefix = currentBlockType === 'circuit' ? ('КРУГОВАЯ ' + sections.length + ': ')
+            var blockInfo = blockTypeInfo(currentBlockType);
+            var prefix = blockInfo ? (blockInfo.prefix + ' ' + sections.length + ': ')
                 : (currentBlockType === 'triset' ? 'ТРИСЕТ: ' : 'СЕТ: ');
             name = prefix + name;
         }
