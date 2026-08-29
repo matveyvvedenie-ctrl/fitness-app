@@ -2061,6 +2061,15 @@ function renderWorkout() {
 // Раньше ссылка на видео шла прямо в onclick="..." со «своим» экранированием
 // под JS-строку — если в ссылке (скопированной из таблицы) оказывалась хоть
 // одна двойная кавычка/перенос строки, вся кнопка молча ломалась.
+// Экранирование произвольного текста внутри HTML. Названия упражнений
+// приходят от тренера и содержат что угодно — кавычки, угловые скобки.
+function _escHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 function _escHtmlAttr(s) {
     return String(s == null ? '' : s)
         .replace(/&/g, '&amp;')
@@ -3806,15 +3815,20 @@ function renderExerciseMediaList(filter) {
         var thumb1 = ex.photo1 ? '<img src="' + ex.photo1 + '">' : '🏋️';
         var thumb2 = ex.photo2 ? '<img src="' + ex.photo2 + '">' : '💪';
         var hasVideo = !!(ex.video || ex.videoVk);
-        return '<div class="ex-media-item" onclick="openExerciseMediaEditor(\'' + ex.name.replace(/'/g, "\\'") + '\')">' +
+        // Имя кладём в data-атрибут, а не в onclick: у упражнений вроде
+        // «"Кошка-корова"» или «"Птичка" bird dog» двойная кавычка закрывала
+        // атрибут прямо посреди названия, и карточка переставала нажиматься
+        // (жалоба Анны: «на домашнюю тренировку не нажимается»). Экранирования
+        // одного апострофа тут мало.
+        return '<div class="ex-media-item" data-ex-name="' + _escHtmlAttr(ex.name) + '">' +
             '<div class="ex-media-thumbs">' +
                 '<div class="ex-media-thumb">' + thumb1 + '</div>' +
                 '<div class="ex-media-thumb">' + thumb2 + '</div>' +
             '</div>' +
             '<div class="ex-media-info">' +
-                '<div class="ex-media-name">' + ex.name + '</div>' +
+                '<div class="ex-media-name">' + _escHtml(ex.name) + '</div>' +
                 '<div class="ex-media-badges">' +
-                    (ex.group ? '<span class="ex-media-badge filled">' + ex.group + '</span>' : '') +
+                    (ex.group ? '<span class="ex-media-badge filled">' + _escHtml(ex.group) + '</span>' : '') +
                     '<span class="ex-media-badge ' + (ex.photo1 && ex.photo2 ? 'filled' : '') + '">📷 фото</span>' +
                     '<span class="ex-media-badge ' + (hasVideo ? 'filled' : '') + '">🎬 видео</span>' +
                 '</div>' +
@@ -3822,6 +3836,12 @@ function renderExerciseMediaList(filter) {
             '<div class="ex-media-edit-icon">✏️</div>' +
         '</div>';
     }).join('');
+
+    list.querySelectorAll('.ex-media-item').forEach(function(el) {
+        el.addEventListener('click', function() {
+            openExerciseMediaEditor(el.dataset.exName || '');
+        });
+    });
 }
 
 // Рисует чипы групп мышц в редакторе упражнения — переключение как в
