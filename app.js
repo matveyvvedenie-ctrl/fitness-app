@@ -1810,29 +1810,58 @@ if (vkLaunchUserId) {
         contentSafeAreaInset: { top: 0 }
     };
     document.documentElement.style.setProperty('--tg-top-pad', '0px');
+    document.documentElement.style.setProperty('--tg-bottom-pad', '0px');
     document.documentElement.style.setProperty('--vk-right-pad', '110px');
 } else {
 try {
     tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
-    // НЕ блокируем вертикальный свайп — пользователь должен иметь возможность свернуть мини-апп жестом.
-    // (раньше вызывали tg.disableVerticalSwipes() и tg.requestFullscreen() — это мешало)
+    // Полноэкранный режим (Bot API 8.0+). Раньше его убрали ВМЕСТЕ с
+    // disableVerticalSwipes() — мешала именно блокировка свайпа: без неё
+    // мини-апп нельзя было свернуть жестом. Свайп оставляем включённым,
+    // просим только полный экран.
+    //
+    // Вызов обёрнут: на старых клиентах метода нет, а на десктопе он может
+    // ответить ошибкой — в обоих случаях просто остаёмся в обычном режиме.
+    // Отступ сверху пересчитается сам: applyTelegramTopInset ниже уже умеет
+    // читать contentSafeAreaInset и слушает событие fullscreenChanged.
+    try {
+        if (typeof tg.requestFullscreen === 'function' &&
+            typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast('8.0')) {
+            tg.requestFullscreen();
+        }
+    } catch (_) {}
     // Отступ сверху, чтобы контент не залезал под Telegram-шапку (Закрыть/▼/⋯).
     // Bot API 8.0+: tg.contentSafeAreaInset.top даёт точное значение. Старые версии — fallback 56px.
-    function applyTelegramTopInset() {
-        var top = 0;
+    // Telegram отдаёт ДВА разных отступа, и их надо складывать:
+    //   safeAreaInset        — железо: чёлка/строка состояния снизу и сверху;
+    //   contentSafeAreaInset — интерфейс Telegram: плавающие «Закрыть» и «•••».
+    // Раньше учитывался только второй, поэтому в полноэкранном режиме
+    // приветствие и аватар уезжали под кнопку «Закрыть».
+    //
+    // Снизу env(safe-area-inset-bottom) во встроенном браузере Telegram
+    // часто равен нулю — из-за этого подписи нижней навигации срезало
+    // домашней полоской. Берём значение у самого Telegram и в CSS выбираем
+    // большее из двух.
+    function applyTelegramInsets() {
+        var top = 0, bottom = 0;
         try {
-            if (tg.isFullscreen === true) {
-                top = (tg.contentSafeAreaInset && tg.contentSafeAreaInset.top) || 0;
-            } else if (tg.contentSafeAreaInset && typeof tg.contentSafeAreaInset.top === 'number') {
-                top = tg.contentSafeAreaInset.top;
-            } else {
-                top = 56; // запас под Telegram-шапку на iPhone
-            }
-        } catch (_) { top = 56; }
-        document.documentElement.style.setProperty('--tg-top-pad', top + 'px');
+            var safe = tg.safeAreaInset || {};
+            var content = tg.contentSafeAreaInset || {};
+            var haveSafe = typeof safe.top === 'number' || typeof content.top === 'number';
+            top = (safe.top || 0) + (content.top || 0);
+            // Старые клиенты не отдают ни того, ни другого: оставляем прежний
+            // запас под шапку, но только когда мы НЕ в полный экран.
+            if (!haveSafe && tg.isFullscreen !== true) top = 56;
+            bottom = (safe.bottom || 0) + (content.bottom || 0);
+        } catch (_) { top = 56; bottom = 0; }
+        var root = document.documentElement;
+        root.style.setProperty('--tg-top-pad', top + 'px');
+        root.style.setProperty('--tg-bottom-pad', bottom + 'px');
     }
+    // Прежнее имя оставляем: на него подписаны обработчики событий ниже.
+    var applyTelegramTopInset = applyTelegramInsets;
     applyTelegramTopInset();
     // Обновляем при изменении viewport / fullscreen
     try {
@@ -1840,6 +1869,7 @@ try {
             tg.onEvent('viewportChanged', applyTelegramTopInset);
             tg.onEvent('contentSafeAreaChanged', applyTelegramTopInset);
             tg.onEvent('fullscreenChanged', applyTelegramTopInset);
+            tg.onEvent('safeAreaChanged', applyTelegramTopInset);
         }
     } catch (_) {}
 } catch (e) {
@@ -3088,6 +3118,80 @@ function _renderHomeUI(trainingDays, doneDays) {
     }
 }
 
+// Анкета клиента нужна в двух местах — для блока «Твоя цель» и для выбора
+// показательного упражнения в карточке рекорда. Запрашиваем один раз и
+// отдаём обоим один и тот же промис, чтобы не ходить на сервер дважды.
+var _myProfilePromise = null;
+function _getMyProfile() {
+    if (!_myProfilePromise) {
+        _myProfilePromise = fetch(APPS_SCRIPT_URL + '?action=getClientProfile&targetChatId=' + _myChatId())
+            .then(function(r) { return r.json(); })
+            .then(function(d) { return (d && (d.profile || d)) || {}; })
+            .catch(function() { return {}; });
+    }
+    return _myProfilePromise;
+}
+
+// Показательное упражнение для карточки рекорда: у женщин — ягодичный
+// мостик, у мужчин — жим лёжа. Если клиент его не делал, карточка
+// возвращается к прежнему поведению и показывает самый тяжёлый результат.
+function _showcaseExercisePattern(gender) {
+    var g = String(gender || '').toLowerCase();
+    var male = /^m|муж/.test(g);
+    return male ? /жим.*л[еёe]ж/i : /ягодичн|мостик/i;
+}
+
+// Мини-график динамики для карточек «Последний рекорд» и «Текущий вес».
+// Рисуем инлайн-SVG сами: Chart.js для полоски 40px высотой избыточен, а
+// каждая его копия — это ещё один canvas и обработчики.
+//
+// Значения приходят как есть; сглаживание — обычная кривая Безье между
+// соседними точками. Один ряд, поэтому цвет акцентный (DESIGN.md, раздел 12).
+function _sparkline(values) {
+    var pts = (values || []).map(Number).filter(function(v) { return isFinite(v); });
+    if (pts.length < 2) return '';
+    // По горизонтали отступ больше, чем по вертикали: график растянут во всю
+    // ширину карточки, и без запаса точка на конце упиралась бы в край.
+    var W = 100, H = 34, PX = 7, PY = 4;
+    var min = Math.min.apply(null, pts), max = Math.max.apply(null, pts);
+    var span = (max - min) || 1;
+    var xy = pts.map(function(v, i) {
+        return [PX + i * (W - 2 * PX) / (pts.length - 1),
+                H - PY - (v - min) / span * (H - 2 * PY)];
+    });
+    var d = 'M' + xy[0][0].toFixed(1) + ' ' + xy[0][1].toFixed(1);
+    for (var i = 1; i < xy.length; i++) {
+        var p0 = xy[i - 1], p1 = xy[i], cx = (p0[0] + p1[0]) / 2;
+        d += ' C' + cx.toFixed(1) + ' ' + p0[1].toFixed(1) +
+             ' ' + cx.toFixed(1) + ' ' + p1[1].toFixed(1) +
+             ' ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1);
+    }
+    var area = d + ' L' + xy[xy.length - 1][0].toFixed(1) + ' ' + H +
+               ' L' + xy[0][0].toFixed(1) + ' ' + H + ' Z';
+    var gid = 'spk' + Math.random().toString(36).slice(2, 8);
+    var last = xy[xy.length - 1];
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
+        '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+            '<stop offset="0" stop-color="currentColor" stop-opacity=".22"/>' +
+            '<stop offset="1" stop-color="currentColor" stop-opacity="0"/>' +
+        '</linearGradient></defs>' +
+        '<path d="' + area + '" fill="url(#' + gid + ')"/>' +
+        '<path d="' + d + '" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>' +
+        '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="2.6" ' +
+            'fill="currentColor" vector-effect="non-scaling-stroke"/>' +
+    '</svg>';
+}
+
+// Подпись изменения: направление словом и цветом, без эмодзи.
+function _trendDelta(el, diff, unit, lowerIsBetter) {
+    if (!el) return;
+    if (!isFinite(diff) || diff === 0) { el.textContent = ''; el.className = 'home-trend-delta'; return; }
+    var good = lowerIsBetter ? diff < 0 : diff > 0;
+    el.textContent = (diff > 0 ? '+' : '') + diff.toFixed(1) + ' ' + unit;
+    el.className = 'home-trend-delta ' + (good ? 'trend-good' : 'trend-bad');
+}
+
 // Блок «Твоя цель». Цель берётся из анкеты клиента существующей ручкой —
 // новых серверных методов не добавляем. Если анкета не заполнена или запрос
 // не прошёл, блок просто не показывается: выдуманной цели быть не должно.
@@ -3095,9 +3199,7 @@ async function loadHomeGoal() {
     var box = document.getElementById('home-goal');
     if (!box) return;
     try {
-        var res = await fetch(APPS_SCRIPT_URL + '?action=getClientProfile&targetChatId=' + _myChatId());
-        var data = await res.json();
-        var prof = data.profile || data || {};
+        var prof = await _getMyProfile();
         var labels = { loss: 'Похудение', mass: 'Набор массы', tone: 'Тонус и поддержание', strength: 'Сила' };
         var goal = labels[prof.goal] || prof.goal || '';
         if (!goal) return;
@@ -3135,16 +3237,36 @@ async function loadHomeExtras() {
                     bestByEx[name] = { weight: w, date: d.date };
                 }
             });
-            // Самый тяжёлый
+            // Сначала ищем показательное упражнение по полу из анкеты.
+            var profile = await _getMyProfile();
+            var want = _showcaseExercisePattern(profile.gender);
             var topName = '', topW = 0, topDate = '';
             for (var k in bestByEx) {
-                if (bestByEx[k].weight > topW) {
-                    topW = bestByEx[k].weight; topName = k; topDate = bestByEx[k].date;
+                if (want.test(k)) { topW = bestByEx[k].weight; topName = k; topDate = bestByEx[k].date; break; }
+            }
+            // Не нашли — как и раньше, показываем самый тяжёлый результат.
+            if (!topName) {
+                for (var k2 in bestByEx) {
+                    if (bestByEx[k2].weight > topW) {
+                        topW = bestByEx[k2].weight; topName = k2; topDate = bestByEx[k2].date;
+                    }
                 }
             }
             if (topW > 0) {
                 document.getElementById('home-last-pr').textContent = topW + ' кг';
                 document.getElementById('home-last-pr-sub').textContent = topName;
+                // График: как рос вес именно в этом упражнении. Данные уже
+                // загружены выше, дополнительный запрос не нужен.
+                var series = history
+                    .filter(function(d) { return cleanExerciseName(d.exercise) === topName; })
+                    .map(function(d) { return parseFloat(d.weight) || 0; })
+                    .filter(function(w) { return w > 0; });
+                var spark = document.getElementById('home-pr-spark');
+                if (spark) spark.innerHTML = _sparkline(series);
+                if (series.length >= 2) {
+                    _trendDelta(document.getElementById('home-last-pr-delta'),
+                                series[series.length - 1] - series[0], 'кг', false);
+                }
             }
         }
     } catch (e) { console.warn('home extras (history) fail:', e); }
@@ -3158,14 +3280,18 @@ async function loadHomeExtras() {
             var last = meas[meas.length - 1];
             if (last.weight) {
                 document.getElementById('home-weight').textContent = last.weight + ' кг';
+                var wSeries = meas.map(function(m) { return parseFloat(m.weight) || 0; })
+                                  .filter(function(w) { return w > 0; });
+                var wSpark = document.getElementById('home-weight-spark');
+                if (wSpark) wSpark.innerHTML = _sparkline(wSeries);
                 if (meas.length >= 2) {
                     var prev = meas[meas.length - 2];
                     if (prev.weight) {
+                        // Раньше здесь были эмодзи 📈📉➡️. Направление теперь
+                        // показывает цвет: для веса снижение — хорошая динамика.
                         var diff = (parseFloat(last.weight) - parseFloat(prev.weight));
-                        var sign = diff > 0 ? '+' : '';
-                        var arrow = diff > 0 ? '📈' : (diff < 0 ? '📉' : '➡️');
-                        document.getElementById('home-weight-sub').textContent =
-                            arrow + ' ' + sign + diff.toFixed(1) + ' кг с прошлого замера';
+                        document.getElementById('home-weight-sub').textContent = 'с прошлого замера';
+                        _trendDelta(document.getElementById('home-weight-delta'), diff, 'кг', true);
                     }
                 }
             }

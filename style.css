@@ -191,7 +191,11 @@
        поэтому формула безопасна везде. Всё, что прижато к низу экрана,
        отступает именно на --nav-total, а не на «примерно 56». */
     --nav-h: 56px;
-    --nav-total: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+    /* Нижний запас: во встроенном браузере Telegram env(safe-area-inset-bottom)
+       часто равен нулю, и подписи навигации срезало домашней полоской.
+       Берём большее из системного значения и того, что сообщает Telegram. */
+    --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-bottom-pad, 0px));
+    --nav-total: calc(var(--nav-h) + var(--safe-bottom));
 
     --dur-fast: 120ms;   /* нажатие */
     --dur-base: 150ms;   /* цвет, прозрачность */
@@ -1288,7 +1292,7 @@ body.theme-dark .save-btn.success {
     z-index: 50;
     box-shadow: var(--shadow-nav);
     padding-right: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: var(--safe-bottom);
 }
 
 .tab-btn {
@@ -7849,3 +7853,63 @@ body.theme-dark #workout-tab::after {
     font-weight: 600;
     cursor: pointer;
 }
+
+
+/* ─── Карточки с мини-графиком: «Последний рекорд» и «Текущий вес» ───────
+   Данные и подписи те же, что были в плитках; добавилась полоска динамики.
+   График — инлайн-SVG, цвет наследуется от карточки через currentColor,
+   поэтому follows цвет тренера вместе со всем остальным. */
+#home-tab .home-trend-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap-3);
+    margin-top: var(--gap-3);
+}
+#home-tab .home-trend-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: var(--gap-3) var(--gap-4) 0;
+    border: 1px solid var(--ds-border-soft);
+    border-radius: var(--radius-lg);
+    background: var(--ds-surface);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+}
+#home-tab .home-trend-sub {
+    margin-top: var(--gap-1);
+    font-size: var(--fs-micro);
+    line-height: var(--lh-micro);
+    color: var(--ds-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-height: var(--lh-micro);
+}
+#home-tab .home-trend-value {
+    margin-top: 2px;
+    font-size: var(--fs-num-xl);
+    line-height: var(--lh-num-xl);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ds-text);
+}
+/* Направление изменения — данные, а не украшение: для веса хорошо снижение,
+   для рекорда — рост. Какое из них хорошее, решает вызывающий код. */
+#home-tab .home-trend-delta {
+    min-height: var(--lh-micro);
+    font-size: var(--fs-micro);
+    line-height: var(--lh-micro);
+    font-weight: 600;
+    color: var(--ds-text-faint);
+}
+#home-tab .home-trend-delta.trend-good { color: var(--ds-fg-success); }
+#home-tab .home-trend-delta.trend-bad  { color: var(--ds-fg-danger); }
+
+#home-tab .home-trend-spark {
+    margin: var(--gap-2) calc(var(--gap-4) * -1) 0;
+    height: 44px;
+    color: var(--accent-500);
+}
+#home-tab .home-trend-spark svg { display: block; width: 100%; height: 100%; }
+#home-tab .home-trend-spark:empty { height: var(--gap-3); }
