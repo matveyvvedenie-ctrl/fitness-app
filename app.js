@@ -31,8 +31,23 @@ const VK_LAUNCH_PARAMS_RAW = window.location.search.replace(/^\?/, '');
 // см. VK_LAUNCH_PARAMS_RAW ниже) — бэкенд узнаёт "это супер-админ, ему можно
 // любой /trainers/{id}/..." по ПОДПИСИ, не по этому параметру, см.
 // require_telegram_or_vk_auth_for_trainer_routes в main.py.
-let CURRENT_TRAINER_ID = new URLSearchParams(window.location.search).get('superadmin_view_trainer_id') ||
-    new URLSearchParams(window.location.search).get('vk_group_id') || '';
+//
+// Параметр ищем и в строке запроса, и в хеше: кнопка open_app во VK (см.
+// _mini_app_keyboard в vk_bot.py) отдаёт свои данные приложению именно как
+// #vk_group_id=..., а не как ?vk_group_id=... Раньше бот присылал текстовую
+// ссылку, VK открывал её во встроенном браузере, и параметр приходил в
+// запросе — теперь открытие родное, а параметр в хеше.
+function _launchParam(name) {
+    try {
+        var q = new URLSearchParams(window.location.search).get(name);
+        if (q) return q;
+        var h = String(window.location.hash || '').replace(/^#/, '');
+        return h ? (new URLSearchParams(h).get(name) || '') : '';
+    } catch (_) { return ''; }
+}
+
+let CURRENT_TRAINER_ID = _launchParam('superadmin_view_trainer_id') ||
+    _launchParam('vk_group_id') || '';
 
 // Тема текущего тенанта, подтягивается в init() через loadTenantConfig().
 // tenantTrainerChatId — фоллбэк для isTrainer() у тренеров, подключённых
