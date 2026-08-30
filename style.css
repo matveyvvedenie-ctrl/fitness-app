@@ -508,6 +508,30 @@ body.theme-sand {
     --fg-warning:   #8a6a2f;
     --fg-info:      #4a6076;
     --accent-text:  var(--color-primary);
+
+    /* Новые экраны построены на --ds-*, а бежевая тема их не переопределяла —
+       поэтому у тенанта с этой темой светлые карточки садились на бежевый
+       фон. Повторяем ту же палитру в бежевых тонах: значения взяты из
+       --surface/--text выше, чтобы обе системы совпадали до тона. */
+    --ds-page-bg:     #f6f1ea;
+    --ds-surface:     #fffdfa;
+    --ds-surface-2:   #f1eae0;
+    --ds-surface-3:   #faf6f0;
+    --ds-surface-4:   #e8dfd2;
+    --ds-border:      #e3d9ca;
+    --ds-border-soft: #efe7dc;
+    --ds-text:        #2a2521;
+    --ds-text-muted:  #6f655a;
+    --ds-text-faint:  #9c9082;
+
+    --ds-tint-success: #eaf0e6;
+    --ds-tint-danger:  #f6e9e6;
+    --ds-tint-warning: #f6efdf;
+    --ds-tint-info:    #e9eef3;
+    --ds-fg-success:   #4c6b45;
+    --ds-fg-danger:    #9c4a3c;
+    --ds-fg-warning:   #8a6a2f;
+    --ds-fg-info:      #4a6076;
 }
 
 /* Заголовки — засечным шрифтом, как в макете. Обычный текст и цифры
@@ -5525,8 +5549,12 @@ body.theme-dark .save-btn.success {
     position: absolute;
     inset: 0;
     background-color: var(--accent-700);
+    /* Градиент идёт от графита к цвету тренера, а не к зашитому петролю:
+       иначе у тенанта с другой темой на экране появлялась чужая зелёная
+       карточка. Графит слева оставляем — он держит читаемость белого текста
+       при любом фирменном цвете. */
     background-image: var(--home-hero-photo,
-        linear-gradient(135deg, #2B3033 0%, #1E4F4C 62%, #16706B 100%));
+        linear-gradient(135deg, #2B3033 0%, var(--accent-700) 62%, var(--accent-500) 100%));
     background-size: cover;
     background-position: center;
     display: flex;

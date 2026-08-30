@@ -1809,9 +1809,14 @@ if (vkLaunchUserId) {
         isFullscreen: false,
         contentSafeAreaInset: { top: 0 }
     };
-    document.documentElement.style.setProperty('--tg-top-pad', '0px');
+    // Во VK кнопки "•••" и "✕" висят плавающими в правом верхнем углу поверх
+    // страницы. Пока вкладки стояли сверху, под них резервировалось место
+    // справа (--vk-right-pad). После переноса навигации вниз резерв стал не
+    // нужен, но содержимое страницы поехало под эти кнопки — приветствие и
+    // аватар оказывались под ними. Отступаем сверху так же, как в Telegram.
+    document.documentElement.style.setProperty('--tg-top-pad', '48px');
     document.documentElement.style.setProperty('--tg-bottom-pad', '0px');
-    document.documentElement.style.setProperty('--vk-right-pad', '110px');
+    document.documentElement.style.setProperty('--vk-right-pad', '0px');
 } else {
 try {
     tg = window.Telegram.WebApp;
