@@ -1731,6 +1731,20 @@ async function resolveTenantForVkUser() {
     var tenants = (data && data.tenants || []).filter(function(t) {
         return t.trainerStatus !== 'disabled' && t.clientStatus !== 'deleted' && t.clientStatus !== 'archived';
     });
+    // 2026-08-30. Тенанты, где человек — сам тренер (демо), берём ТОЛЬКО если
+    // клиентских нет. Порядок важен: у тренера, который вдобавок занимается
+    // сам у себя или у коллеги, «мой кабинет клиента» и «мой демо-кабинет»
+    // раньше были бы двумя вариантами, и вместо приложения человек получал бы
+    // выбор тенанта, которого никогда не видел. Роли в ответе может не быть
+    // (бэкенд старее фронтенда — VK-хостинг обновляется руками, отдельно от
+    // сервера): тогда считаем строку клиентской, то есть ведём себя ровно как
+    // до этой правки.
+    var clientTenants = tenants.filter(function(t) { return (t.role || 'client') === 'client'; });
+    if (clientTenants.length) {
+        tenants = clientTenants;
+    } else {
+        tenants = tenants.filter(function(t) { return t.role === 'trainer'; });
+    }
     if (!tenants.length) return;
     if (tenants.length === 1) { NEW_API_RESOLVED_TRAINER_ID = tenants[0].trainerId; return; }
     var saved = '';
