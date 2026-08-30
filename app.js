@@ -1429,6 +1429,127 @@ var _PROFILE_KEYS = ['gender', 'age', 'height', 'weight', 'goal', 'level', 'freq
 // Затемняет hex-цвет на заданную долю (0..1) — чтобы из ОДНОГО присланного
 // тренером акцентного цвета получить вторую точку градиента, не требуя от
 // тренера подбирать пару цветов вручную.
+// Разбор цвета и смешивание с белым — нужны, чтобы построить всю шкалу
+// акцента из одного фирменного цвета тренера.
+function _hexToRgb(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length === 3) h = h.split('').map(function(c) { return c + c; }).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+    var n = parseInt(h, 16);
+    return { r: (n >> 16) & 0xFF, g: (n >> 8) & 0xFF, b: n & 0xFF };
+}
+function _rgbToHex(c) {
+    return '#' + [c.r, c.g, c.b].map(function(v) {
+        return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+    }).join('');
+}
+// Смешать цвет с белым: 0 — исходный, 1 — белый.
+function _mixWhite(hex, k) {
+    var c = _hexToRgb(hex);
+    if (!c) return hex;
+    return _rgbToHex({ r: c.r + (255 - c.r) * k, g: c.g + (255 - c.g) * k, b: c.b + (255 - c.b) * k });
+}
+// Контраст двух цветов по WCAG (1 — неразличимы, 21 — чёрное на белом).
+// Порог по «средней яркости» для этого не годится: петроль #16706B имеет
+// яркость 0.36 и выглядит достаточно светлым по формуле, но на почти чёрном
+// фоне даёт контраст всего 3.2.
+function _relLum(hex) {
+    var c = _hexToRgb(hex);
+    if (!c) return 0;
+    var v = [c.r, c.g, c.b].map(function(x) {
+        x = x / 255;
+        return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+}
+function _contrast(a, b) {
+    var l1 = _relLum(a), l2 = _relLum(b);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+// Относительная яркость (0 — чёрный, 1 — белый).
+function _luminance(hex) {
+    var c = _hexToRgb(hex);
+    if (!c) return 0.5;
+    return (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
+}
+
+// Строит шкалу акцента из фирменного цвета тренера и кладёт её в --accent-*.
+// Без этого клиентские экраны всегда были бы петрольными, каким бы ни был
+// цвет тренера: петроль задан в :root как значение по умолчанию, а тенантная
+// тема ставила только --color-primary.
+//
+// Шкала строится ИЗ ОДНОГО И ТОГО ЖЕ цвета для обеих тем, меняется только
+// способ: на светлом фоне цвет при необходимости затемняется и разбавляется
+// белым, на тёмном — осветляется, а мягкие ступени становятся полупрозрачными
+// (разбавленный белым цвет на чёрном фоне выглядел бы грязно-серым).
+// Отдельного фиксированного акцента для тёмной темы больше нет.
+//
+// Пустой цвет = у тренера свой цвет не задан: снимаем все inline-значения,
+// и в силу вступают значения по умолчанию из :root. Так цвет предыдущего
+// тренера не остаётся при переключении в супер-админке.
+var _ACCENT_PROPS = ['--accent-50', '--accent-100', '--accent-200', '--accent-300',
+                     '--accent-500', '--accent-600', '--accent-700',
+                     '--accent-rgb', '--text-on-accent'];
+
+function _applyAccentScale(hex, isDark) {
+    var root = document.documentElement;
+    if (!_hexToRgb(hex)) {
+        // Цвета у тренера нет — снимаем всё, и в силу вступают значения по
+        // умолчанию из :root.
+        _ACCENT_PROPS.forEach(function(p) { root.style.removeProperty(p); });
+        if (!isDark) return;
+        // Но значение по умолчанию рассчитано на светлый фон и на чёрном
+        // читается плохо. Берём его же и прогоняем через ту же адаптацию,
+        // что и цвет тренера. Фиксированный акцент в body.theme-dark для
+        // этого заводить нельзя: объявление на body перебивает то, что JS
+        // ставит на html, и ломает цвет тренера.
+        hex = getComputedStyle(root).getPropertyValue('--accent-500').trim();
+        if (!_hexToRgb(hex)) return;
+    }
+    var base = hex;
+    if (isDark) {
+        // На тёмном фоне подсвечиваем цвет, пока он не станет читаемым.
+        // Ориентир — контраст к фону тёмной темы (--ds-page-bg = #0E0F11),
+        // а не абстрактный порог яркости.
+        for (var i = 0; i < 14 && _contrast(base, '#0E0F11') < 4.5; i++) {
+            var next = _mixWhite(base, 0.14);
+            if (next === base) break;
+            base = next;
+        }
+        if (_luminance(base) > 0.72) base = _darkenHex(base, 0.18);
+    } else {
+        var lum = _luminance(base);
+        if (lum > 0.55) base = _darkenHex(base, Math.min(0.45, (lum - 0.4) * 1.1));
+        else if (lum < 0.12) base = _mixWhite(base, 0.28);
+    }
+
+    var c = _hexToRgb(base);
+    var rgb = c.r + ', ' + c.g + ', ' + c.b;
+    root.style.setProperty('--accent-rgb', rgb);
+    root.style.setProperty('--accent-300', _mixWhite(base, 0.18));
+    root.style.setProperty('--accent-500', base);
+    root.style.setProperty('--accent-600', _darkenHex(base, isDark ? 0.18 : 0.20));
+
+    if (isDark) {
+        root.style.setProperty('--accent-50',  'rgba(' + rgb + ', .16)');
+        root.style.setProperty('--accent-100', 'rgba(' + rgb + ', .24)');
+        root.style.setProperty('--accent-200', 'rgba(' + rgb + ', .38)');
+        // Акцентный текст на тёмном фоне обязан быть светлым, а не тёмным.
+        root.style.setProperty('--accent-700', _mixWhite(base, 0.55));
+    } else {
+        root.style.setProperty('--accent-50',  _mixWhite(base, 0.93));
+        root.style.setProperty('--accent-100', _mixWhite(base, 0.86));
+        root.style.setProperty('--accent-200', _mixWhite(base, 0.66));
+        root.style.setProperty('--accent-700', _darkenHex(base, 0.38));
+    }
+
+    // Текст поверх акцентной заливки: обычно белый, но если фирменный цвет
+    // оказался очень светлым — тёмный, иначе надпись пропадёт.
+    root.style.setProperty('--text-on-accent',
+        _luminance(base) > 0.62 ? '#15171B' : '#FFFFFF');
+}
+
 function _darkenHex(hex, amount) {
     try {
         var h = hex.replace('#', '');
@@ -1459,11 +1580,21 @@ function _syncTenantBanner(tabName) {
 
 function applyTenantTheme(theme) {
     if (!theme) return;
+    // Цвет применяем ВСЕГДА, а не только когда он задан: иначе при
+    // переключении между тренерами в супер-админке (без перезагрузки) на
+    // экране оставался бы цвет предыдущего тренера.
+    var root = document.documentElement;
     if (theme.primary) {
-        var root = document.documentElement;
         root.style.setProperty('--color-primary', theme.primary);
         root.style.setProperty('--color-primary-dark', _darkenHex(theme.primary, 0.2));
+    } else {
+        root.style.removeProperty('--color-primary');
+        root.style.removeProperty('--color-primary-dark');
     }
+    // Клиентские экраны красятся через --accent-*, поэтому фирменный цвет
+    // разворачиваем в полную шкалу. Тёмной теме нужен тот же цвет, но
+    // адаптированный по яркости, — отдельного акцента у неё больше нет.
+    _applyAccentScale(theme.primary || '', theme.mode === 'dark');
     // Тёмная тема тенанта целиком (не только акцент). Всё переключение —
     // один класс на body, дальше работают переменные в style.css.
     // Тем теперь три, поэтому не переключатель «тёмная да/нет», а выбор
@@ -1998,11 +2129,21 @@ function renderWorkout() {
         var dayHeader = document.createElement('div');
         dayHeader.className = 'day-header day-collapsible';
         dayHeader.dataset.dayIndex = dayIndex;
-        dayHeader.innerHTML = '<span class="day-title">' + day.day + '</span>' +
+        // Тёмная карточка дня (DESIGN.md + утверждённый макет): слева иконка
+        // и название с подписью недели, справа счётчик и шеврон. Символы ✅ ▼
+        // заменены на Lucide — эмодзи из интерфейса убраны.
+        dayHeader.innerHTML =
+            '<span class="day-head-main">' +
+                '<span class="day-head-ico">' + _homeIcon('flame') + '</span>' +
+                '<span class="day-head-txt">' +
+                    '<span class="day-title">' + _escHtml(day.day) + '</span>' +
+                    '<span class="day-sub">' + _escHtml(weekTitle || '') + '</span>' +
+                '</span>' +
+            '</span>' +
             '<span class="day-status">' +
-                '<span class="day-counter">' + dayCompleted + '/' + dayTotal + '</span>' +
-                (dayDone ? ' ✅' : '') +
-                '<span class="day-chevron">▼</span>' +
+                (dayDone ? '<span class="day-done">' + _homeIcon('check') + '</span>' : '') +
+                '<span class="day-counter">' + dayCompleted + ' / ' + dayTotal + '</span>' +
+                '<span class="day-chevron">' + _homeIcon('chevron') + '</span>' +
             '</span>';
         container.appendChild(dayHeader);
 
@@ -2030,7 +2171,7 @@ function renderWorkout() {
                 var blockInfo = blockTypeInfo(group.type);
                 label.textContent = blockInfo
                     ? (blockInfo.label + ' · ' + group.exercises.length + ' упр.')
-                    : (group.type === 'triset' ? '🔗 Трисет' : '🔗 Суперсет');
+                    : (group.type === 'triset' ? 'Трисет' : 'Суперсет');
                 wrap.appendChild(label);
                 group.exercises.forEach(function(exercise) {
                     wrap.appendChild(createExerciseCard(exercise, dayIndex, flatIndex));
@@ -2047,10 +2188,10 @@ function renderWorkout() {
         // Клик по заголовку — свернуть/развернуть
         dayHeader.addEventListener('click', function() {
             var body = document.getElementById('day-body-' + this.dataset.dayIndex);
-            var chevron = this.querySelector('.day-chevron');
             var isCollapsed = body.classList.toggle('collapsed');
             this.classList.toggle('collapsed', isCollapsed);
-            chevron.textContent = isCollapsed ? '▶' : '▼';
+            // Шеврон — SVG, поэтому поворачиваем его стилями по классу
+            // .collapsed у заголовка, а не подменяем символ текстом.
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         });
     });
@@ -2078,19 +2219,116 @@ function _escHtmlAttr(s) {
         .replace(/>/g, '&gt;');
 }
 
+// Упражнения, которые клиент раскрыл руками, хотя они уже выполнены.
+// Живёт только в памяти вкладки: это состояние интерфейса, а не данные, и
+// на сервер оно не уходит. Свёрнутость сама по себе никуда не сохраняется —
+// она выводится из exercise.feedback, поэтому переживает любую перерисовку.
+var _exExpanded = {};
+
+// Содержимое свёрнутой карточки. Собирается отдельно, чтобы после выбора
+// оценки обновить только его, не перерисовывая карточку целиком.
+function _exSummaryInner(exercise, exIndex) {
+    var fbInfo = exercise.feedback ? RPE_FEEDBACK_MAP[exercise.feedback] : null;
+    var photo = exercise.photo1 || exercise.photo2 || '';
+    var thumb = photo
+        ? '<span class="ex-sum-thumb"><img src="' + _escHtmlAttr(String(photo)) + '" alt="" ' +
+          'loading="lazy" onerror="this.style.display=\'none\'"></span>'
+        : '';
+    // Вес показываем фактический; пока его нет — плановый, чтобы строка не
+    // выглядела пустой.
+    var w = exercise.weightFact || getDisplayWeight(exercise.weightPlan) || '';
+    var meta = [];
+    if (exercise.sets && exercise.reps) meta.push(exercise.sets + ' × ' + exercise.reps);
+    if (w) meta.push(w + ' кг');
+    return thumb +
+        '<span class="ex-sum-txt">' +
+            '<span class="ex-sum-head">' +
+                '<span class="ex-sum-num">' + (exIndex + 1) + '</span>' +
+                '<span class="ex-sum-name">' + cleanExerciseName(exercise.exercise) + '</span>' +
+            '</span>' +
+            (meta.length ? '<span class="ex-sum-meta">' + meta.join(' · ') + '</span>' : '') +
+            (fbInfo ? '<span class="ex-sum-res">' + _homeIcon('check') +
+                      '<span>' + fbInfo.label + '</span></span>' : '') +
+        '</span>' +
+        '<span class="ex-sum-chev">' + _homeIcon('chevron') + '</span>';
+}
+
+// Приводит карточку к её состоянию: выполненная и не раскрытая руками —
+// свёрнута. Никаких данных не трогает, только классы и текст сводки.
+function _syncExerciseCard(dayIndex, exIndex) {
+    var card = document.getElementById('ex-card-' + dayIndex + '-' + exIndex);
+    if (!card) return;
+    var ex = workoutData[dayIndex] && workoutData[dayIndex].exercises[exIndex];
+    if (!ex) return;
+    var done = !!ex.feedback;
+    card.classList.toggle('has-feedback', done);
+    card.classList.toggle('collapsed', done && !_exExpanded[dayIndex + '-' + exIndex]);
+    var sum = card.querySelector('.ex-summary');
+    if (sum) sum.innerHTML = _exSummaryInner(ex, exIndex);
+}
+
+// Клик по свёрнутой карточке — раскрыть, по шеврону раскрытой — свернуть.
+function toggleExerciseCard(dayIndex, exIndex) {
+    var key = dayIndex + '-' + exIndex;
+    if (_exExpanded[key]) delete _exExpanded[key];
+    else _exExpanded[key] = true;
+    _syncExerciseCard(dayIndex, exIndex);
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+}
+
 function createExerciseCard(exercise, dayIndex, exIndex) {
     var card = document.createElement('div');
     card.className = 'exercise-card';
+    card.id = 'ex-card-' + dayIndex + '-' + exIndex;
     var videoStr = exercise.video != null ? String(exercise.video).trim() : '';
     var videoVkStr = exercise.videoVk != null ? String(exercise.videoVk).trim() : '';
     var hasVideo = (videoStr && (videoStr.indexOf('http') !== -1 || videoStr.indexOf('📽️') !== -1)) ||
         (videoVkStr && videoVkStr.indexOf('http') !== -1);
-    var photo1 = exercise.photo1 || '';
-    var photo2 = exercise.photo2 || '';
-    var photoHtml1 = photo1 ? '<img src="' + photo1 + '" alt="Photo 1" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'🏋️\'">' : '🏋️';
-    var photoHtml2 = photo2 ? '<img src="' + photo2 + '" alt="Photo 2" class="exercise-photo-img" onerror="this.parentElement.innerHTML=\'💪\'">' : '💪';
-    var noteHtml = exercise.note ? '<div class="trainer-note">💬 ' + exercise.note + '</div>' : '';
-    var videoHtml = hasVideo ? '<button class="video-btn" data-video="' + _escHtmlAttr(videoStr) + '" data-video-vk="' + _escHtmlAttr(videoVkStr) + '" onclick="openVideo(this.dataset.video, this.dataset.videoVk)">📹 ВИДЕО ТЕХНИКИ</button>' : '';
+    // Фото упражнения. Их может быть два (исходное и конечное положение) —
+    // показываем оба в одной медиа-области. Если фото нет вообще, рисуем
+    // аккуратную заглушку с иконкой, а не эмодзи-гантелю, как раньше.
+    var photos = [];
+    if (exercise.photo1) photos.push(String(exercise.photo1));
+    if (exercise.photo2) photos.push(String(exercise.photo2));
+    var videoAttrs = 'data-video="' + _escHtmlAttr(videoStr) + '" ' +
+                     'data-video-vk="' + _escHtmlAttr(videoVkStr) + '" ' +
+                     'onclick="openVideo(this.dataset.video, this.dataset.videoVk)"';
+
+    // Большая медиа-область рисуется ТОЛЬКО когда фото действительно есть.
+    // Раньше на её месте оставалась пустая серая плашка на 223px — самый
+    // крупный элемент карточки, не несущий никакой информации.
+    var mediaHtml = '';
+    var videoRowHtml = '';
+    if (photos.length) {
+        var imgs = photos.map(function(src) {
+            return '<img src="' + _escHtmlAttr(src) + '" alt="" class="ex-media-img" ' +
+                   'loading="lazy" onerror="this.style.display=\'none\'">';
+        }).join('');
+        // Кнопка видео поверх фото: круглая «play» по центру и подпись внизу.
+        var overlay = hasVideo
+            ? '<button class="video-btn" ' + videoAttrs + '>' +
+                  '<span class="video-play">' + _homeIcon('play') + '</span>' +
+                  '<span class="video-cap">Видео техники</span>' +
+              '</button>'
+            : '';
+        mediaHtml = '<div class="ex-media' + (photos.length > 1 ? ' ex-media-2' : '') + '">' +
+            imgs + overlay + '</div>';
+    } else if (hasVideo) {
+        // Фото нет, но видео есть — компактная кликабельная строка вместо
+        // картинки. Если нет ни того, ни другого, не рисуем ничего: пустой
+        // заглушки и фальшивых кнопок на экране быть не должно.
+        videoRowHtml = '<button class="video-row" ' + videoAttrs + '>' +
+                '<span class="video-row-ico">' + _homeIcon('play') + '</span>' +
+                '<span class="video-row-txt">Видео техники</span>' +
+                '<span class="video-row-arrow">' + _homeIcon('chevron') + '</span>' +
+            '</button>';
+    }
+    // Заметка тренера — лёгкая карточка-подсказка. Текст экранируем: он
+    // приходит от тренера и раньше вставлялся в разметку как есть.
+    var noteHtml = exercise.note
+        ? '<div class="trainer-note">' + _homeIcon('bulb') +
+          '<span>' + _escHtml(exercise.note) + '</span></div>'
+        : '';
     var commentValue = exercise.comment || '';
     if (commentValue && /^\d{4}-\d{2}-\d{2}T/.test(commentValue)) commentValue = '';
     if (commentValue && /^\d{2}\.\d{2}\.\d{4}/.test(commentValue)) commentValue = '';
@@ -2107,40 +2345,77 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
     var lastSessionHtml = '';
     if (exercise.lastSession && exercise.lastSession.weight) {
         var ls = exercise.lastSession;
-        var fbEmoji = '';
         var fbInfo = RPE_FEEDBACK_MAP[ls.feedback];
-        if (fbInfo) fbEmoji = ' ' + fbInfo.emoji;
-        var dateStr = ls.date ? ' (' + ls.date + ')' : '';
-        lastSessionHtml = '<div class="last-session-info">📊 Прошлый раз: ' +
-            ls.weight + ' × ' + ls.reps + fbEmoji + dateStr +
+        var fbText = fbInfo ? ' · ' + fbInfo.label : '';
+        var dateStr = ls.date ? ' · ' + ls.date : '';
+        lastSessionHtml = '<div class="last-session-info">' + _homeIcon('history') +
+            '<span>Прошлый раз: ' + ls.weight + ' × ' + ls.reps + fbText + dateStr + '</span>' +
             '</div>';
     }
 
+    function _param(icon, label, value, cls) {
+        return '<div class="param">' +
+                   '<div class="param-label">' + _homeIcon(icon) + '<span>' + label + '</span></div>' +
+                   '<div class="param-value' + (cls ? ' ' + cls : '') + '">' + value + '</div>' +
+               '</div>';
+    }
+
     card.innerHTML =
-        '<div class="exercise-photos">' +
-            '<div class="exercise-photo">' + photoHtml1 + '</div>' +
-            '<div class="exercise-photo">' + photoHtml2 + '</div>' +
-        '</div>' +
+        // Свёрнутый вид. Лежит в разметке всегда, показывается по классу —
+        // так после выбора оценки не нужно пересобирать карточку.
+        '<button type="button" class="ex-summary" ' +
+            'onclick="toggleExerciseCard(' + dayIndex + ',' + exIndex + ')">' +
+            _exSummaryInner(exercise, exIndex) +
+        '</button>' +
+        mediaHtml +
         '<div class="exercise-body">' +
-            '<div class="exercise-name">' + cleanExerciseName(exercise.exercise) + '</div>' +
-            noteHtml +
+            '<div class="exercise-name">' +
+                '<span>' + cleanExerciseName(exercise.exercise) + '</span>' +
+                // Кнопка «свернуть» есть в разметке всегда, но видна только у
+                // выполненных упражнений (класс has-feedback на карточке).
+                '<button type="button" class="ex-collapse" ' +
+                    'onclick="toggleExerciseCard(' + dayIndex + ',' + exIndex + ')" ' +
+                    'aria-label="Свернуть упражнение">' + _homeIcon('chevron') + '</button>' +
+            '</div>' +
+            videoRowHtml +
             lastSessionHtml +
             '<div class="exercise-params">' +
-                '<div class="param"><div class="param-label">Подх</div><div class="param-value">' + exercise.sets + '</div></div>' +
-                '<div class="param"><div class="param-label">Повт</div><div class="param-value">' + exercise.reps + '</div></div>' +
-                '<div class="param"><div class="param-label">Вес</div><div class="param-value plan">' + weightHtml + '</div></div>' +
-                '<div class="param"><div class="param-label">RPE</div><div class="param-value rpe">' + exercise.rpe + '</div></div>' +
+                _param('hash',   'Подходы',    exercise.sets) +
+                _param('repeat', 'Повторения', exercise.reps) +
+                _param('weight', 'Вес',        weightHtml, 'plan') +
+                _param('flame',  'Сложность',  exercise.rpe, 'rpe') +
             '</div>' +
-            videoHtml +
-            '<div class="input-row">' +
-                '<input type="number" inputmode="decimal" enterkeyhint="done" class="input-field" placeholder="Вес (кг)" value="' + (exercise.weightFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="weight" onchange="handleInput(this)">' +
-                '<input type="number" inputmode="numeric" enterkeyhint="done" class="input-field" placeholder="Повторения" value="' + (exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" onchange="handleInput(this)">' +
+            noteHtml +
+            '<div class="ex-result">' +
+            // Факт и самочувствие — два разных вопроса, поэтому и два разных
+            // блока со своими заголовками. Раньше поля и кнопки стояли одной
+            // сеткой и читались как шесть одинаковых прямоугольников.
+            '<div class="ex-block">' +
+                '<div class="ex-block-ttl">Фактический результат</div>' +
+                '<div class="input-row">' +
+                    '<label class="input-cell"><span class="input-cap">Вес, кг</span>' +
+                        '<input type="number" inputmode="decimal" enterkeyhint="done" class="input-field" placeholder="—" value="' + (exercise.weightFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="weight" onchange="handleInput(this)">' +
+                    '</label>' +
+                    '<label class="input-cell"><span class="input-cap">Повторения</span>' +
+                        '<input type="number" inputmode="numeric" enterkeyhint="done" class="input-field" placeholder="—" value="' + (exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" onchange="handleInput(this)">' +
+                    '</label>' +
+                '</div>' +
             '</div>' +
-            '<div class="rpe-feedback-row" id="rpe-row-' + dayIndex + '-' + exIndex + '">' +
-                renderRpeButton(exercise, dayIndex, exIndex) +
+            '<div class="ex-block">' +
+                '<div class="ex-block-ttl">Как прошло упражнение?</div>' +
+                '<div class="rpe-feedback-row" id="rpe-row-' + dayIndex + '-' + exIndex + '">' +
+                    renderRpeButton(exercise, dayIndex, exIndex) +
+                '</div>' +
             '</div>' +
             '<textarea class="comment-field" placeholder="Комментарий к упражнению (опционально)" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="comment" onchange="handleInput(this)">' + commentValue + '</textarea>' +
+            '</div>' +
         '</div>';
+
+    // Уже оценённое упражнение приезжает свёрнутым; незаполненное — раскрытым.
+    if (exercise.feedback && !_exExpanded[dayIndex + '-' + exIndex]) {
+        card.classList.add('collapsed');
+    }
+    if (exercise.feedback) card.classList.add('has-feedback');
     return card;
 }
 
@@ -2151,6 +2426,9 @@ var WELLNESS_MAP = {
     sick:  { multiplier: 0.85, emoji: '🤧', label: 'Приболел',   factor: '−15%' },
     pms:   { multiplier: 0.90, emoji: '🩸', label: 'ПМС',        factor: '−10%' }
 };
+// Иконка состояния для баннера. Ключи те же, что в WELLNESS_MAP.
+var WELLNESS_ICONS = { good: 'smile', tired: 'moon', sick: 'thermometer', pms: 'droplet' };
+
 var sessionWellness = 'good';
 var wellnessAsked = false;
 
@@ -2186,9 +2464,13 @@ function updateWellnessBanner() {
     }
     var info = WELLNESS_MAP[sessionWellness];
     b.classList.remove('hidden');
-    b.innerHTML = info.emoji + ' ' + info.label +
-                  ' — рекомендуемые веса снижены на ' + info.factor +
-                  ' <button class="wellness-banner-edit" onclick="openWellnessModal()">изменить</button>';
+    // WELLNESS_MAP не трогаем — эмодзи в нём остаются для других мест.
+    // В интерфейсе показываем иконку по тому же ключу.
+    b.innerHTML = '<span class="wellness-banner-ico">' +
+                      _homeIcon(WELLNESS_ICONS[sessionWellness] || 'moon') + '</span>' +
+                  '<span class="wellness-banner-txt">' + info.label +
+                      ' — рекомендуемые веса снижены на ' + info.factor + '</span>' +
+                  '<button class="wellness-banner-edit" onclick="openWellnessModal()">изменить</button>';
 }
 
 // Перерисовка дней — поддержка обновления весов после смены самочувствия
@@ -2246,22 +2528,29 @@ var FAIL_REASON_LABELS = {
 // где действительно надо уточнить причину (она влияет на прогрессию весов).
 var RPE_QUICK_KINDS = ['easy', 'normal', 'hard'];
 
+// Иконка для каждой оценки. Эмодзи в RPE_FEEDBACK_MAP оставлены нетронутыми:
+// они используются в других местах (уведомления, отчёты), а в интерфейсе
+// экрана тренировки рисуем Lucide.
+var RPE_ICONS = { easy: 'smile', normal: 'dumbbell', hard: 'flame', failed: 'x' };
+
 function renderRpeButton(exercise, dayIndex, exIndex) {
     var fb = exercise.feedback || '';
+    // Четыре равные кнопки-состояния в сетке 2x2. Раньше «Не вытянул» была
+    // отдельной широкой кнопкой под тремя остальными — смысл и обработчик те
+    // же, изменилась только раскладка.
+    var kinds = RPE_QUICK_KINDS.concat(['failed']);
     var html = '<div class="rpe-quick-row">';
-    for (var i = 0; i < RPE_QUICK_KINDS.length; i++) {
-        var kind = RPE_QUICK_KINDS[i];
+    for (var i = 0; i < kinds.length; i++) {
+        var kind = kinds[i];
         var info = RPE_FEEDBACK_MAP[kind];
-        html += '<button class="rpe-quick-btn rpe-' + kind + (fb === kind ? ' rpe-picked' : '') + '" ' +
+        html += '<button type="button" class="rpe-quick-btn rpe-' + kind +
+            (fb === kind ? ' rpe-picked' : '') + '" ' +
             'onclick="setRpeQuick(' + dayIndex + ',' + exIndex + ',\'' + kind + '\')">' +
-            info.emoji + ' ' + info.label +
+            _homeIcon(RPE_ICONS[kind] || 'smile') +
+            '<span>' + info.label + '</span>' +
             '</button>';
     }
     html += '</div>';
-    html += '<button class="rpe-fail-btn' + (fb === 'failed' ? ' rpe-picked' : '') + '" ' +
-        'onclick="setRpeQuick(' + dayIndex + ',' + exIndex + ',\'failed\')">' +
-        RPE_FEEDBACK_MAP.failed.emoji + ' ' + RPE_FEEDBACK_MAP.failed.label +
-        '</button>';
     return html;
 }
 
@@ -2289,6 +2578,12 @@ function setRpeQuick(dayIndex, exIndex, kind) {
         if (kind !== 'failed') ex.failReason = '';
     }
     refreshRpeButton(dayIndex, exIndex);
+    // Оценка поставлена — упражнение считается выполненным и сворачивается,
+    // чтобы на экране помещалось сразу несколько. Снятие оценки раскрывает
+    // его обратно. Ручное раскрытие сбрасываем, иначе карточка осталась бы
+    // развёрнутой вопреки только что сделанному выбору.
+    delete _exExpanded[dayIndex + '-' + exIndex];
+    _syncExerciseCard(dayIndex, exIndex);
     if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
     if (ex.feedback === 'failed') openFailReasonModal(ex);
 }
@@ -2370,20 +2665,28 @@ function updateDayCounter(dayIndex) {
         var counter = header.querySelector('.day-counter');
         if (counter) counter.textContent = dayCompleted + '/' + dayTotal;
         // Обновляем галочку
+        // Разметка должна повторять ту, что собирает renderWorkout: иконки
+        // Lucide, а не эмодзи и текстовый шеврон. Раньше здесь оставалась
+        // старая версия, и после первого же ввода веса у карточки дня
+        // пропадала стрелка и появлялась галочка-эмодзи.
+        // Направление шеврона задаётся классом .collapsed на заголовке,
+        // поэтому подменять его содержимое не нужно.
         var status = header.querySelector('.day-status');
-        var chevron = header.querySelector('.day-chevron');
-        var chevronText = chevron ? chevron.textContent : '▼';
-        status.innerHTML = '<span class="day-counter">' + dayCompleted + '/' + dayTotal + '</span>' +
-            (dayDone ? ' ✅' : '') +
-            '<span class="day-chevron">' + chevronText + '</span>';
+        status.innerHTML =
+            (dayDone ? '<span class="day-done">' + _homeIcon('check') + '</span>' : '') +
+            '<span class="day-counter">' + dayCompleted + ' / ' + dayTotal + '</span>' +
+            '<span class="day-chevron">' + _homeIcon('chevron') + '</span>';
     }
 }
 
 document.getElementById('save-btn').addEventListener('click', async function() {
     var exercisesToSave = [];
     var btn = document.getElementById('save-btn');
-    var originalText = btn.textContent;
-    btn.textContent = '⏳ Сохранение...';
+    // Раньше здесь запоминался и восстанавливался btn.textContent. С тех пор
+    // у кнопки появилась иконка, и восстановление текстом стирало бы её —
+    // работаем с разметкой целиком.
+    var originalHtml = btn.innerHTML;
+    btn.innerHTML = '<span>Сохранение…</span>';
     btn.classList.add('saving');
     btn.disabled = true;
     try {
@@ -2480,7 +2783,7 @@ document.getElementById('save-btn').addEventListener('click', async function() {
                     }
                     tg.showAlert(alertMsg);
                     btn.classList.remove('success');
-                    btn.textContent = originalText;
+                    btn.innerHTML = originalHtml;
                 }, 1000);
             } else {
                 var errMsg = 'Не удалось сохранить ❌\n';
@@ -2496,7 +2799,7 @@ document.getElementById('save-btn').addEventListener('click', async function() {
     } finally {
         setTimeout(function() {
             btn.classList.remove('saving', 'success');
-            btn.textContent = originalText;
+            btn.innerHTML = originalHtml;
             btn.disabled = false;
         }, 1500);
     }
@@ -2563,14 +2866,14 @@ async function loadSelfHistory(force) {
         var resp = await fetch(APPS_SCRIPT_URL + '?action=getSelfHistory&chatId=' + encodeURIComponent(chatId) + '&limit=60');
         var data = await resp.json();
         if (data.error) {
-            container.innerHTML = '<div class="no-data">Не удалось загрузить историю ❌</div>';
+            container.innerHTML = '<div class="no-data">Не удалось загрузить историю</div>';
             return;
         }
         selfHistoryLoaded = true;
         renderClientHistory(data.history || [], 'client-history-container');
     } catch (e) {
         console.error('loadSelfHistory failed:', e);
-        container.innerHTML = '<div class="no-data">Не удалось загрузить историю ❌</div>';
+        container.innerHTML = '<div class="no-data">Не удалось загрузить историю</div>';
     }
 }
 
@@ -2672,7 +2975,146 @@ function renderHome() {
     });
 
     document.getElementById('home-week-summary').textContent =
-        doneDays + ' из ' + trainingDays.length + ' дней выполнено';
+        doneDays + ' из ' + trainingDays.length + ' дней';
+
+    _renderHomeUI(trainingDays, doneDays);
+    loadHomeGoal();
+}
+
+// ── Оформление главной ─────────────────────────────────────────────────────
+// Здесь только то, чего нет в данных готовым: инициалы для аватара, какая
+// тренировка ближайшая, состояния дней и сводные плитки. Все числа считаются
+// из уже загруженных workoutData / completedCount — новых запросов к серверу
+// эта функция не делает и данные не меняет.
+var _HOME_WD = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
+var _HOME_ICONS = {
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    chevron: '<path d="m6 9 6 6 6-6"/>',
+    play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
+    bulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+    comment: '<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>',
+    moon: '<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>',
+    thermometer: '<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0"/>',
+    droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+    smile: '<circle cx="12" cy="12" r="10"/><path d="M15 10V9"/><path d="M16.472 15a6 6 0 0 1-8.943 0"/><path d="M9 10V9"/>',
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+    hash: '<path d="M4 9h16"/><path d="M4 15h16"/><path d="M10 3 8 21"/><path d="M16 3l-2 18"/>',
+    repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+    weight: '<circle cx="12" cy="5" r="3"/><path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z"/>',
+    dumbbell: '<path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/>',
+    flame: '<path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/>',
+    dashed: '<path d="M10.1 2.182a10 10 0 0 1 3.8 0"/><path d="M13.9 21.818a10 10 0 0 1-3.8 0"/><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/><path d="M2.182 13.9a10 10 0 0 1 0-3.8"/><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/><path d="M21.818 10.1a10 10 0 0 1 0 3.8"/><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/>'
+};
+
+function _homeIcon(key) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" ' +
+           'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+           _HOME_ICONS[key] + '</svg>';
+}
+
+// Двухбуквенная метка дня — та же логика, что и у кружков недели
+function _homeDayLabel(day) {
+    return (day || '').toString()
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+        .trim().substring(0, 2).toUpperCase();
+}
+
+function _renderHomeUI(trainingDays, doneDays) {
+    var todayLabel = _HOME_WD[new Date().getDay()];
+
+    // Аватар: первая буква имени. Фотографии пользователя в системе нет.
+    var av = document.getElementById('home-avatar');
+    if (av) {
+        var letter = (clientName || '').replace(/[^A-Za-zА-Яа-яЁё]/g, '').charAt(0);
+        av.textContent = (letter || '?').toUpperCase();
+    }
+
+    // Состояния дней: иконка вместо символа, плюс отметка «сегодня»
+    var dots = document.querySelectorAll('#home-week-dots .home-dot');
+    for (var i = 0; i < dots.length; i++) {
+        var dot = dots[i];
+        var st = dot.querySelector('.home-dot-status');
+        if (st) {
+            st.innerHTML = _homeIcon(dot.classList.contains('full') ? 'check' :
+                                     dot.classList.contains('partial') ? 'flame' : 'dashed');
+        }
+        var lbl = dot.querySelector('.home-dot-day');
+        if (lbl && lbl.textContent.trim().toUpperCase() === todayLabel) dot.classList.add('today');
+    }
+
+    // Ближайшая тренировка для карточки-героя
+    var todayDay = null, nextDay = null;
+    trainingDays.forEach(function(d) {
+        var done = 0;
+        d.exercises.forEach(function(ex) { if (ex.weightFact || ex.repsFact) done++; });
+        if (_homeDayLabel(d.day) === todayLabel && !todayDay) todayDay = d;
+        if (done < d.exercises.length && !nextDay) nextDay = d;
+    });
+    var pick = todayDay || nextDay;
+    var whenEl = document.getElementById('home-hero-when');
+    var titleEl = document.getElementById('home-hero-title');
+    var descEl = document.getElementById('home-hero-desc');
+    if (whenEl && titleEl && descEl) {
+        if (!pick) {
+            whenEl.textContent = trainingDays.length ? 'Неделя закрыта' : 'Пока пусто';
+            titleEl.textContent = trainingDays.length ? 'Все тренировки выполнены' : 'Тренировок ещё нет';
+            descEl.textContent = trainingDays.length ? 'Отличная работа' : 'Тренер скоро добавит план';
+        } else {
+            whenEl.textContent = todayDay ? 'Сегодня' : 'Ближайшая';
+            // Убираем служебный префикс вида «ПН — », оставляем название
+            titleEl.textContent = (pick.day || 'Тренировка').toString()
+                .replace(/^[А-Яа-я]{2}\s*[—–-]\s*/, '').trim() || 'Тренировка';
+            var n = pick.exercises.length;
+            var word = (n % 10 === 1 && n % 100 !== 11) ? 'упражнение' :
+                       (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? 'упражнения' : 'упражнений';
+            descEl.textContent = n + ' ' + word;
+        }
+    }
+
+    // Плитки «Твои результаты» — счётчики по текущей неделе
+    var pct = totalExercises > 0 ? Math.round(completedCount / totalExercises * 100) : 0;
+    var wEl = document.getElementById('home-stat-workouts');
+    if (wEl) {
+        wEl.textContent = doneDays;
+        document.getElementById('home-stat-workouts-sub').textContent =
+            'из ' + trainingDays.length + ' на неделе';
+    }
+    var pEl = document.getElementById('home-stat-progress');
+    if (pEl) {
+        pEl.textContent = pct + '%';
+        document.getElementById('home-stat-progress-sub').textContent =
+            completedCount + ' из ' + totalExercises + ' упражнений';
+    }
+}
+
+// Блок «Твоя цель». Цель берётся из анкеты клиента существующей ручкой —
+// новых серверных методов не добавляем. Если анкета не заполнена или запрос
+// не прошёл, блок просто не показывается: выдуманной цели быть не должно.
+async function loadHomeGoal() {
+    var box = document.getElementById('home-goal');
+    if (!box) return;
+    try {
+        var res = await fetch(APPS_SCRIPT_URL + '?action=getClientProfile&targetChatId=' + _myChatId());
+        var data = await res.json();
+        var prof = data.profile || data || {};
+        var labels = { loss: 'Похудение', mass: 'Набор массы', tone: 'Тонус и поддержание', strength: 'Сила' };
+        var goal = labels[prof.goal] || prof.goal || '';
+        if (!goal) return;
+
+        // Процент — выполнение текущей недели. Отдельного показателя
+        // «продвижение к цели» в системе нет, поэтому подпись прямо говорит,
+        // что именно посчитано.
+        var pct = totalExercises > 0 ? Math.round(completedCount / totalExercises * 100) : 0;
+        document.getElementById('home-goal-name').textContent = goal;
+        document.getElementById('home-goal-pct').textContent = pct + '%';
+        document.getElementById('home-goal-fill').style.width = pct + '%';
+        document.getElementById('home-goal-msg').textContent =
+            pct >= 100 ? 'Неделя выполнена полностью. Так держать!' :
+            pct > 0    ? 'Неделя выполнена на ' + pct + '%. Ты движешься к цели.' :
+                         'Неделя ещё впереди — начни с первой тренировки.';
+        box.classList.remove('hidden');
+    } catch (e) { /* анкета не обязательна — блок остаётся скрытым */ }
 }
 
 // Подгружает рекорды и текущий вес для карточек на главной — асинхронно, не блокирует UI
@@ -2813,12 +3255,10 @@ async function loadExerciseHistory() {
         groupOrder.forEach(function(groupName) {
             if (!groups[groupName] || groups[groupName].length === 0) return;
             var optgroup = document.createElement('optgroup');
-            var groupEmoji = {
-                'Грудь': '🫁', 'Спина': '🔙', 'Ноги': '🦵',
-                'Плечи': '🤷', 'Бицепс': '💪', 'Трицепс': '💪',
-                'Пресс': '🎯', 'Другое': '🏋️'
-            };
-            optgroup.label = (groupEmoji[groupName] || '') + ' ' + groupName;
+            // Раньше к названию группы приклеивался эмодзи. В интерфейсе
+            // эмодзи не используем, а в нативном списке они к тому же
+            // выглядят по-разному на iPhone и Android.
+            optgroup.label = groupName;
             groups[groupName].sort().forEach(function(ex) {
                 var option = document.createElement('option');
                 option.value = ex;
@@ -2861,6 +3301,17 @@ function renderChart(exerciseName) {
     if (data.length === 0) return;
     if (progressChart) progressChart.destroy();
     var ctx = document.getElementById('progress-chart').getContext('2d');
+
+    // Цвет ЛИНИИ ДАННЫХ — не петроль. Интерфейс вокруг акцентный, а сама
+    // кривая должна читаться как данные, а не как ещё один элемент
+    // управления. Синий заметно отличается от петроля и не попадает под
+    // запреты (золото/жёлтый/фиолетовый/красный).
+    var LINE = '#2F6BB5';
+    var fill = ctx.createLinearGradient(0, 0, 0, 220);
+    fill.addColorStop(0, 'rgba(47,107,181,.20)');
+    fill.addColorStop(1, 'rgba(47,107,181,0)');
+    var FONT = { family: 'Inter, -apple-system, sans-serif', size: 11, weight: '600' };
+
     progressChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -2868,39 +3319,58 @@ function renderChart(exerciseName) {
             datasets: [{
                 label: 'Вес (кг)',
                 data: data.map(function(d) { return d.weight; }),
-                borderColor: '#E53935',
-                backgroundColor: 'rgba(229, 57, 53, 0.1)',
-                borderWidth: 3,
+                borderColor: LINE,
+                backgroundColor: fill,
+                borderWidth: 2.5,
                 fill: true,
                 tension: 0.4,
-                pointRadius: 6,
-                pointBackgroundColor: '#E53935',
+                pointRadius: 3.5,
+                pointBackgroundColor: LINE,
                 pointBorderColor: '#fff',
                 pointBorderWidth: 2,
-                pointHoverRadius: 8
+                pointHoverRadius: 6,
+                pointHoverBorderWidth: 2
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: { duration: 400, easing: 'easeOutQuart' },
+            layout: { padding: { top: 8, right: 4 } },
+            interaction: { intersect: false, mode: 'index' },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#1a1a1a',
-                    titleColor: '#fff',
+                    backgroundColor: '#1E2126',
+                    titleColor: 'rgba(255,255,255,.62)',
                     bodyColor: '#fff',
-                    padding: 12,
+                    titleFont: { family: FONT.family, size: 11, weight: '600' },
+                    bodyFont: { family: FONT.family, size: 13, weight: '700' },
+                    padding: { top: 6, bottom: 6, left: 10, right: 10 },
                     cornerRadius: 8,
-                    displayColors: false
+                    displayColors: false,
+                    caretSize: 0
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: { color: '#f0f0f0' },
-                    ticks: { callback: function(value) { return value + ' кг'; } }
+                    border: { display: false },
+                    // Горизонтальную сетку убираем, вертикальную оставляем —
+                    // так задано в DESIGN.md, раздел 12.
+                    grid: { display: false },
+                    ticks: {
+                        padding: 6,
+                        color: '#A0A4AB',
+                        font: FONT,
+                        callback: function(value) { return value + ' кг'; }
+                    }
                 },
-                x: { grid: { display: false } }
+                x: {
+                    border: { display: false },
+                    grid: { color: '#F0F0F3', drawTicks: false },
+                    ticks: { padding: 6, color: '#A0A4AB', font: FONT, maxRotation: 0, autoSkipPadding: 12 }
+                }
             }
         }
     });
@@ -2917,14 +3387,15 @@ function renderRecords() {
     });
     var top5 = Object.values(records).sort(function(a, b) { return b.weight - a.weight; }).slice(0, 5);
     if (top5.length === 0) {
-        recordsList.innerHTML = '<div class="no-data">Пока нет данных о рекордах 📊<br><br>Заполни несколько тренировок!</div>';
+        recordsList.innerHTML = '<div class="no-data">Пока нет данных о рекордах<br><br>Заполни несколько тренировок!</div>';
         return;
     }
+    // Медали-эмодзи заменены на номер места: тот же порядок, та же пятёрка,
+    // те же значения — меняется только вид.
     recordsList.innerHTML = top5.map(function(record, index) {
-        var icon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏆';
-        return '<div class="record-item">' +
-            '<div class="record-icon">' + icon + '</div>' +
-            '<div class="record-name">' + cleanExerciseName(record.exercise) + '</div>' +
+        return '<div class="record-item' + (index === 0 ? ' record-top' : '') + '">' +
+            '<div class="record-rank">' + (index + 1) + '</div>' +
+            '<div class="record-name">' + _escHtml(cleanExerciseName(record.exercise)) + '</div>' +
             '<div class="record-weight">' + record.weight + ' кг</div>' +
         '</div>';
     }).join('');
@@ -6251,11 +6722,23 @@ function daysAgoLabel(dateObj) {
     return months + ' мес назад';
 }
 
+// Иконка оценки по её коду — тот же набор, что на экране тренировки.
+var HH_FB_ICONS = { easy: 'smile', normal: 'dumbbell', hard: 'flame', failed: 'x' };
+
 function renderClientHistory(history, containerId) {
     var container = document.getElementById(containerId || 'cc-history-container');
     if (!container) return;
+    // Эта функция рисует историю в ДВУХ местах: на клиентской вкладке и в
+    // карточке клиента у тренера. Отличаем их по контейнеру: у клиента
+    // интерфейс переведён на дизайн-систему и эмодзи в нём не используются,
+    // у тренера всё остаётся как было. Данные и разметка в остальном общие.
+    var isClient = (containerId === 'client-history-container');
+    var ico = function(name) { return isClient ? _homeIcon(name) : ''; };
+
     if (!history || history.length === 0) {
-        container.innerHTML = '<div class="no-data">📅 У клиента пока нет завершённых тренировок</div>';
+        container.innerHTML = '<div class="no-data">' +
+            (isClient ? 'Пока нет завершённых тренировок' : '📅 У клиента пока нет завершённых тренировок') +
+            '</div>';
         return;
     }
 
@@ -6292,14 +6775,21 @@ function renderClientHistory(history, containerId) {
             var feedbackHtml = '';
             if (ex.feedback && ex.feedback.label) {
                 feedbackHtml = '<span class="hh-ex-feedback hh-fb-' + ex.feedback.code + '">' +
-                    ex.feedback.emoji + ' ' + ex.feedback.label +
+                    (isClient
+                        ? ico(HH_FB_ICONS[ex.feedback.code] || 'smile')
+                        : ex.feedback.emoji + ' ') +
+                    '<span>' + ex.feedback.label + '</span>' +
                 '</span>';
             }
 
             var rpeText = (ex.rpe !== '' && ex.rpe != null) ? ' · RPE ' + ex.rpe : '';
 
             var commentHtml = (ex.comment && ex.comment.toString().trim())
-                ? '<div class="hh-ex-comment">💬 ' + ex.comment + '</div>' : '';
+                ? '<div class="hh-ex-comment">' +
+                      (isClient ? ico('comment') : '💬 ') +
+                      '<span>' + ex.comment + '</span>' +
+                  '</div>'
+                : '';
 
             var planText = '';
             if (weightPlanClean) {
@@ -6321,7 +6811,7 @@ function renderClientHistory(history, containerId) {
         return '<details class="hh-day"' + (isOpen ? ' open' : '') + '>' +
             '<summary class="hh-day-summary">' +
                 '<div class="hh-day-head">' +
-                    '<div class="hh-date">📅 ' + dateLabel + '</div>' +
+                    '<div class="hh-date">' + (isClient ? '' : '📅 ') + dateLabel + '</div>' +
                     '<div class="hh-ago">' + agoLabel + '</div>' +
                 '</div>' +
                 weekInfo +
@@ -8443,7 +8933,7 @@ async function loadMeasurementsData() {
         renderPhotoProgress();
         if (measurementsData.length === 0) {
             document.getElementById('measurements-latest').innerHTML =
-                '<div class="no-data">Пока нет замеров 📏<br><br>Заполни форму ниже чтобы записать первые замеры!</div>';
+                '<div class="no-data">Пока нет замеров<br><br>Заполни форму ниже, чтобы записать первые</div>';
             document.getElementById('measurements-list').innerHTML = '';
             initMeasForm();
             return;
@@ -8484,8 +8974,8 @@ function renderPhotoProgress() {
     if (withPhotos.length === 0) {
         container.innerHTML =
             '<div class="photo-progress-empty">' +
-                '<div class="photo-progress-empty-icon">🤳</div>' +
-                '<div>Пока нет фото прогресса.<br>Прикрепи первое фото в форме ниже 👇</div>' +
+                '<div class="photo-progress-empty-icon">' + _homeIcon('image') + '</div>' +
+                '<div>Пока нет фото прогресса.<br>Прикрепи первое фото в форме ниже</div>' +
             '</div>';
         return;
     }
@@ -8532,8 +9022,13 @@ function renderPhotoProgress() {
     container.innerHTML =
         '<div class="photo-progress-cols">' + colsHtml + '</div>' +
         gapHtml +
-        (withPhotos.length > 2 ? '<div class="photo-progress-hint">Все фото — в истории замеров ниже 📋</div>' : '');
+        (withPhotos.length > 2 ? '<div class="photo-progress-hint">Все фото — в истории замеров ниже</div>' : '');
 }
+
+// Показатели, где СНИЖЕНИЕ — хорошая динамика. Для всех остальных хорошей
+// считается прибавка: плечи, грудь, бёдра, бицепс и бедро растут вместе с
+// мышцами, и красить их рост красным неправильно.
+var MEAS_LOWER_IS_BETTER = { weight: true, waist: true };
 
 function renderLatestMeasurements() {
     var latest = measurementsData[measurementsData.length - 1];
@@ -8544,8 +9039,15 @@ function renderLatestMeasurements() {
         var diffHtml = '';
         if (prev && prev[key] != null && val != null) {
             var diff = (val - prev[key]).toFixed(1);
-            if (diff > 0) diffHtml = '<div class="latest-item-diff diff-up">+' + diff + '</div>';
-            else if (diff < 0) diffHtml = '<div class="latest-item-diff diff-down">' + diff + '</div>';
+            // .diff-up / .diff-down по-прежнему означают НАПРАВЛЕНИЕ и общие
+            // с тренерской статистикой — их смысл не меняем. Цвет вешаем на
+            // отдельный класс, который есть только на этом экране: он говорит
+            // не «выросло/упало», а «хорошо/плохо».
+            var grew = Number(diff) > 0;
+            var good = MEAS_LOWER_IS_BETTER[key] ? !grew : grew;
+            var tone = good ? ' diff-good' : ' diff-bad';
+            if (diff > 0) diffHtml = '<div class="latest-item-diff diff-up' + tone + '">+' + diff + '</div>';
+            else if (diff < 0) diffHtml = '<div class="latest-item-diff diff-down' + tone + '">' + diff + '</div>';
             else diffHtml = '<div class="latest-item-diff diff-neutral">0</div>';
         }
         return '<div class="latest-item">' +
@@ -8619,8 +9121,15 @@ function initMeasForm() {
 
 var measPhotoPending = { 1: null, 2: null, 3: null };
 
+// Исходная разметка кнопки «Сохранить замеры» — см. saveMeasurements ниже.
+var _MEAS_SAVE_HTML = '';
+
 async function saveMeasurements() {
     var btn = document.getElementById('meas-save-btn');
+    // Разметку кнопки (вместе с иконкой) запоминаем один раз: раньше
+    // состояния ставились через textContent, и иконка стиралась бы после
+    // первого же сохранения.
+    if (!_MEAS_SAVE_HTML) _MEAS_SAVE_HTML = btn.innerHTML;
     var fields = {
         weight: document.getElementById('meas-weight').value,
         shoulders: document.getElementById('meas-shoulders').value,
@@ -8635,11 +9144,13 @@ async function saveMeasurements() {
     var hasAnyPhoto = !!(measPhotoPending[1] || measPhotoPending[2] || measPhotoPending[3]);
     var hasAny = Object.values(fields).some(function(v) { return v && v.trim() !== ''; }) || hasAnyPhoto;
     if (!hasAny) {
-        tg.showAlert('Заполни хотя бы одно поле или прикрепи фото! 📏');
+        tg.showAlert('Заполни хотя бы одно поле или прикрепи фото');
         return;
     }
 
-    btn.textContent = '⏳ Сохранение...';
+    // Иконка кнопки сохраняется во всех состояниях: раньше здесь стоял
+    // textContent — он стирал её и подставлял эмодзи.
+    btn.innerHTML = _homeIcon('check') + '<span>Сохранение…</span>';
     btn.classList.add('saving');
     btn.disabled = true;
 
@@ -8673,7 +9184,7 @@ async function saveMeasurements() {
         if (data.success) {
             btn.classList.remove('saving');
             btn.classList.add('success');
-            btn.textContent = '✅ Сохранено!';
+            btn.innerHTML = _homeIcon('check') + '<span>Сохранено</span>';
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             // Clear form
             document.querySelectorAll('.meas-input').forEach(function(input) {
@@ -8691,7 +9202,7 @@ async function saveMeasurements() {
             // Reload data
             setTimeout(function() {
                 btn.classList.remove('success');
-                btn.textContent = '💾 Сохранить замеры';
+                btn.innerHTML = _MEAS_SAVE_HTML;
                 btn.disabled = false;
                 measSelectInitialized = false;
                 loadMeasurementsData();
@@ -8699,14 +9210,14 @@ async function saveMeasurements() {
         } else {
             tg.showAlert('Ошибка сохранения: ' + (data.error || 'Попробуй ещё раз'));
             btn.classList.remove('saving');
-            btn.textContent = '💾 Сохранить замеры';
+            btn.innerHTML = _MEAS_SAVE_HTML;
             btn.disabled = false;
         }
     } catch (error) {
         console.error('Save measurements error:', error);
-        tg.showAlert('Ошибка сохранения ❌');
+        tg.showAlert('Ошибка сохранения');
         btn.classList.remove('saving');
-        btn.textContent = '💾 Сохранить замеры';
+        btn.innerHTML = _MEAS_SAVE_HTML;
         btn.disabled = false;
     }
 }
@@ -8716,11 +9227,30 @@ function renderMeasurementsChart(key) {
     if (filtered.length === 0) return;
     if (measurementsChart) measurementsChart.destroy();
     var ctx = document.getElementById('measurements-chart').getContext('2d');
+
+    // Цвета РЯДОВ ДАННЫХ, по одному на показатель: переключив показатель,
+    // клиент по цвету понимает, что перед ним другой график. Это данные, а
+    // не элементы интерфейса, поэтому они не акцентные.
+    //
+    // Ярко-красный и фиолетовый убраны: первый читался как ошибка, второй —
+    // как чужой акцент. Палитра приглушённая, все семь различимы между собой.
+    // Карта цветов у тренера (renderStatsMeasurements) своя и не менялась.
     var colors = {
-        weight: '#E53935', shoulders: '#455A64', chest: '#1565C0', waist: '#F57C00',
-        hips: '#7B1FA2', bicep: '#2E7D32', thigh: '#C62828'
+        weight:    '#2F6BB5',  // синий — как на «Прогрессе»
+        shoulders: '#4A6572',  // серо-синий
+        chest:     '#3E7C8C',  // приглушённая бирюза
+        waist:     '#A9743F',  // терракота вместо оранжевого
+        hips:      '#6B6BA3',  // спокойный сине-лиловый вместо фиолетового
+        bicep:     '#4C7A52',  // приглушённый зелёный
+        thigh:     '#8A5A66'   // пыльно-винный вместо красного
     };
-    var color = colors[key] || '#E53935';
+    var color = colors[key] || '#2F6BB5';
+    var c = _hexToRgb(color) || { r: 47, g: 107, b: 181 };
+    var fill = ctx.createLinearGradient(0, 0, 0, 220);
+    fill.addColorStop(0, 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',.20)');
+    fill.addColorStop(1, 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',0)');
+    var FONT = { family: 'Inter, -apple-system, sans-serif', size: 11, weight: '600' };
+
     measurementsChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -8729,37 +9259,59 @@ function renderMeasurementsChart(key) {
                 label: MEAS_LABELS[key] + ' (' + MEAS_UNITS[key] + ')',
                 data: filtered.map(function(m) { return m[key]; }),
                 borderColor: color,
-                backgroundColor: color + '1A',
-                borderWidth: 3,
+                backgroundColor: fill,
+                borderWidth: 2.5,
                 fill: true,
                 tension: 0.4,
-                pointRadius: 6,
+                pointRadius: 3.5,
                 pointBackgroundColor: color,
                 pointBorderColor: '#fff',
                 pointBorderWidth: 2,
-                pointHoverRadius: 8
+                pointHoverRadius: 6,
+                pointHoverBorderWidth: 2
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: { duration: 400, easing: 'easeOutQuart' },
+            layout: { padding: { top: 8, right: 4 } },
+            interaction: { intersect: false, mode: 'index' },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#1a1a1a',
-                    titleColor: '#fff',
+                    backgroundColor: '#1E2126',
+                    titleColor: 'rgba(255,255,255,.62)',
                     bodyColor: '#fff',
-                    padding: 12,
+                    titleFont: { family: FONT.family, size: 11, weight: '600' },
+                    bodyFont: { family: FONT.family, size: 13, weight: '700' },
+                    padding: { top: 6, bottom: 6, left: 10, right: 10 },
                     cornerRadius: 8,
-                    displayColors: false
+                    displayColors: false,
+                    caretSize: 0
                 }
             },
             scales: {
                 y: {
-                    grid: { color: '#f0f0f0' },
-                    ticks: { callback: function(v) { return v + ' ' + MEAS_UNITS[key]; } }
+                    border: { display: false },
+                    grid: { display: false },
+                    ticks: {
+                        padding: 6,
+                        color: '#A0A4AB',
+                        font: FONT,
+                        // Округление: Chart.js сам подбирает шаг оси и выдаёт
+                        // числа вроде 63.80000000000001 — без этого подпись
+                        // такой и рисовалась, растягивая ось на пол-экрана.
+                        callback: function(v) {
+                            return (Math.round(v * 10) / 10) + ' ' + MEAS_UNITS[key];
+                        }
+                    }
                 },
-                x: { grid: { display: false } }
+                x: {
+                    border: { display: false },
+                    grid: { color: '#F0F0F3', drawTicks: false },
+                    ticks: { padding: 6, color: '#A0A4AB', font: FONT, maxRotation: 0, autoSkipPadding: 12 }
+                }
             }
         }
     });
@@ -8785,7 +9337,7 @@ function renderMeasurementsHistory() {
             }).join('') + '</div>'
             : '';
         return '<div class="measurement-row" style="animation-delay:' + (i * 0.05) + 's">' +
-            '<div class="measurement-row-date">📅 ' + formatDate(m.date) + '</div>' +
+            '<div class="measurement-row-date">' + formatDate(m.date) + '</div>' +
             photoHtml +
             '<div class="measurement-row-values">' + values + '</div>' +
         '</div>';

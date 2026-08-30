@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260829b">
+    <link rel="stylesheet" href="style.css?v=20260830a">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -120,13 +120,13 @@
 
         <!-- Tabs -->
         <div class="tabs" id="tabs-container">
-            <button class="tab-btn active" data-tab="home"><span class="tab-ico">🏠</span><span class="tab-lbl">Главная</span></button>
-            <button class="tab-btn" data-tab="workout"><span class="tab-ico">💪</span><span class="tab-lbl">Тренировка</span></button>
-            <button class="tab-btn" data-tab="progress"><span class="tab-ico">📊</span><span class="tab-lbl">Прогресс</span></button>
-            <button class="tab-btn" data-tab="history"><span class="tab-ico">📜</span><span class="tab-lbl">История</span></button>
-            <button class="tab-btn" data-tab="measurements"><span class="tab-ico">📏</span><span class="tab-lbl">Замеры</span></button>
-            <button class="tab-btn hidden" data-tab="admin" id="admin-tab-btn"><span class="tab-ico">👑</span><span class="tab-lbl">Админ</span><span class="tab-badge hidden" id="admin-badge">0</span></button>
-            <button class="tab-btn hidden" data-tab="superadmin" id="superadmin-tab-btn"><span class="tab-ico">🛠</span><span class="tab-lbl">Тренеры</span></button>
+            <button class="tab-btn active" data-tab="home"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="tab-lbl">Главная</span></button>
+            <button class="tab-btn" data-tab="workout"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/></svg></span><span class="tab-lbl">Тренировка</span></button>
+            <button class="tab-btn" data-tab="progress"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></span><span class="tab-lbl">Прогресс</span></button>
+            <button class="tab-btn" data-tab="history"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg></span><span class="tab-lbl">История</span></button>
+            <button class="tab-btn" data-tab="measurements"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg></span><span class="tab-lbl">Замеры</span></button>
+            <button class="tab-btn hidden" data-tab="admin" id="admin-tab-btn"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg></span><span class="tab-lbl">Админ</span><span class="tab-badge hidden" id="admin-badge">0</span></button>
+            <button class="tab-btn hidden" data-tab="superadmin" id="superadmin-tab-btn"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></svg></span><span class="tab-lbl">Тренеры</span></button>
         </div>
 
         <!-- Баннер тренера — ПОД вкладками: вкладки остаются наверху и
@@ -137,47 +137,98 @@
 
         <!-- Home Tab -->
         <div id="home-tab" class="tab-content active">
-            <!-- Hero: приветствие + неделя/день -->
+            <!-- Шапка: приветствие и аватар. Аватар — инициалы из имени клиента:
+                 фотографии пользователя в системе нет, а рисовать пустой кружок
+                 или чужое лицо нельзя. Колокольчика уведомлений здесь нет
+                 сознательно — у клиента в приложении нет ленты уведомлений,
+                 тренер пишет ему в чат бота. -->
+            <div class="home-head">
+                <div class="home-head-txt">
+                    <div class="home-greet" id="home-greet">Привет!</div>
+                    <div class="home-subtitle" id="home-subtitle">Готов к тренировке?</div>
+                </div>
+                <div class="home-avatar" id="home-avatar" aria-hidden="true"></div>
+            </div>
+
+            <!-- Карточка ближайшей тренировки. Картинки тренировок в системе
+                 пока нет, поэтому под текстом лежит акцентная подложка с
+                 водяным знаком. Появится фото — достаточно поставить
+                 --home-hero-photo, разметку менять не придётся. -->
             <div class="home-hero">
-                <div class="home-greet" id="home-greet">Привет!</div>
-                <div class="home-subtitle" id="home-subtitle">Готов к тренировке?</div>
+                <div class="home-hero-media"><svg class="home-hero-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" /> <path d="m2.5 21.5 1.4-1.4" /> <path d="m20.1 3.9 1.4-1.4" /> <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" /> <path d="m9.6 14.4 4.8-4.8" /></svg></div>
+                <div class="home-hero-body">
+                    <div class="home-hero-badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></svg><span id="home-hero-when">Сегодня</span></div>
+                    <div class="home-hero-title" id="home-hero-title">Тренировка</div>
+                    <div class="home-hero-desc" id="home-hero-desc"></div>
+                    <button id="home-start-btn" class="home-start-btn">
+                        <span>Начать тренировку</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg>
+                    </button>
+                </div>
             </div>
 
-            <!-- Прогресс недели: карточки по дням -->
+            <!-- Текущая неделя: дни тренировок с состояниями -->
             <div class="home-card">
-                <div class="home-card-title">📅 <span id="home-week-num">—</span></div>
+                <div class="home-sec-head">
+                    <div class="home-sec-title">Текущая неделя</div>
+                    <div class="home-sec-meta" id="home-week-summary">— из —</div>
+                </div>
+                <div class="home-week-chip"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></svg><span id="home-week-num">—</span></div>
                 <div class="home-week-dots" id="home-week-dots"></div>
-                <div class="home-week-summary" id="home-week-summary">— из —</div>
             </div>
 
-            <!-- Большая кнопка "Начать тренировку" -->
-            <button id="home-start-btn" class="home-start-btn">
-                🔥 Начать тренировку
-            </button>
-
-            <!-- Карточки: последний рекорд + последний вес -->
+            <!-- Твои результаты -->
+            <div class="home-sec-head home-sec-head-bare">
+                <div class="home-sec-title">Твои результаты</div>
+            </div>
             <div class="home-info-grid">
                 <div class="home-info-card">
-                    <div class="home-info-icon">🏆</div>
-                    <div class="home-info-label">Последний рекорд</div>
+                    <div class="home-info-head"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" /> <path d="m2.5 21.5 1.4-1.4" /> <path d="m20.1 3.9 1.4-1.4" /> <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" /> <path d="m9.6 14.4 4.8-4.8" /></svg><span class="home-info-label">Тренировок</span></div>
+                    <div class="home-info-value" id="home-stat-workouts">—</div>
+                    <div class="home-info-sub" id="home-stat-workouts-sub"></div>
+                </div>
+                <div class="home-info-card">
+                    <div class="home-info-head"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" /> <path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" /> <path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" /> <path d="M4 22h16" /> <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" /> <path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" /></svg><span class="home-info-label">Рекорд</span></div>
                     <div class="home-info-value" id="home-last-pr">—</div>
                     <div class="home-info-sub" id="home-last-pr-sub"></div>
                 </div>
                 <div class="home-info-card">
-                    <div class="home-info-icon">⚖️</div>
-                    <div class="home-info-label">Текущий вес</div>
+                    <div class="home-info-head"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 7h6v6" /> <path d="m22 7-8.5 8.5-5-5L2 17" /></svg><span class="home-info-label">Прогресс</span></div>
+                    <div class="home-info-value" id="home-stat-progress">—</div>
+                    <div class="home-info-sub" id="home-stat-progress-sub"></div>
+                </div>
+                <div class="home-info-card">
+                    <div class="home-info-head"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18" /> <path d="m19 8 3 8a5 5 0 0 1-6 0zV7" /> <path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1" /> <path d="m5 8 3 8a5 5 0 0 1-6 0zV7" /> <path d="M7 21h10" /></svg><span class="home-info-label">Текущий вес</span></div>
                     <div class="home-info-value" id="home-weight">—</div>
                     <div class="home-info-sub" id="home-weight-sub"></div>
                 </div>
+            </div>
+
+            <!-- Твоя цель. Показывается, только когда цель реально заполнена в
+                 анкете клиента. Процент — выполнение текущей недели: отдельного
+                 показателя «продвижение к цели» в системе нет, и выдумывать его
+                 нельзя, поэтому подпись под полосой говорит, что именно считаем. -->
+            <div class="home-goal hidden" id="home-goal">
+                <div class="home-goal-head">
+                    <div class="home-goal-ttl"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg><span>Твоя цель</span></div>
+                    <div class="home-goal-pct" id="home-goal-pct">—</div>
+                </div>
+                <div class="home-goal-name" id="home-goal-name">—</div>
+                <div class="home-goal-track"><div class="home-goal-fill" id="home-goal-fill"></div></div>
+                <div class="home-goal-msg" id="home-goal-msg"></div>
             </div>
         </div>
 
         <!-- Workout Tab -->
         <div id="workout-tab" class="tab-content">
-            <!-- Header -->
+            <!-- Шапка экрана: название, неделя, счётчик выполненного.
+                 Кнопки «назад» и «…» из макета здесь нет: «Тренировка» —
+                 это вкладка нижней навигации, а не открытый поверх экран,
+                 возвращаться из неё некуда, и меню «…» тоже не к чему
+                 привязать. Придумывать нерабочие кнопки не стали. -->
             <div class="header">
-                <div class="week-badge">
-                    💪 Неделя <span id="week-number">-</span>
+                <div class="header-main">
+                    <div class="header-title">Тренировка</div>
+                    <div class="week-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/></svg> Неделя <span id="week-number">-</span></div>
                 </div>
                 <div class="progress-info">
                     <span id="completed-count">0</span> / <span id="total-count">0</span>
@@ -196,53 +247,66 @@
             <div id="exercises-container" class="exercises-container"></div>
 
             <!-- Save Button -->
-            <button id="save-btn" class="save-btn">
-                💾 Сохранить результаты
-            </button>
+            <button id="save-btn" class="save-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Сохранить результаты</span></button>
         </div>
 
         <!-- Progress Tab -->
         <div id="progress-tab" class="tab-content">
-            <!-- Stats Cards -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">🏆</div>
-                    <div class="stat-value" id="stat-weeks">-</div>
-                    <div class="stat-label">Недель завершено</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">💪</div>
-                    <div class="stat-value" id="stat-exercises">-</div>
-                    <div class="stat-label">Упражнений выполнено</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">⚡</div>
-                    <div class="stat-value" id="stat-avg-weight">-</div>
-                    <div class="stat-label">Средний вес</div>
+            <!-- Шапка — та же, что на экране тренировки -->
+            <div class="header">
+                <div class="header-main">
+                    <div class="header-title">Прогресс</div>
                 </div>
             </div>
 
-            <!-- Exercise Selector -->
+            <!-- Показатели. Состав и значения прежние, меняется только вид. -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></svg><span class="stat-label">Недель завершено</span></div>
+                    <div class="stat-value" id="stat-weeks">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" /> <path d="m2.5 21.5 1.4-1.4" /> <path d="m20.1 3.9 1.4-1.4" /> <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" /> <path d="m9.6 14.4 4.8-4.8" /></svg><span class="stat-label">Упражнений выполнено</span></div>
+                    <div class="stat-value" id="stat-exercises">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="3" /> <path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z" /></svg><span class="stat-label">Средний вес</span></div>
+                    <div class="stat-value" id="stat-avg-weight">-</div>
+                </div>
+            </div>
+
+            <!-- График по упражнению. Выбор упражнения и сам график —
+                 прежние элементы с прежними id, обработчик не тронут. -->
             <div class="chart-section">
-                <h3 class="section-title">📈 График прогресса по упражнению</h3>
-                <select id="exercise-select" class="exercise-select">
-                    <option value="">Выберите упражнение...</option>
-                </select>
+                <h3 class="section-title">Прогресс по упражнению</h3>
+                <div class="exercise-select-wrap">
+                    <select id="exercise-select" class="exercise-select">
+                        <option value="">Выберите упражнение...</option>
+                    </select>
+                    <span class="exercise-select-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></span>
+                </div>
                 <div class="chart-container">
                     <canvas id="progress-chart"></canvas>
                 </div>
             </div>
 
-            <!-- Records -->
+            <!-- Личные рекорды -->
             <div class="records-section">
-                <h3 class="section-title">🏆 Личные рекорды</h3>
+                <h3 class="section-title">Личные рекорды</h3>
                 <div id="records-list" class="records-list"></div>
             </div>
         </div>
 
         <!-- История тренировок клиента: тот же вид, что тренер видит в карточке -->
         <div id="history-tab" class="tab-content">
-            <div class="section-title" style="padding: 14px 14px 0;">📜 История тренировок</div>
+            <!-- Шапка — та же, что на «Тренировке» и «Прогрессе». Контейнер и его
+                 id не менялись: содержимое рисует общая с тренерской функция
+                 renderClientHistory(), и она ищет элемент по этому id. -->
+            <div class="header">
+                <div class="header-main">
+                    <div class="header-title">История</div>
+                </div>
+            </div>
             <div id="client-history-container" class="cc-history-container">
                 <div class="no-data">Загрузка истории...</div>
             </div>
@@ -250,14 +314,26 @@
 
         <!-- Measurements Tab -->
         <div id="measurements-tab" class="tab-content">
-            <!-- Guide (самое первое — как правильно делать замеры и фото) -->
-            <div class="meas-guide-section">
-                <img src="body.jpg?v=20260818e" alt="Как правильно делать замеры" class="meas-guide-image">
+            <div class="header">
+                <div class="header-main">
+                    <div class="header-title">Замеры</div>
+                </div>
             </div>
+
+            <!-- Инструкция. Раньше картинка на 356 КБ занимала весь первый
+                 экран при каждом заходе. Теперь свёрнута в <details> —
+                 механика нативная, без JS; сама картинка не менялась. -->
+            <details class="meas-guide-section">
+                <summary class="meas-guide-summary">
+                    <span class="meas-guide-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" /> <path d="M9 18h6" /> <path d="M10 22h4" /></svg></span>
+                    <span class="meas-guide-ttl">Как правильно делать замеры</span>
+                </summary>
+                <img src="body.jpg?v=20260818e" alt="Как правильно делать замеры" class="meas-guide-image">
+            </details>
 
             <!-- Photo Progress (живые фото клиента) -->
             <div class="photo-progress-section">
-                <h3 class="section-title">📸 Фото прогресса</h3>
+                <h3 class="section-title">Фото прогресса</h3>
                 <div id="photo-progress-content" class="photo-progress-content">
                     <div class="no-data">Загрузка фото...</div>
                 </div>
@@ -270,66 +346,66 @@
 
             <!-- Input Form -->
             <div class="meas-form-section" id="meas-form-section">
-                <h3 class="section-title">✏️ Записать замеры</h3>
+                <h3 class="section-title">Записать замеры</h3>
                 <div class="meas-form-grid">
                     <div class="meas-input-group">
-                        <label class="meas-input-label">⚖️ Вес (кг)</label>
+                        <label class="meas-input-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="3" /> <path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z" /></svg><span>Вес, кг</span></label>
                         <input type="number" inputmode="decimal" class="meas-input" id="meas-weight" placeholder="70.5">
                     </div>
                     <div class="meas-input-group">
-                        <label class="meas-input-label">📐 Плечи (см)</label>
+                        <label class="meas-input-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" /> <path d="m14.5 12.5 2-2" /> <path d="m11.5 9.5 2-2" /> <path d="m8.5 6.5 2-2" /> <path d="m17.5 15.5 2-2" /></svg><span>Плечи, см</span></label>
                         <input type="number" inputmode="decimal" class="meas-input" id="meas-shoulders" placeholder="110">
                     </div>
                     <div class="meas-input-group">
-                        <label class="meas-input-label">📐 Грудь (см)</label>
+                        <label class="meas-input-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" /> <path d="m14.5 12.5 2-2" /> <path d="m11.5 9.5 2-2" /> <path d="m8.5 6.5 2-2" /> <path d="m17.5 15.5 2-2" /></svg><span>Грудь, см</span></label>
                         <input type="number" inputmode="decimal" class="meas-input" id="meas-chest" placeholder="95">
                     </div>
                     <div class="meas-input-group">
-                        <label class="meas-input-label">📐 Талия (см)</label>
+                        <label class="meas-input-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" /> <path d="m14.5 12.5 2-2" /> <path d="m11.5 9.5 2-2" /> <path d="m8.5 6.5 2-2" /> <path d="m17.5 15.5 2-2" /></svg><span>Талия, см</span></label>
                         <input type="number" inputmode="decimal" class="meas-input" id="meas-waist" placeholder="75">
                     </div>
                     <div class="meas-input-group">
-                        <label class="meas-input-label">📐 Бёдра (см)</label>
+                        <label class="meas-input-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" /> <path d="m14.5 12.5 2-2" /> <path d="m11.5 9.5 2-2" /> <path d="m8.5 6.5 2-2" /> <path d="m17.5 15.5 2-2" /></svg><span>Бёдра, см</span></label>
                         <input type="number" inputmode="decimal" class="meas-input" id="meas-hips" placeholder="100">
                     </div>
                     <div class="meas-input-group">
-                        <label class="meas-input-label">💪 Бицепс (см)</label>
+                        <label class="meas-input-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" /> <path d="m2.5 21.5 1.4-1.4" /> <path d="m20.1 3.9 1.4-1.4" /> <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" /> <path d="m9.6 14.4 4.8-4.8" /></svg><span>Бицепс, см</span></label>
                         <input type="number" inputmode="decimal" class="meas-input" id="meas-bicep" placeholder="35">
                     </div>
                     <div class="meas-input-group">
-                        <label class="meas-input-label">🦵 Бедро (см)</label>
+                        <label class="meas-input-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" /> <path d="m14.5 12.5 2-2" /> <path d="m11.5 9.5 2-2" /> <path d="m8.5 6.5 2-2" /> <path d="m17.5 15.5 2-2" /></svg><span>Бедро, см</span></label>
                         <input type="number" inputmode="decimal" class="meas-input" id="meas-thigh" placeholder="55">
                     </div>
                 </div>
                 <div class="meas-photo-field">
-                    <label class="meas-input-label">📸 Фото прогресса (можно 1-3 ракурса)</label>
+                    <label class="meas-input-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg><span>Фото прогресса — можно 1–3 ракурса</span></label>
                     <div class="meas-photo-slots">
                         <div class="meas-photo-slot" id="meas-photo-slot-1" data-slot="1">
-                            <span class="meas-photo-slot-icon">📷</span>
+                            <span class="meas-photo-slot-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg></span>
                             <span class="meas-photo-slot-label">Спереди</span>
-                            <button type="button" class="meas-photo-slot-remove hidden" data-slot="1">✕</button>
+                            <button type="button" class="meas-photo-slot-remove hidden" data-slot="1" aria-label="Убрать фото"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></button>
                             <input type="file" accept="image/*" id="meas-photo-file-1" class="meas-photo-file-input hidden">
                         </div>
                         <div class="meas-photo-slot" id="meas-photo-slot-2" data-slot="2">
-                            <span class="meas-photo-slot-icon">📷</span>
+                            <span class="meas-photo-slot-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg></span>
                             <span class="meas-photo-slot-label">Сбоку</span>
-                            <button type="button" class="meas-photo-slot-remove hidden" data-slot="2">✕</button>
+                            <button type="button" class="meas-photo-slot-remove hidden" data-slot="2" aria-label="Убрать фото"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></button>
                             <input type="file" accept="image/*" id="meas-photo-file-2" class="meas-photo-file-input hidden">
                         </div>
                         <div class="meas-photo-slot" id="meas-photo-slot-3" data-slot="3">
-                            <span class="meas-photo-slot-icon">📷</span>
+                            <span class="meas-photo-slot-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg></span>
                             <span class="meas-photo-slot-label">Сзади</span>
-                            <button type="button" class="meas-photo-slot-remove hidden" data-slot="3">✕</button>
+                            <button type="button" class="meas-photo-slot-remove hidden" data-slot="3" aria-label="Убрать фото"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></svg></button>
                             <input type="file" accept="image/*" id="meas-photo-file-3" class="meas-photo-file-input hidden">
                         </div>
                     </div>
                 </div>
-                <button class="meas-save-btn" id="meas-save-btn">💾 Сохранить замеры</button>
+                <button class="meas-save-btn" id="meas-save-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Сохранить замеры</span></button>
             </div>
 
             <!-- Measurements Chart -->
             <div class="chart-section">
-                <h3 class="section-title">📈 Динамика замеров</h3>
+                <h3 class="section-title">Динамика замеров</h3>
                 <select id="measurement-select" class="exercise-select">
                     <option value="weight">Вес (кг)</option>
                     <option value="shoulders">Плечи (см)</option>
@@ -346,7 +422,7 @@
 
             <!-- Measurements History -->
             <div class="measurements-history">
-                <h3 class="section-title">📋 История замеров</h3>
+                <h3 class="section-title">История замеров</h3>
                 <div id="measurements-list" class="measurements-list"></div>
             </div>
         </div>
@@ -1641,28 +1717,28 @@
             <div class="rpe-modal-title">Как сегодня самочувствие?</div>
             <div class="rpe-modal-summary">От этого зависят рекомендуемые веса на сегодня</div>
             <button class="rpe-btn wellness-good" onclick="setWellness('good')">
-                <span class="rpe-btn-emoji">💪</span>
+                <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 10V9" /> <path d="M16.472 15a6 6 0 01-8.943 0" /> <path d="M9 10V9" /> <circle cx="12" cy="12" r="10" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>Бодрый, готов</strong>
                     <small>работаем по плану</small>
                 </span>
             </button>
             <button class="rpe-btn wellness-tired" onclick="setWellness('tired')">
-                <span class="rpe-btn-emoji">😴</span>
+                <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>Устал / недосып</strong>
                     <small>веса будут снижены на 10%</small>
                 </span>
             </button>
             <button class="rpe-btn wellness-sick" onclick="setWellness('sick')">
-                <span class="rpe-btn-emoji">🤧</span>
+                <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>Приболел / выздоравливаю</strong>
                     <small>веса будут снижены на 15%</small>
                 </span>
             </button>
             <button class="rpe-btn wellness-pms" onclick="setWellness('pms')">
-                <span class="rpe-btn-emoji">🩸</span>
+                <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>ПМС / месячные</strong>
                     <small>веса будут снижены на 10%</small>
@@ -1679,35 +1755,35 @@
             <div class="rpe-modal-title">Не вытянул. Почему?</div>
             <div class="rpe-modal-summary">Это поможет правильно скорректировать программу</div>
             <button class="rpe-btn fail-too-hard" onclick="setFailReason('too_hard')">
-                <span class="rpe-btn-emoji">💪</span>
+                <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>Слишком тяжело</strong>
                     <small>вес правда большой — снизим</small>
                 </span>
             </button>
             <button class="rpe-btn fail-sleep" onclick="setFailReason('sleep')">
-                <span class="rpe-btn-emoji">💤</span>
+                <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>Плохо спал</strong>
                     <small>вес оставим как есть</small>
                 </span>
             </button>
             <button class="rpe-btn fail-illness" onclick="setFailReason('illness')">
-                <span class="rpe-btn-emoji">🤧</span>
+                <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>Самочувствие плохое</strong>
                     <small>вес оставим как есть</small>
                 </span>
             </button>
             <button class="rpe-btn fail-stress" onclick="setFailReason('stress')">
-                <span class="rpe-btn-emoji">😟</span>
+                <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>Стресс / голова забита</strong>
                     <small>вес оставим как есть</small>
                 </span>
             </button>
             <button class="rpe-btn fail-food" onclick="setFailReason('food')">
-                <span class="rpe-btn-emoji">🍔</span>
+                <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /> <path d="M7 2v20" /> <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>Ел мало / нет энергии</strong>
                     <small>вес оставим как есть</small>
@@ -1724,6 +1800,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260829b" defer></script>
+    <script src="app.js?v=20260830a" defer></script>
 </body>
 </html>
