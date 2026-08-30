@@ -1742,6 +1742,13 @@ async function resolveTenantForVkUser() {
     var clientTenants = tenants.filter(function(t) { return (t.role || 'client') === 'client'; });
     if (clientTenants.length) {
         tenants = clientTenants;
+    } else if (vkLaunchUserId === TRAINER_VK_CHAT_ID.replace('vk_', '')) {
+        // Сам Matvey: его кабинет — всегда дефолтный, его и так вернёт
+        // _newApiTrainerId ниже по цепочке. Без этой ветки он, будучи
+        // тренером своего тенанта (и любых демо, выписанных на себя для
+        // проверки), увидел бы «Чей кабинет открыть?» — экран выбора,
+        // которого у него никогда не было.
+        return;
     } else {
         tenants = tenants.filter(function(t) { return t.role === 'trainer'; });
     }
