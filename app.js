@@ -1312,6 +1312,19 @@ var NEW_API_ACTIONS = {
             return _fakeJsonResponse(data, 200);
         }); });
     },
+    setTrainerAvatar: function(nativeFetch, params, init) {
+        var body = {};
+        try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
+        var path = '/admin/trainers/' + encodeURIComponent(params.get('targetTrainerId') || '') +
+            '/avatar?asChatId=' + encodeURIComponent(_myChatId());
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(body)
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse(data, 200);
+        }); });
+    },
     setTrainerTheme: function(nativeFetch, params) {
         var asChatId = encodeURIComponent(_myChatId());
         var path = '/admin/trainers/' + encodeURIComponent(params.get('targetTrainerId') || '') +
@@ -1622,6 +1635,12 @@ function applyTenantTheme(theme) {
         var titleEl = document.querySelector('title');
         if (titleEl) titleEl.textContent = theme.displayName;
     }
+    // Фото тренера для кружка на главной. Приходит вместе с темой, поэтому
+    // подхватывается и при обычном входе, и когда супер-админ смотрит
+    // чужого тренанта.
+    _tenantAvatarUrl = theme.avatar || '';
+    _renderHomeAvatar();
+
     // Фирменный фон мини-аппа (лейбл/лого тренера) — тот же themeLogo, что
     // раньше приходил с бэкенда, но нигде не выводился. Опционально: без
     // него — как раньше, обычный светло-серый фон.
@@ -3073,12 +3092,7 @@ function _homeDayLabel(day) {
 function _renderHomeUI(trainingDays, doneDays) {
     var todayLabel = _HOME_WD[new Date().getDay()];
 
-    // Аватар: первая буква имени. Фотографии пользователя в системе нет.
-    var av = document.getElementById('home-avatar');
-    if (av) {
-        var letter = (clientName || '').replace(/[^A-Za-zА-Яа-яЁё]/g, '').charAt(0);
-        av.textContent = (letter || '?').toUpperCase();
-    }
+    _renderHomeAvatar();
 
     // Состояния дней: иконка вместо символа, плюс отметка «сегодня»
     var dots = document.querySelectorAll('#home-week-dots .home-dot');
@@ -3150,6 +3164,32 @@ function _getMyProfile() {
             .catch(function() { return {}; });
     }
     return _myProfilePromise;
+}
+
+// Кружок на главной. Если тренер загрузил своё фото — показываем его:
+// клиент видит лицо СВОЕГО тренера, у каждого тенанта своё. Фото нет —
+// остаётся первая буква имени клиента, как было раньше.
+var _tenantAvatarUrl = '';
+
+function _renderHomeAvatar() {
+    var av = document.getElementById('home-avatar');
+    if (!av) return;
+    if (_tenantAvatarUrl) {
+        av.classList.add('has-photo');
+        av.innerHTML = '<img src="' + _escHtmlAttr(_tenantAvatarUrl) + '" alt="" ' +
+                       'onerror="_onHomeAvatarError()">';
+        return;
+    }
+    av.classList.remove('has-photo');
+    var letter = (clientName || '').replace(/[^A-Za-zА-Яа-яЁё]/g, '').charAt(0);
+    av.textContent = (letter || '?').toUpperCase();
+}
+
+// Картинка не загрузилась (удалили из базы, нет сети) — не оставляем пустой
+// кружок, откатываемся на букву.
+function _onHomeAvatarError() {
+    _tenantAvatarUrl = '';
+    _renderHomeAvatar();
 }
 
 // Показательное упражнение для карточки рекорда: у женщин — ягодичный
@@ -3714,6 +3754,10 @@ function renderSuperAdminTrainers(trainers) {
                         (t.themeLogo ? '🖼 Сменить баннер' : '🖼 Баннер') +
                     '</button>' +
                     (t.themeLogo ? '<button class="superadmin-toggle-btn" onclick="removeTrainerLogo(\'' + t.trainerId + '\')">✕ Убрать баннер</button>' : '') +
+                    '<button class="superadmin-toggle-btn" onclick="pickTrainerAvatar(\'' + t.trainerId + '\')">' +
+                        (t.themeAvatar ? '👤 Сменить фото' : '👤 Фото') +
+                    '</button>' +
+                    (t.themeAvatar ? '<button class="superadmin-toggle-btn" onclick="removeTrainerAvatar(\'' + t.trainerId + '\')">✕ Убрать фото</button>' : '') +
                     '<button class="superadmin-toggle-btn" onclick="cycleTrainerTheme(\'' + t.trainerId + '\', \'' + (t.themeMode || '') + '\')">' +
                         THEME_LABELS[t.themeMode || ''] +
                     '</button>' +
@@ -3757,6 +3801,45 @@ function removeTrainerLogo(trainerId) {
 async function _sendTrainerLogo(trainerId, payload, okText) {
     try {
         var url = APPS_SCRIPT_URL + '?action=setTrainerLogo&targetTrainerId=' + encodeURIComponent(trainerId);
+        var resp = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        var data = await resp.json();
+        if (!data.success) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        await loadSuperAdminTrainers();
+        tg.showAlert('✅ ' + okText + '. Тренеру и его клиентам нужно закрыть и открыть мини-апп заново.');
+    } catch (e) {
+        tg.showAlert('Ошибка соединения');
+    }
+}
+
+// Фото тренера — кружок на главной у его клиентов. Отдельно от баннера:
+// баннер широкий, в круглый аватар не годится. Сжимаем до 400px — больше
+// для кружка 44px не нужно даже на экранах с тройной плотностью.
+function pickTrainerAvatar(trainerId) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = function() {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        _compressImageFile(file, 400, 0.85, function(res) {
+            _sendTrainerAvatar(trainerId, { avatarBase64: res.base64, avatarMime: res.mime }, 'Фото обновлено');
+        }, function(err) { tg.showAlert(err); });
+    };
+    input.click();
+}
+
+function removeTrainerAvatar(trainerId) {
+    tgConfirm('Убрать фото у этого тренера? В кружке снова будет буква.').then(function(ok) {
+        if (ok) _sendTrainerAvatar(trainerId, { remove: true }, 'Фото убрано');
+    });
+}
+
+async function _sendTrainerAvatar(trainerId, payload, okText) {
+    try {
+        var url = APPS_SCRIPT_URL + '?action=setTrainerAvatar&targetTrainerId=' + encodeURIComponent(trainerId);
         var resp = await fetch(url, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });

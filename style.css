@@ -7941,3 +7941,16 @@ body.theme-dark #workout-tab::after {
 }
 #home-tab .home-trend-spark svg { display: block; width: 100%; height: 100%; }
 #home-tab .home-trend-spark:empty { height: var(--gap-3); }
+
+/* Кружок на главной с фотографией тренера. Без фото остаётся акцентная
+   заливка с буквой — правило .home-avatar выше. */
+#home-tab .home-avatar.has-photo {
+    background: var(--ds-surface-2);
+    overflow: hidden;
+}
+#home-tab .home-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
