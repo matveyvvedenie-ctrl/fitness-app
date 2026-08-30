@@ -4,7 +4,7 @@
   "private": true,
   "homepage": ".",
   "scripts": {
-    "build": "rm -rf build && mkdir -p build && cp index.html app.js style.css body.jpg build/ && cp index.html build/index_DG.html && cp -r assets vendor build/",
+    "build": "rm -rf build && mkdir -p build && cp index.html app.js style.css body.jpg version.txt build/ && cp index.html build/index_DG.html && cp -r assets vendor build/",
     "predeploy": "npm run build",
     "deploy": "vk-miniapps-deploy"
   },
