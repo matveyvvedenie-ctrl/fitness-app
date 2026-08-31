@@ -938,67 +938,58 @@ var NEW_API_ACTIONS = {
     // Bulk (сет/трисет/несколько упражнений разом) — новый API умеет только
     // по одному, поэтому шлём N последовательных POST вместо одного bulk-запроса.
     addClientExercises: function(nativeFetch, params, init) {
+        // 2026-08-31. Раньше блок сохранялся ПО ОДНОМУ упражнению: на новом
+        // бэкенде не было ручки на пачку — при переезде её просто не
+        // перенесли, хотя в старой системе такая команда была. Прослойка
+        // честно разбирала блок на отдельные запросы, и четырнадцать
+        // упражнений превращались в четырнадцать обращений подряд. Медленно,
+        // и на мобильной связи рвётся: у клиента Анны так пропала половина
+        // дня, а тренер узнавал об этом только глазами.
+        //
+        // Теперь один запрос на весь блок, и на сервере всё или ничего —
+        // половины блока в программе больше не бывает. Повторы оставляем:
+        // один сорванный запрос лечится повтором, а не потерей данных.
         var sheetName = params.get('sheetName') || '';
         var dayName = params.get('dayName') || '';
         var body;
         try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
         var exercises = body.exercises || [];
+        if (!exercises.length) return Promise.resolve(_fakeJsonResponse({ success: true, saved: 0 }, 200));
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Sheet not found: ' + sheetName }, 200);
-            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program/exercises';
-            var chain = Promise.resolve();
-            var savedCount = 0;
-            var firstError = null;
-            exercises.forEach(function(ex) {
-                chain = chain.then(function() {
-                    // 2026-08-31. Раньше здесь был голый nativeFetch без единого
-                    // повтора — при том, что все остальные обращения к бэкенду
-                    // ходят через _fetchNewApiWithRetry именно потому, что
-                    // соединение до Timeweb рвётся само по себе примерно в 15%
-                    // случаев (замеры в комментарии к _newApiCall). В блоке из
-                    // четырнадцати упражнений это почти гарантированный обрыв.
-                    //
-                    // Хуже того: сорванный fetch (или r.json() на не-JSON
-                    // ответе) выбрасывал исключение, и вся ЦЕПОЧКА обрывалась —
-                    // оставшиеся упражнения даже не пытались сохраниться, а
-                    // подсчёт «сохранено N из M» до вызывающего не доходил.
-                    // Тренер видел ошибку связи, в программе оказывалась
-                    // половина дня, а клиент — «малую часть тренировки».
-                    //
-                    // Теперь каждое упражнение идёт с повторами, и его провал
-                    // не роняет остальные: цепочка доходит до конца всегда и
-                    // всегда честно отчитывается, сколько прошло.
-                    return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
-                        method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
-                        body: JSON.stringify({
-                            day: dayName, exercise: ex.exercise || '', sets: ex.sets || '', reps: ex.reps || '',
-                            weightPlan: ex.weightPlan || '', rpe: ex.rpe || '', note: ex.note || ''
-                        })
-                    }, 3).then(function(r) {
-                        if (r.ok) { savedCount++; return; }
-                        return r.json().catch(function() { return {}; }).then(function(data) {
-                            if (!firstError) firstError = data.detail || ('Ошибка ' + r.status);
-                        });
-                    }).catch(function(err) {
-                        if (!firstError) firstError = (err && err.message) || 'Обрыв связи';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
+                encodeURIComponent(chatId) + '/program/exercises/bulk';
+            return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
+                method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({
+                    day: dayName,
+                    exercises: exercises.map(function(ex) {
+                        return {
+                            day: dayName, exercise: ex.exercise || '', sets: ex.sets || '',
+                            reps: ex.reps || '', weightPlan: ex.weightPlan || '',
+                            rpe: ex.rpe || '', note: ex.note || ''
+                        };
+                    })
+                })
+            }, 3).then(function(r) {
+                if (r.ok) {
+                    return r.json().then(function(data) {
+                        return _fakeJsonResponse({ success: true, saved: (data && data.saved) || exercises.length }, 200);
+                    }, function() {
+                        return _fakeJsonResponse({ success: true, saved: exercises.length }, 200);
                     });
-                });
-            });
-            return chain.then(function() {
-                if (firstError && savedCount === 0) return _fakeJsonResponse({ success: false, error: firstError }, 200);
-                // Частичный провал раньше отдавался как успех: из четырнадцати
-                // упражнений сохранялось восемь, тренер видел «готово», а в
-                // программе оказывалась половина дня. Теперь говорим прямо,
-                // сколько прошло — остальное тренер досоздаёт, а не ищет
-                // пропажу глазами.
-                if (firstError) {
+                }
+                return r.json().catch(function() { return {}; }).then(function(data) {
                     return _fakeJsonResponse({
                         success: false,
-                        error: 'Сохранено ' + savedCount + ' из ' + exercises.length +
-                               ' — остальные не прошли: ' + firstError
+                        error: (data && data.detail) || ('Ошибка ' + r.status) + ' — блок не сохранён целиком, ничего не записалось'
                     }, 200);
-                }
-                return _fakeJsonResponse({ success: true, saved: savedCount }, 200);
+                });
+            }).catch(function(err) {
+                return _fakeJsonResponse({
+                    success: false,
+                    error: ((err && err.message) || 'Обрыв связи') + ' — блок не сохранён, ничего не записалось'
+                }, 200);
             });
         });
     },
