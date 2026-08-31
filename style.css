@@ -2023,6 +2023,18 @@ body.theme-dark .save-btn.success {
 /* Отметка «день тренировки / день отдыха» в шапке дня дневника питания.
    Тренерский экран, поэтому цвета берём из старой палитры (--color-primary),
    а не из клиентских accent-токенов. */
+/* M-4: расхождение между числом в названии блока и реальным количеством. */
+.cc-block-warn {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 8px;
+    background: #FFF3CD;
+    color: #8A6100;
+    font-size: 11px;
+    font-weight: 700;
+}
+
 .food-log-daytype {
     display: inline-block;
     margin-left: 8px;
@@ -6401,7 +6413,17 @@ body.theme-dark .save-btn.success {
     background: var(--accent-50);
 }
 #workout-tab .exercise-group-label {
-    margin-bottom: var(--gap-2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    /* Гасим наследие старого дизайна: .exercise-group-label выше по файлу
+       красится в индиго #3F51B5 — фиолетовый, которого по DESIGN.md в
+       приложении нет вообще. Скоуп-правило раньше перебивало только цвет
+       текста, и подпись блока оставалась фиолетовой плашкой. */
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    margin: 0 0 var(--gap-2);
     font-size: var(--fs-micro);
     line-height: var(--lh-micro);
     font-weight: 700;
@@ -6409,9 +6431,43 @@ body.theme-dark .save-btn.success {
     text-transform: uppercase;
     color: var(--accent-700);
 }
+/* Иконка вместо эмодзи (M-3, 31.08). Без явного размера SVG растягивается
+   на всю ширину блока — подпись превращалась в огромный квадрат. */
+#workout-tab .exercise-group-label svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+}
 #workout-tab .exercise-group-block .exercise-card:last-child { margin-bottom: 0; }
 
 /* ─── Карточка упражнения ───────────────────────────────────────────────── */
+/* Прошлый результат и стрелка «лучше/хуже» рядом с полем ввода (H-3, 31.08).
+   Тренеру нужно видеть прошлый раз и разницу, не уходя во вкладку «История». */
+#workout-tab .ex-delta-slot {
+    display: block;
+    min-height: 16px;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+}
+#workout-tab .ex-delta.up { color: var(--ds-success, #1E8E5A); }
+#workout-tab .ex-delta.down { color: var(--ds-text-muted, #6B7280); }
+#workout-tab .ex-delta.same { color: var(--ds-text-faint, #9AA0A6); font-weight: 500; }
+#workout-tab .last-session-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 var(--gap-3);
+    padding: 8px 10px;
+    border-radius: var(--radius-2, 10px);
+    background: rgba(var(--accent-rgb), .07);
+    color: var(--ds-text-secondary, #4B5563);
+    font-size: 13px;
+    font-weight: 500;
+}
+#workout-tab .last-session-info svg { width: 15px; height: 15px; color: var(--accent-500); flex: 0 0 auto; }
+
 #workout-tab .exercise-card {
     margin-bottom: var(--gap-3);
     padding: 0;

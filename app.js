@@ -890,6 +890,14 @@ var NEW_API_ACTIONS = {
             return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: _newApiHeaders() })
                 .then(function(r) {
                     if (r.status === 204 || r.ok) return _fakeJsonResponse({ success: true }, 200);
+                    // 2026-08-31 (L-2). 404 здесь — не поломка, а «удалять
+                    // уже нечего»: чаще всего это второе нажатие по той же
+                    // кнопке или открытая в двух местах программа. Раньше
+                    // человек видел то же красное «Ошибка», что и при
+                    // настоящем сбое, и не понимал, прошло удаление или нет.
+                    if (r.status === 404) {
+                        return _fakeJsonResponse({ success: true, alreadyGone: true }, 200);
+                    }
                     return r.json().then(function(data) {
                         return _fakeJsonResponse({ success: false, error: (data && data.detail) || 'Не удалось' }, 200);
                     });
@@ -2070,6 +2078,18 @@ async function init() {
             document.getElementById('week-number').textContent = weekNum;
         }
         workoutData = response.days || [];
+        // Прошлый результат по каждому упражнению — одним запросом на всю
+        // тренировку (см. loadLastSessions). Ошибка не мешает: карточки
+        // просто отрисуются без блока «Прошлый раз».
+        try {
+            var _lsMap = await loadLastSessions(_myChatId());
+            workoutData.forEach(function(day) {
+                (day.exercises || []).forEach(function(ex) {
+                    var ls = _lsMap[_lastSessionKey(ex.exercise)];
+                    if (ls) ex.lastSession = ls;
+                });
+            });
+        } catch (e) { console.error('lastSessions attach failed:', e); }
         totalExercises = 0;
         completedCount = 0;
         workoutData.forEach(day => {
@@ -2288,9 +2308,15 @@ function renderWorkout() {
                 var label = document.createElement('div');
                 label.className = 'exercise-group-label';
                 var blockInfo = blockTypeInfo(group.type);
-                label.textContent = blockInfo
-                    ? (blockInfo.label + ' · ' + group.exercises.length + ' упр.')
-                    : (group.type === 'triset' ? 'Трисет' : 'Суперсет');
+                // 2026-08-31 (M-3). Раньше здесь стояло blockInfo.label —
+                // «🤸 Разминка», «🔄 Круговая», «🧘 Заминка». Это были
+                // единственные эмодзи на клиентских экранах, где по DESIGN.md
+                // их нет вообще, только иконки Lucide. У тренера подписи
+                // остаются прежними — его интерфейс мы не трогаем.
+                label.innerHTML = blockInfo
+                    ? (_homeIcon('repeat') + '<span>' + _escHtml(blockInfo.short) +
+                       ' · ' + group.exercises.length + ' упр.</span>')
+                    : ('<span>' + (group.type === 'triset' ? 'Трисет' : 'Суперсет') + '</span>');
                 wrap.appendChild(label);
                 group.exercises.forEach(function(exercise) {
                     wrap.appendChild(createExerciseCard(exercise, dayIndex, flatIndex));
@@ -2303,6 +2329,9 @@ function renderWorkout() {
             }
         });
         container.appendChild(dayBody);
+
+        // Стрелки для уже заполненных упражнений — сразу, не дожидаясь ввода.
+        (day.exercises || []).forEach(function(_ex, i) { updateExerciseDelta(dayIndex, i); });
 
         // Клик по заголовку — свернуть/развернуть
         dayHeader.addEventListener('click', function() {
@@ -2363,7 +2392,7 @@ function _exSummaryInner(exercise, exIndex) {
         '<span class="ex-sum-txt">' +
             '<span class="ex-sum-head">' +
                 '<span class="ex-sum-num">' + (exIndex + 1) + '</span>' +
-                '<span class="ex-sum-name">' + cleanExerciseName(exercise.exercise) + '</span>' +
+                '<span class="ex-sum-name">' + _escHtml(cleanExerciseName(exercise.exercise)) + '</span>' +
             '</span>' +
             (meta.length ? '<span class="ex-sum-meta">' + meta.join(' · ') + '</span>' : '') +
             (fbInfo ? '<span class="ex-sum-res">' + _homeIcon('check') +
@@ -2393,6 +2422,71 @@ function toggleExerciseCard(dayIndex, exIndex) {
     else _exExpanded[key] = true;
     _syncExerciseCard(dayIndex, exIndex);
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+}
+
+
+// ── Прошлый результат прямо в карточке упражнения (2026-08-31, H-3) ──────────
+// Разметка для этого в карточке была давно (lastSessionHtml), но поле
+// exercise.lastSession никто не заполнял — блок не показывался никогда, и
+// тренер уходил смотреть прошлый результат во вкладку «История».
+//
+// Берём ВСЮ историю ОДНИМ запросом (getSelfHistory уже используется вкладкой
+// истории), а не по запросу на упражнение: в дне их бывает двадцать, и
+// двадцать обращений к серверу на открытие тренировки — это секунды ожидания
+// на телефоне и лишний риск на рваной связи.
+var _lastSessionByExercise = null;
+
+function _lastSessionKey(name) {
+    return cleanExerciseName(name || '').toLowerCase().trim();
+}
+
+async function loadLastSessions(chatId) {
+    if (_lastSessionByExercise) return _lastSessionByExercise;
+    var map = {};
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=getSelfHistory&chatId=' +
+            encodeURIComponent(chatId) + '&limit=60');
+        var data = await resp.json();
+        // История отсортирована от свежих к старым — значит первое встреченное
+        // упоминание упражнения и есть последний результат.
+        (data.history || []).forEach(function(day) {
+            (day.exercises || []).forEach(function(ex) {
+                var key = _lastSessionKey(ex.exercise);
+                if (!key || map[key]) return;
+                if (!ex.weightFact && !ex.repsFact) return;
+                map[key] = {
+                    weight: ex.weightFact, reps: ex.repsFact, rpe: ex.rpe,
+                    feedback: _rpeToFeedback(ex.rpe), date: day.date || ''
+                };
+            });
+        });
+    } catch (e) {
+        console.error('loadLastSessions failed:', e);   // не критично: просто не покажем
+    }
+    _lastSessionByExercise = map;
+    return map;
+}
+
+// Стрелка «лучше/хуже/так же» рядом с полем ввода.
+function _deltaHtml(current, previous, unit) {
+    var cur = parseFloat(String(current).replace(',', '.'));
+    var prev = parseFloat(String(previous).replace(',', '.'));
+    if (!isFinite(cur) || !isFinite(prev)) return '';
+    var diff = Math.round((cur - prev) * 100) / 100;
+    if (diff > 0) return '<span class="ex-delta up">↑ +' + diff + (unit || '') + '</span>';
+    if (diff < 0) return '<span class="ex-delta down">↓ ' + diff + (unit || '') + '</span>';
+    return '<span class="ex-delta same">= без изменений</span>';
+}
+
+// Пересчитать стрелки у одного упражнения — зовётся при каждом вводе.
+function updateExerciseDelta(dayIndex, exIndex) {
+    var ex = workoutData[dayIndex] && workoutData[dayIndex].exercises[exIndex];
+    if (!ex) return;
+    var ls = ex.lastSession;
+    var wBox = document.getElementById('delta-weight-' + dayIndex + '-' + exIndex);
+    var rBox = document.getElementById('delta-reps-' + dayIndex + '-' + exIndex);
+    if (wBox) wBox.innerHTML = (ls && ls.weight) ? _deltaHtml(ex.weightFact, ls.weight, ' кг') : '';
+    if (rBox) rBox.innerHTML = (ls && ls.reps) ? _deltaHtml(ex.repsFact, ls.reps, '') : '';
 }
 
 function createExerciseCard(exercise, dayIndex, exIndex) {
@@ -2489,7 +2583,7 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
         mediaHtml +
         '<div class="exercise-body">' +
             '<div class="exercise-name">' +
-                '<span>' + cleanExerciseName(exercise.exercise) + '</span>' +
+                '<span>' + _escHtml(cleanExerciseName(exercise.exercise)) + '</span>' +
                 // Кнопка «свернуть» есть в разметке всегда, но видна только у
                 // выполненных упражнений (класс has-feedback на карточке).
                 '<button type="button" class="ex-collapse" ' +
@@ -2513,10 +2607,12 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
                 '<div class="ex-block-ttl">Фактический результат</div>' +
                 '<div class="input-row">' +
                     '<label class="input-cell"><span class="input-cap">Вес, кг</span>' +
-                        '<input type="number" inputmode="decimal" enterkeyhint="done" class="input-field" placeholder="—" value="' + (exercise.weightFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="weight" onchange="handleInput(this)">' +
+                        '<input type="text" inputmode="decimal" enterkeyhint="done" class="input-field" placeholder="—" value="' + _escHtmlAttr(exercise.weightFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="weight" oninput="handleInput(this)" onchange="handleInput(this)">' +
+                        '<span class="ex-delta-slot" id="delta-weight-' + dayIndex + '-' + exIndex + '"></span>' +
                     '</label>' +
                     '<label class="input-cell"><span class="input-cap">Повторения</span>' +
-                        '<input type="number" inputmode="numeric" enterkeyhint="done" class="input-field" placeholder="—" value="' + (exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" onchange="handleInput(this)">' +
+                        '<input type="text" inputmode="numeric" enterkeyhint="done" class="input-field" placeholder="—" value="' + _escHtmlAttr(exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" oninput="handleInput(this)" onchange="handleInput(this)">' +
+                        '<span class="ex-delta-slot" id="delta-reps-' + dayIndex + '-' + exIndex + '"></span>' +
                     '</label>' +
                 '</div>' +
             '</div>' +
@@ -2729,6 +2825,20 @@ function handleInput(input) {
     var dayIndex = input.dataset.day;
     var exIndex = input.dataset.exercise;
     var field = input.dataset.field;
+    // 2026-08-31 (H-2). Поля были type="number": браузер отвергал «40,5» ещё
+    // до нашего кода — input.value отдавал пустоту, человек видел, как
+    // введённый вес исчезает. По-русски десятичный разделитель — запятая, и
+    // на телефонной клавиатуре она стоит рядом. Теперь поля текстовые, а
+    // запятую приводим к точке и отсекаем лишние символы прямо при вводе.
+    if (field === 'weight') {
+        var w = String(input.value).replace(',', '.').replace(/[^0-9.]/g, '');
+        var dot = w.indexOf('.');
+        if (dot !== -1) w = w.slice(0, dot + 1) + w.slice(dot + 1).replace(/\./g, '');
+        if (w !== input.value) input.value = w;
+    } else if (field === 'reps') {
+        var r = String(input.value).replace(/[^0-9]/g, '');
+        if (r !== input.value) input.value = r;
+    }
     var value = input.value;
     var exercise = workoutData[dayIndex].exercises[exIndex];
     if (field === 'weight') exercise.weightFact = value;
@@ -2741,6 +2851,7 @@ function handleInput(input) {
         input.classList.remove('filled');
     }
     if (field === 'weight' || field === 'reps') {
+        updateExerciseDelta(dayIndex, exIndex);
         var wasCompleted = exercise.completed;
         exercise.completed = !!(exercise.weightFact || exercise.repsFact);
         if (!wasCompleted && exercise.completed) {
@@ -3108,6 +3219,10 @@ function renderHome() {
 var _HOME_WD = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
 var _HOME_ICONS = {
     check: '<path d="M20 6 9 17l-5-5"/>',
+    // Часы со стрелкой назад (Lucide history) — блок «Прошлый раз» в карточке
+    // упражнения ссылался на этот ключ, а его в наборе не было: в разметку
+    // подставлялось undefined.
+    history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
     chevron: '<path d="m6 9 6 6 6-6"/>',
     play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
     bulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
@@ -3129,7 +3244,7 @@ var _HOME_ICONS = {
 function _homeIcon(key) {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" ' +
            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-           _HOME_ICONS[key] + '</svg>';
+           (_HOME_ICONS[key] || '') + '</svg>';
 }
 
 // Двухбуквенная метка дня — та же логика, что и у кружков недели
@@ -3790,8 +3905,8 @@ function renderSuperAdminTrainers(trainers) {
         return (
             '<div class="superadmin-trainer-row">' +
                 '<div class="superadmin-trainer-info">' +
-                    '<div class="superadmin-trainer-name">' + name + '</div>' +
-                    '<div class="superadmin-trainer-meta">ID: ' + t.trainerId +
+                    '<div class="superadmin-trainer-name">' + _escHtml(name) + '</div>' +
+                    '<div class="superadmin-trainer-meta">ID: ' + _escHtml(t.trainerId) +
                         (t.vkGroupId ? (' · группа ' + t.vkGroupId) : '') + '</div>' +
                     expiresLine +
                     '<span class="superadmin-status-badge status-' + (t.status || '') + '">' + statusLabel + '</span>' +
@@ -4271,7 +4386,7 @@ function renderClientCards() {
         return '<div class="client-card ' + statusClass + '">' +
             '<div class="client-header">' +
                 '<div class="client-status">' + statusIcon + '</div>' +
-                '<div class="client-name">' + (client.name || 'Клиент') + '</div>' +
+                '<div class="client-name">' + _escHtml(client.name || 'Клиент') + '</div>' +
                 trendHtml +
                 sparkHtml +
             '</div>' +
@@ -4340,11 +4455,11 @@ var FOOD_DAY_TYPE_LABELS = {
 function renderFoodLogDays(days) {
     return (days || []).map(function(day) {
         var entriesHtml = (day.entries || []).map(function(e) {
-            var noteHtml = e.note ? '<div class="food-log-note">' + e.note + '</div>' : '';
+            var noteHtml = e.note ? '<div class="food-log-note">' + _escHtml(e.note) + '</div>' : '';
             return '<div class="food-log-entry">' +
                 '<div class="food-log-entry-head">' +
-                    '<span class="food-log-time">' + (e.time || '') + '</span>' +
-                    '<span>' + (e.mealType || '') + '</span>' +
+                    '<span class="food-log-time">' + _escHtml(e.time || '') + '</span>' +
+                    '<span>' + _escHtml(e.mealType || '') + '</span>' +
                     '<span>' + (FOOD_VERDICT_EMOJI[e.verdict] || '') + '</span>' +
                 '</div>' +
                 '<div class="food-log-macros">' +
@@ -4575,8 +4690,8 @@ function renderExerciseMediaList(filter) {
         return;
     }
     list.innerHTML = items.map(function(ex) {
-        var thumb1 = ex.photo1 ? '<img src="' + ex.photo1 + '">' : '🏋️';
-        var thumb2 = ex.photo2 ? '<img src="' + ex.photo2 + '">' : '💪';
+        var thumb1 = ex.photo1 ? '<img src="' + _escHtmlAttr(ex.photo1) + '">' : '🏋️';
+        var thumb2 = ex.photo2 ? '<img src="' + _escHtmlAttr(ex.photo2) + '">' : '💪';
         var hasVideo = !!(ex.video || ex.videoVk);
         // Имя кладём в data-атрибут, а не в onclick: у упражнений вроде
         // «"Кошка-корова"» или «"Птичка" bird dog» двойная кавычка закрывала
@@ -4865,7 +4980,7 @@ function renderPaymentDayDetails() {
     info.paid.forEach(function(p) {
         rows += '<div class="pay-cal-row">' +
             '<i class="pay-dot pay-dot-in"></i>' +
-            '<span class="pay-cal-name">' + p.name + '</span>' +
+            '<span class="pay-cal-name">' + _escHtml(p.name) + '</span>' +
             '<span class="pay-cal-meta">оплата ' + Math.round(p.amount) + ' ₽' +
                 (p.months ? ' · ' + p.months + ' мес.' : '') + '</span>' +
         '</div>';
@@ -4873,7 +4988,7 @@ function renderPaymentDayDetails() {
     info.ends.forEach(function(p) {
         rows += '<div class="pay-cal-row">' +
             '<i class="pay-dot pay-dot-end"></i>' +
-            '<span class="pay-cal-name">' + p.name + '</span>' +
+            '<span class="pay-cal-name">' + _escHtml(p.name) + '</span>' +
             '<span class="pay-cal-meta">заканчивается абонемент</span>' +
         '</div>';
     });
@@ -4984,7 +5099,7 @@ function renderFinanceList() {
         var safeName = (c.name || '').replace(/'/g, "\\'");
         return '<div class="finance-client-card fc-' + c.status + '">' +
             '<div class="fc-row">' +
-                '<div class="fc-name">' + (c.name || '—') + '</div>' +
+                '<div class="fc-name">' + _escHtml(c.name || '—') + '</div>' +
                 '<div class="fc-status-badge b-' + c.status + '">' + statusLabel + '</div>' +
             '</div>' +
             '<div class="fc-info">' + daysText + endText + amountText + '</div>' +
@@ -5166,8 +5281,8 @@ function renderMonthlyReports() {
         var statusClass = noData ? 's-empty' : 's-ok';
         var statusText = noData ? 'нет данных' : 'есть прогресс';
         return '<div class="report-card' + (noData ? ' no-data' : '') + '">' +
-            '<div class="report-card-name">' + (r.name || '—') + '</div>' +
-            '<div class="report-card-summary">' + (r.summary || '') + '</div>' +
+            '<div class="report-card-name">' + _escHtml(r.name || '—') + '</div>' +
+            '<div class="report-card-summary">' + _escHtml(r.summary || '') + '</div>' +
             '<span class="report-card-status ' + statusClass + '">' + statusText + '</span>' +
             '<div class="report-card-actions">' +
                 '<button class="report-preview-btn" onclick="previewReport(' + idx + ')">👁 Превью</button>' +
@@ -5404,13 +5519,13 @@ function renderAdminClients() {
             return '<div class="admin-client-card ' + info.klass + (isArchived ? ' admin-card-archived' : '') + '" data-chat="' + (c.chatId || '') + '">' +
                 '<div class="admin-card-top">' +
                     '<div class="admin-card-status">' + info.icon + '</div>' +
-                    '<div class="admin-card-name">' + (c.name || 'Клиент') + '</div>' +
+                    '<div class="admin-card-name">' + _escHtml(c.name || 'Клиент') + '</div>' +
                     '<div class="admin-card-status-label">' + info.label + '</div>' +
                 '</div>' +
                 '<div class="admin-card-meta">' +
                     '<div class="admin-card-meta-item">' +
                         '<span class="admin-card-meta-label">📅 Неделя</span>' +
-                        '<span class="admin-card-meta-value">' + (c.weekTitle || '—') + '</span>' +
+                        '<span class="admin-card-meta-value">' + _escHtml(c.weekTitle || '—') + '</span>' +
                     '</div>' +
                     '<div class="admin-card-meta-item">' +
                         '<span class="admin-card-meta-label">🏋️ Последняя</span>' +
@@ -5445,8 +5560,8 @@ function renderAdminClients() {
                 : '<button class="admin-row-btn" title="В архив" onclick="toggleArchiveClient(\'' + c.chatId + '\', true)">📦</button>';
             return '<tr class="' + info.klass + (isArchived ? ' admin-row-archived' : '') + '">' +
                 '<td><span class="admin-row-status">' + info.icon + '</span><span class="admin-row-status-label">' + info.label + '</span></td>' +
-                '<td class="admin-row-name">' + (c.name || 'Клиент') + (isArchived ? ' <span class="admin-row-archive-tag">📦</span>' : '') + '</td>' +
-                '<td>' + (c.weekTitle || '—') + '</td>' +
+                '<td class="admin-row-name">' + _escHtml(c.name || 'Клиент') + (isArchived ? ' <span class="admin-row-archive-tag">📦</span>' : '') + '</td>' +
+                '<td>' + _escHtml(c.weekTitle || '—') + '</td>' +
                 '<td>' + formatDaysAgo(c.lastWorkoutDaysAgo) + '</td>' +
                 '<td>' + (c.workouts7Days || 0) + '</td>' +
                 '<td class="admin-row-actions">' +
@@ -6052,7 +6167,7 @@ function renderMealPlanSummary(data) {
     '</div>';
     (data.meals || []).forEach(function(meal) {
         html += '<div class="mp-meal-summary-item">' +
-            '<div class="mp-meal-summary-name">' + (meal.name || 'Приём пищи') + '</div>' +
+            '<div class="mp-meal-summary-name">' + _escHtml(meal.name || 'Приём пищи') + '</div>' +
             '<div class="mp-meal-summary-meta">' + (meal.time || '') +
                 (meal.total_calories ? ' · ' + meal.total_calories + ' ккал' : '') +
                 (meal.total_protein ? ' · Б: ' + meal.total_protein + 'г' : '') +
@@ -6062,7 +6177,7 @@ function renderMealPlanSummary(data) {
         '</div>';
     });
     if (data.notes) {
-        html += '<div class="mp-notes-summary">💬 ' + data.notes + '</div>';
+        html += '<div class="mp-notes-summary">💬 ' + _escHtml(data.notes) + '</div>';
     }
     // Возвращаем разметку, а не пишем в DOM: над ней ещё встаёт переключатель
     // дня (см. renderMealPlanView), и собирать страницу должен кто-то один.
@@ -6540,8 +6655,23 @@ function groupExercises(exercises) {
             // Берём не больше, чем реально осталось в дне: упражнение из блока
             // могли удалить, и уводить группировку за край списка нельзя.
             var take = Math.min(block.size, exercises.length - i);
+            // 2026-08-31 (M-4). И не больше, чем до начала СЛЕДУЮЩЕГО блока.
+            // Если тренер написал «КРУГОВАЯ 5», а в круге по факту три
+            // упражнения, блок молча забирал два следующих — в том числе
+            // начало разминки или заминки — и подписывал их как часть круга.
+            // Данные при этом не терялись, но структура тренировки на экране
+            // у клиента была не та, что расписал тренер, и заметить это было
+            // невозможно. Теперь блок останавливается на границе следующего.
+            for (var k = 1; k < take; k++) {
+                if (numberedBlockStart(exercises[i + k])) { take = k; break; }
+            }
             displayNum++;
-            groups.push({ type: block.type, exercises: exercises.slice(i, i + take), number: displayNum });
+            groups.push({
+                type: block.type, exercises: exercises.slice(i, i + take), number: displayNum,
+                // Сколько тренер ЗАЯВИЛ в названии блока — нужно, чтобы
+                // показать ему расхождение (см. M-4 в карточке клиента).
+                declaredSize: block.size
+            });
             i += take;
         } else if (isTrisetStart(ex) && i + 2 < exercises.length) {
             displayNum++;
@@ -6575,10 +6705,10 @@ function renderExerciseRow(ex, label) {
     var done = (ex.weightFact !== '' && ex.weightFact != null && ex.weightFact !== 0)
         || (ex.repsFact !== '' && ex.repsFact != null && ex.repsFact !== 0);
     var factHtml = done
-        ? '<div class="cc-ex-fact">Факт: ' + (ex.weightFact || '—') + ' кг × ' + (ex.repsFact || '—') + '</div>'
+        ? '<div class="cc-ex-fact">Факт: ' + _escHtml(ex.weightFact || '—') + ' кг × ' + _escHtml(ex.repsFact || '—') + '</div>'
         : '';
     var noteHtml = (ex.note && ex.note.toString().trim())
-        ? '<div class="cc-ex-note">' + ex.note + '</div>' : '';
+        ? '<div class="cc-ex-note">' + _escHtml(ex.note) + '</div>' : '';
     var labelHtml = label
         ? '<span class="cc-ex-suplabel">' + label + '</span>' : '';
     var editBtn = ex.rowIndex
@@ -6586,7 +6716,7 @@ function renderExerciseRow(ex, label) {
         : '';
     return '<div class="cc-ex-row">' +
         '<div class="cc-ex-name-row">' +
-            '<div class="cc-ex-name">' + labelHtml + cleanExerciseName(ex.exercise) + '</div>' +
+            '<div class="cc-ex-name">' + labelHtml + _escHtml(cleanExerciseName(ex.exercise)) + '</div>' +
             editBtn +
         '</div>' +
         '<div class="cc-ex-grid">' +
@@ -6800,7 +6930,18 @@ function renderClientProgram(data) {
                     '<div class="cc-ex-num">' + group.number + '</div>' +
                     '<div class="cc-ex-info">' +
                         '<div class="cc-superset-header cc-block-header cc-block-header-' + group.type + '">' +
-                            numbered.short + ' · ' + group.exercises.length + ' упр.</div>' +
+                            numbered.short + ' · ' + group.exercises.length + ' упр.' +
+                            // M-4: в названии блока стоит одно число, а
+                            // упражнений в нём другое — тренер об этом раньше
+                            // не узнавал: блок просто забирал соседние
+                            // упражнения себе. Теперь говорим прямо, здесь же.
+                            (group.declaredSize && group.declaredSize !== group.exercises.length
+                                ? ' <span class="cc-block-warn" title="В названии блока указано ' +
+                                  group.declaredSize + ', а упражнений ' + group.exercises.length +
+                                  '. Поправь число в названии первого упражнения.">⚠ указано ' +
+                                  group.declaredSize + '</span>'
+                                : '') +
+                        '</div>' +
                         '<div class="cc-superset-body">' + circuitBody + '</div>' +
                         actionsHtml +
                     '</div>' +
@@ -6855,7 +6996,7 @@ function renderClientProgram(data) {
         var safeDay = (day.day || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return '<div class="cc-day-block">' +
             '<div class="cc-day-title-row">' +
-                '<div class="cc-day-title">' + (day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
+                '<div class="cc-day-title">' + _escHtml(day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
                 '<button class="cc-day-menu-btn" onclick="showDayActionsDialog(\'' + safeDay + '\')" title="Действия с днём">⋯</button>' +
             '</div>' +
             '<div class="cc-day-exercises" data-day-name="' + safeDay + '">' +
@@ -7079,7 +7220,7 @@ function renderClientHistory(history, containerId) {
             var commentHtml = (ex.comment && ex.comment.toString().trim())
                 ? '<div class="hh-ex-comment">' +
                       (isClient ? ico('comment') : '💬 ') +
-                      '<span>' + ex.comment + '</span>' +
+                      '<span>' + _escHtml(ex.comment) + '</span>' +
                   '</div>'
                 : '';
 
@@ -7089,7 +7230,7 @@ function renderClientHistory(history, containerId) {
                 planText = '<span class="hh-ex-plan">план: ' + weightPlanClean + repsPart + '</span>';
             }
             return '<div class="hh-ex">' +
-                '<div class="hh-ex-name">' + cleanExerciseName(ex.exercise) + '</div>' +
+                '<div class="hh-ex-name">' + _escHtml(cleanExerciseName(ex.exercise)) + '</div>' +
                 '<div class="hh-ex-fact-row">' +
                     (fact ? '<span class="hh-ex-fact-value">' + fact + '</span>' : '<span class="hh-ex-skipped">не выполнено</span>') +
                     '<span class="hh-ex-rpe">' + rpeText + '</span>' +
@@ -7176,7 +7317,7 @@ function renderStatsPhotoCompareStrip() {
         }
         return (gapHtml ? gapHtml : '') +
             '<div class="stats-compare-item">' +
-                '<img src="' + p.url + '">' +
+                '<img src="' + _escHtmlAttr(p.url) + '">' +
                 '<div class="stats-compare-date">' + p.date + '</div>' +
                 (p.weight ? '<div class="stats-compare-weight">' + p.weight + ' кг</div>' : '') +
             '</div>';
@@ -7360,7 +7501,7 @@ function renderClientStats() {
             return '<div class="stats-pr-row">' +
                 '<div class="stats-pr-medal">' + medal + '</div>' +
                 '<div class="stats-pr-info">' +
-                    '<div class="stats-pr-name">' + pr.name + '</div>' +
+                    '<div class="stats-pr-name">' + _escHtml(pr.name) + '</div>' +
                     '<div class="stats-pr-date">' + pr.date + '</div>' +
                 '</div>' +
                 '<div class="stats-pr-weight">' + pr.weight + ' кг' + repsTxt + '</div>' +
@@ -7431,7 +7572,7 @@ function renderClientStats() {
                 ? 'toggleStatsPhotoSelect(' + i + ')'
                 : 'tg.openLink(\'' + p.url + '\')';
             return '<div class="stats-photo-item' + (selected ? ' selected' : '') + '" onclick="' + clickHandler + '">' +
-                '<img src="' + p.url + '">' +
+                '<img src="' + _escHtmlAttr(p.url) + '">' +
                 (selected ? '<div class="stats-photo-check">✓</div>' : '') +
                 '<div class="stats-photo-date">' + p.date + (p.weight ? ' · ' + p.weight + 'кг' : '') + '</div>' +
             '</div>';
@@ -7536,7 +7677,7 @@ function renderClientStats() {
             var cls = p.gain > 0 ? 'stats-progress-up' : (p.gain < 0 ? 'stats-progress-down' : 'stats-progress-flat');
             var arrow = p.gain > 0 ? '▲' : (p.gain < 0 ? '▼' : '◆');
             return '<div class="stats-progress-row">' +
-                '<div class="stats-progress-name">' + p.name + '</div>' +
+                '<div class="stats-progress-name">' + _escHtml(p.name) + '</div>' +
                 '<div class="stats-progress-values">' +
                     '<span class="stats-progress-prev">' + p.prev + ' кг</span> → ' +
                     '<strong>' + p.recent + ' кг</strong>' +
@@ -7583,7 +7724,7 @@ function renderNotesList(notes) {
     list.innerHTML = notes.map(function(n) {
         var flag = n.important ? '<span class="notes-flag">⚠️</span>' : '';
         var safeName = (currentClientCard ? currentClientCard.name : '').replace(/'/g, "\\'");
-        var text = (n.text || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+        var text = _escHtml(n.text || '').replace(/\n/g, '<br>');
         return '<div class="notes-item' + (n.important ? ' notes-item-important' : '') + '">' +
             '<div class="notes-item-head">' +
                 '<span class="notes-item-date">📅 ' + n.date + '</span>' +
@@ -8509,6 +8650,7 @@ async function deleteExerciseEdit() {
             return;
         }
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        if (data.alreadyGone) tg.showAlert('Это упражнение уже удалено — обновляю программу.');
         await loadClientProgram(currentClientCard.sheetName);
         closeExerciseEditor();
         delBtn.disabled = false;
@@ -8789,7 +8931,7 @@ function renderLibraryList() {
         var safe = (item.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         var groupHtml = item.group ? '<div class="ex-lib-item-group">' + item.group + '</div>' : '';
         return '<button type="button" class="ex-lib-item" onclick="selectExerciseFromLibrary(\'' + safe + '\')">' +
-            '<div class="ex-lib-item-name">' + item.name + '</div>' +
+            '<div class="ex-lib-item-name">' + _escHtml(item.name) + '</div>' +
             groupHtml +
         '</button>';
     }).join('');
