@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260831b">
+    <link rel="stylesheet" href="style.css?v=20260831c">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -46,8 +46,23 @@
        sessionStorage, чтобы не зациклиться, если сервер отдаёт старое. */
     (function () {
         try {
-            var tag = document.querySelector('script[src^="app.js?v="]');
-            var built = tag ? tag.getAttribute('src').split('v=')[1] : '';
+            /* 2026-08-31. Версию берём из тега СТИЛЕЙ, а не из тега app.js.
+               Раньше искали script[src^="app.js?v="] — но этот скрипт стоит в
+               <head>, а app.js подключается в самом конце <body>: в момент
+               проверки его в документе ещё НЕТ. querySelector возвращал null,
+               built оказывался пустым, и проверка выходила на первой же
+               строке. То есть самообновление не срабатывало никогда — ни во
+               VK, ни в Telegram, и человек мог неделями открывать страницу
+               недельной давности. Так у клиента Анны 31 августа тренировка
+               рисовалась кодом от 28-го: блоки «Разминка/Заминка» тот код ещё
+               не знал и показывал 5 упражнений вместо девяти.
+               Тег <link> со стилями стоит ВЫШЕ этой проверки, поэтому он на
+               месте всегда; ?v= у него тот же самый (bump-version.sh правит
+               обе строки разом). */
+            var tag = document.querySelector('link[href^="style.css?v="]')
+                   || document.querySelector('script[src^="app.js?v="]');
+            var src = tag ? (tag.getAttribute('href') || tag.getAttribute('src')) : '';
+            var built = src ? src.split('v=')[1] : '';
             if (!built || sessionStorage.getItem('freshCheck') === built) return;
             fetch('version.txt?t=' + Date.now(), { cache: 'no-store' })
                 .then(function (r) { return r.ok ? r.text() : ''; })
@@ -1812,6 +1827,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260831b" defer></script>
+    <script src="app.js?v=20260831c" defer></script>
 </body>
 </html>
