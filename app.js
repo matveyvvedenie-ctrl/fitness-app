@@ -943,16 +943,37 @@ var NEW_API_ACTIONS = {
             var firstError = null;
             exercises.forEach(function(ex) {
                 chain = chain.then(function() {
-                    return nativeFetch(NEW_API_BASE + path, {
+                    // 2026-08-31. Раньше здесь был голый nativeFetch без единого
+                    // повтора — при том, что все остальные обращения к бэкенду
+                    // ходят через _fetchNewApiWithRetry именно потому, что
+                    // соединение до Timeweb рвётся само по себе примерно в 15%
+                    // случаев (замеры в комментарии к _newApiCall). В блоке из
+                    // четырнадцати упражнений это почти гарантированный обрыв.
+                    //
+                    // Хуже того: сорванный fetch (или r.json() на не-JSON
+                    // ответе) выбрасывал исключение, и вся ЦЕПОЧКА обрывалась —
+                    // оставшиеся упражнения даже не пытались сохраниться, а
+                    // подсчёт «сохранено N из M» до вызывающего не доходил.
+                    // Тренер видел ошибку связи, в программе оказывалась
+                    // половина дня, а клиент — «малую часть тренировки».
+                    //
+                    // Теперь каждое упражнение идёт с повторами, и его провал
+                    // не роняет остальные: цепочка доходит до конца всегда и
+                    // всегда честно отчитывается, сколько прошло.
+                    return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
                         method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify({
                             day: dayName, exercise: ex.exercise || '', sets: ex.sets || '', reps: ex.reps || '',
                             weightPlan: ex.weightPlan || '', rpe: ex.rpe || '', note: ex.note || ''
                         })
-                    }).then(function(r) { return r.json().then(function(data) {
-                        if (r.ok) savedCount++;
-                        else if (!firstError) firstError = data.detail || 'Не удалось';
-                    }); });
+                    }, 3).then(function(r) {
+                        if (r.ok) { savedCount++; return; }
+                        return r.json().catch(function() { return {}; }).then(function(data) {
+                            if (!firstError) firstError = data.detail || ('Ошибка ' + r.status);
+                        });
+                    }).catch(function(err) {
+                        if (!firstError) firstError = (err && err.message) || 'Обрыв связи';
+                    });
                 });
             });
             return chain.then(function() {
