@@ -2078,18 +2078,6 @@ async function init() {
             document.getElementById('week-number').textContent = weekNum;
         }
         workoutData = response.days || [];
-        // Прошлый результат по каждому упражнению — одним запросом на всю
-        // тренировку (см. loadLastSessions). Ошибка не мешает: карточки
-        // просто отрисуются без блока «Прошлый раз».
-        try {
-            var _lsMap = await loadLastSessions(_myChatId());
-            workoutData.forEach(function(day) {
-                (day.exercises || []).forEach(function(ex) {
-                    var ls = _lsMap[_lastSessionKey(ex.exercise)];
-                    if (ls) ex.lastSession = ls;
-                });
-            });
-        } catch (e) { console.error('lastSessions attach failed:', e); }
         totalExercises = 0;
         completedCount = 0;
         workoutData.forEach(day => {
@@ -2330,9 +2318,6 @@ function renderWorkout() {
         });
         container.appendChild(dayBody);
 
-        // Стрелки для уже заполненных упражнений — сразу, не дожидаясь ввода.
-        (day.exercises || []).forEach(function(_ex, i) { updateExerciseDelta(dayIndex, i); });
-
         // Клик по заголовку — свернуть/развернуть
         dayHeader.addEventListener('click', function() {
             var body = document.getElementById('day-body-' + this.dataset.dayIndex);
@@ -2424,70 +2409,6 @@ function toggleExerciseCard(dayIndex, exIndex) {
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 }
 
-
-// ── Прошлый результат прямо в карточке упражнения (2026-08-31, H-3) ──────────
-// Разметка для этого в карточке была давно (lastSessionHtml), но поле
-// exercise.lastSession никто не заполнял — блок не показывался никогда, и
-// тренер уходил смотреть прошлый результат во вкладку «История».
-//
-// Берём ВСЮ историю ОДНИМ запросом (getSelfHistory уже используется вкладкой
-// истории), а не по запросу на упражнение: в дне их бывает двадцать, и
-// двадцать обращений к серверу на открытие тренировки — это секунды ожидания
-// на телефоне и лишний риск на рваной связи.
-var _lastSessionByExercise = null;
-
-function _lastSessionKey(name) {
-    return cleanExerciseName(name || '').toLowerCase().trim();
-}
-
-async function loadLastSessions(chatId) {
-    if (_lastSessionByExercise) return _lastSessionByExercise;
-    var map = {};
-    try {
-        var resp = await fetch(APPS_SCRIPT_URL + '?action=getSelfHistory&chatId=' +
-            encodeURIComponent(chatId) + '&limit=60');
-        var data = await resp.json();
-        // История отсортирована от свежих к старым — значит первое встреченное
-        // упоминание упражнения и есть последний результат.
-        (data.history || []).forEach(function(day) {
-            (day.exercises || []).forEach(function(ex) {
-                var key = _lastSessionKey(ex.exercise);
-                if (!key || map[key]) return;
-                if (!ex.weightFact && !ex.repsFact) return;
-                map[key] = {
-                    weight: ex.weightFact, reps: ex.repsFact, rpe: ex.rpe,
-                    feedback: _rpeToFeedback(ex.rpe), date: day.date || ''
-                };
-            });
-        });
-    } catch (e) {
-        console.error('loadLastSessions failed:', e);   // не критично: просто не покажем
-    }
-    _lastSessionByExercise = map;
-    return map;
-}
-
-// Стрелка «лучше/хуже/так же» рядом с полем ввода.
-function _deltaHtml(current, previous, unit) {
-    var cur = parseFloat(String(current).replace(',', '.'));
-    var prev = parseFloat(String(previous).replace(',', '.'));
-    if (!isFinite(cur) || !isFinite(prev)) return '';
-    var diff = Math.round((cur - prev) * 100) / 100;
-    if (diff > 0) return '<span class="ex-delta up">↑ +' + diff + (unit || '') + '</span>';
-    if (diff < 0) return '<span class="ex-delta down">↓ ' + diff + (unit || '') + '</span>';
-    return '<span class="ex-delta same">= без изменений</span>';
-}
-
-// Пересчитать стрелки у одного упражнения — зовётся при каждом вводе.
-function updateExerciseDelta(dayIndex, exIndex) {
-    var ex = workoutData[dayIndex] && workoutData[dayIndex].exercises[exIndex];
-    if (!ex) return;
-    var ls = ex.lastSession;
-    var wBox = document.getElementById('delta-weight-' + dayIndex + '-' + exIndex);
-    var rBox = document.getElementById('delta-reps-' + dayIndex + '-' + exIndex);
-    if (wBox) wBox.innerHTML = (ls && ls.weight) ? _deltaHtml(ex.weightFact, ls.weight, ' кг') : '';
-    if (rBox) rBox.innerHTML = (ls && ls.reps) ? _deltaHtml(ex.repsFact, ls.reps, '') : '';
-}
 
 function createExerciseCard(exercise, dayIndex, exIndex) {
     var card = document.createElement('div');
@@ -2608,11 +2529,9 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
                 '<div class="input-row">' +
                     '<label class="input-cell"><span class="input-cap">Вес, кг</span>' +
                         '<input type="text" inputmode="decimal" enterkeyhint="done" class="input-field" placeholder="—" value="' + _escHtmlAttr(exercise.weightFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="weight" oninput="handleInput(this)" onchange="handleInput(this)">' +
-                        '<span class="ex-delta-slot" id="delta-weight-' + dayIndex + '-' + exIndex + '"></span>' +
                     '</label>' +
                     '<label class="input-cell"><span class="input-cap">Повторения</span>' +
                         '<input type="text" inputmode="numeric" enterkeyhint="done" class="input-field" placeholder="—" value="' + _escHtmlAttr(exercise.repsFact || '') + '" data-day="' + dayIndex + '" data-exercise="' + exIndex + '" data-row="' + exercise.rowIndex + '" data-field="reps" oninput="handleInput(this)" onchange="handleInput(this)">' +
-                        '<span class="ex-delta-slot" id="delta-reps-' + dayIndex + '-' + exIndex + '"></span>' +
                     '</label>' +
                 '</div>' +
             '</div>' +
@@ -2851,7 +2770,6 @@ function handleInput(input) {
         input.classList.remove('filled');
     }
     if (field === 'weight' || field === 'reps') {
-        updateExerciseDelta(dayIndex, exIndex);
         var wasCompleted = exercise.completed;
         exercise.completed = !!(exercise.weightFact || exercise.repsFact);
         if (!wasCompleted && exercise.completed) {
