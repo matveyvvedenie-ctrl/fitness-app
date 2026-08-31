@@ -2020,6 +2020,25 @@ body.theme-dark .save-btn.success {
     color: var(--text-muted);
     font-size: 12px;
 }
+/* Отметка «день тренировки / день отдыха» в шапке дня дневника питания.
+   Тренерский экран, поэтому цвета берём из старой палитры (--color-primary),
+   а не из клиентских accent-токенов. */
+.food-log-daytype {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: middle;
+    background: rgba(0, 0, 0, .06);
+    color: var(--text-muted);
+}
+.food-log-daytype-workout {
+    background: rgba(22, 112, 107, .12);
+    color: #16706B;
+}
+
 .food-log-entry {
     background: var(--surface-2);
     border-radius: 10px;

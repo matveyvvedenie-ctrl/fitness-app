@@ -4307,6 +4307,15 @@ var FOOD_VERDICT_EMOJI = { excellent: '⭐⭐⭐⭐⭐', good: '⭐⭐⭐⭐', a
 // Дневник еды клиента по дням. Один рендер на два места: дриллдаун из
 // дашборда по питанию и вкладка «Питание» в карточке клиента — расходиться
 // им незачем.
+// Отметка дня в дневнике питания: по какому плану клиент ел. Приходит с
+// бэкенда только у тех, у кого заведены оба плана и бот спросил (см.
+// food_entries.day_type) — у остальных пусто, и подписи нет вообще, чтобы не
+// плодить «неизвестно» на каждом дне у всех клиентов сразу.
+var FOOD_DAY_TYPE_LABELS = {
+    workout: 'День тренировки',
+    rest: 'День отдыха'
+};
+
 function renderFoodLogDays(days) {
     return (days || []).map(function(day) {
         var entriesHtml = (day.entries || []).map(function(e) {
@@ -4323,9 +4332,13 @@ function renderFoodLogDays(days) {
                 noteHtml +
             '</div>';
         }).join('');
+        var dayTypeLabel = FOOD_DAY_TYPE_LABELS[day.dayType] || '';
+        var dayTypeHtml = dayTypeLabel
+            ? '<span class="food-log-daytype food-log-daytype-' + day.dayType + '">' + dayTypeLabel + '</span>'
+            : '';
         return '<div class="food-log-day">' +
             '<div class="food-log-day-header">' +
-                '<span>' + day.date + '</span>' +
+                '<span>' + day.date + dayTypeHtml + '</span>' +
                 '<span>' + Math.round(day.totals.calories) + ' ккал · Б' + Math.round(day.totals.protein) + ' Ж' + Math.round(day.totals.fats) + ' У' + Math.round(day.totals.carbs) + '</span>' +
             '</div>' +
             entriesHtml +
