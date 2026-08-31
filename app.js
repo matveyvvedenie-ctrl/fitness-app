@@ -634,16 +634,25 @@ var NEW_API_ACTIONS = {
                 return _fakeJsonResponse({ success: true }, 200);
             }); });
     },
-    // Фото замера (photoBase64) новый API пока не умеет хранить (нет файлового
-    // хранилища на бэкенде, см. DB_SCHEMA.md) — честно НЕ перехватываем такой
-    // вызов (возвращаем null), он уйдёт по старому пути и фото не потеряется.
-    // Без фото — сохраняем как обычно.
+    // 2026-08-31. Раньше замер С ФОТО сюда не попадал: строка ниже возвращала
+    // null, и запрос уходил в старый Apps Script — «нет файлового хранилища на
+    // бэкенде». Хранилище давно появилось (фото упражнений живут в базе), а эта
+    // ветка осталась: у Matvey и его клиентов данные в новой базе, фото
+    // сохранялось в старую таблицу и в приложении не появлялось никогда.
+    // Симптом — «грузится, грузится и не сохранилось» у клиентки Дины.
     saveMeasurements: function(nativeFetch, params, init) {
         var chatId = params.get('chatId') || '';
         var body;
         try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
-        if (body.photoBase64) return null; // фолбэк на старый бэкенд, см. коммент выше
         var payload = {};
+        // Три фото прогресса: спереди, сбоку, сзади — все три уходят в базу.
+        ['', '2', '3'].forEach(function(n) {
+            var b = body['photo' + n + 'Base64'];
+            if (b) {
+                payload['photo' + n + 'Base64'] = b;
+                payload['photo' + n + 'Mime'] = body['photo' + n + 'Mime'] || 'image/jpeg';
+            }
+        });
         ['weight', 'shoulders', 'chest', 'waist', 'hips', 'bicep', 'thigh'].forEach(function(k) {
             if (body[k] !== undefined && body[k] !== '') payload[k] = parseFloat(body[k]);
         });
