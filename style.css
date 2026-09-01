@@ -2508,7 +2508,14 @@ body.theme-dark .save-btn.success {
 
 .client-card-screen {
     position: fixed;
-    top: var(--tg-top-pad, 0);
+    /* 2026-08-31. Было top: var(--tg-top-pad) — панель начиналась НИЖЕ верха
+       экрана, и в просвет было видно экран под ней. Во VK отступ 48px (место
+       под кнопки «•••» и «✕»), поэтому там сверху висела полоса чужого
+       интерфейса и казалось, что страница не догрузилась (жалоба Романа).
+       Панель должна закрывать экран целиком, а отступ — сдвигать её
+       СОДЕРЖИМОЕ, а не саму панель. */
+    top: 0;
+    padding-top: var(--tg-top-pad, 0);
     bottom: 0;
     left: 0;
     right: 0;
@@ -3597,7 +3604,14 @@ body.theme-dark .save-btn.success {
 
 .ex-stat-modal {
     position: fixed;
-    top: var(--tg-top-pad, 0);
+    /* 2026-08-31. Было top: var(--tg-top-pad) — панель начиналась НИЖЕ верха
+       экрана, и в просвет было видно экран под ней. Во VK отступ 48px (место
+       под кнопки «•••» и «✕»), поэтому там сверху висела полоса чужого
+       интерфейса и казалось, что страница не догрузилась (жалоба Романа).
+       Панель должна закрывать экран целиком, а отступ — сдвигать её
+       СОДЕРЖИМОЕ, а не саму панель. */
+    top: 0;
+    padding-top: var(--tg-top-pad, 0);
     bottom: 0;
     left: 0;
     right: 0;
@@ -3774,7 +3788,14 @@ body.theme-dark .save-btn.success {
 
 .new-client-wizard {
     position: fixed;
-    top: var(--tg-top-pad, 0);
+    /* 2026-08-31. Было top: var(--tg-top-pad) — панель начиналась НИЖЕ верха
+       экрана, и в просвет было видно экран под ней. Во VK отступ 48px (место
+       под кнопки «•••» и «✕»), поэтому там сверху висела полоса чужого
+       интерфейса и казалось, что страница не догрузилась (жалоба Романа).
+       Панель должна закрывать экран целиком, а отступ — сдвигать её
+       СОДЕРЖИМОЕ, а не саму панель. */
+    top: 0;
+    padding-top: var(--tg-top-pad, 0);
     bottom: 0;
     left: 0;
     right: 0;
@@ -8001,4 +8022,83 @@ body.theme-dark #workout-tab::after {
     height: 100%;
     object-fit: cover;
     display: block;
+}
+
+/* ─── Своё окно подтверждения (31.08) ────────────────────────────────────────
+   Диалоги платформы оказались ненадёжны: во VK метода для них нет, а откат на
+   браузерный confirm() встроенный браузер VK блокирует — кнопки «Отправить
+   клиенту», «В архив», «Написать» молча не срабатывали. Своё окно работает
+   одинаково везде. Экран общий для тренера и клиента, поэтому берём и старые
+   переменные (--surface-1), и новые (--ds-*) с запасными значениями. */
+.app-confirm {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+.app-confirm.hidden { display: none; }
+.app-confirm-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+}
+.app-confirm-card {
+    position: relative;
+    width: 100%;
+    max-width: 340px;
+    padding: 20px;
+    border-radius: 16px;
+    background: var(--ds-surface-1, var(--surface-1, #ffffff));
+    color: var(--ds-text-primary, var(--text-primary, #16181A));
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .28);
+}
+.app-confirm-text {
+    font-size: 15px;
+    line-height: 1.45;
+    white-space: pre-line;
+    margin-bottom: 18px;
+}
+.app-confirm-actions {
+    display: flex;
+    gap: 10px;
+}
+.app-confirm-btn {
+    flex: 1;
+    padding: 12px 10px;
+    border: none;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.app-confirm-no {
+    background: var(--ds-surface-3, var(--surface-2, #EFEFEF));
+    color: var(--ds-text-secondary, var(--text-muted, #55595E));
+}
+.app-confirm-yes {
+    background: var(--accent-500, var(--color-primary, #16706B));
+    color: #ffffff;
+}
+.app-confirm-btn:active { opacity: .85; }
+.app-prompt-input {
+    width: 100%;
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    border: 1px solid var(--ds-border, var(--border, #E3E4E6));
+    border-radius: 10px;
+    background: var(--ds-surface-2, var(--surface-2, #F5F5F7));
+    color: var(--ds-text-primary, var(--text-primary, #16181A));
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.4;
+    resize: vertical;
+    box-sizing: border-box;
+}
+.app-prompt-input:focus {
+    outline: none;
+    border-color: var(--accent-500, var(--color-primary, #16706B));
 }

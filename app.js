@@ -2007,18 +2007,109 @@ function _myChatId() {
 // Telegram-клиентов) или просто не вызывает колбэк — весь await зависал без
 // единого сообщения об ошибке ("нажимаю кнопку — ноль реакции"). Теперь везде
 // только через эту функцию, с откатом на нативный confirm() при любой проблеме.
-function tgConfirm(message) {
+// 2026-08-31. Своё окно подтверждения вместо диалогов платформы.
+//
+// Раньше здесь звался tg.showConfirm, а во VK его подменял вызов
+// VKWebAppShowDialogBox. Такого метода у VK Bridge нет: запрос падал, откат
+// уходил на браузерный confirm(), а встроенный браузер VK его блокирует —
+// исключение улетало из .catch, обработчик не вызывался, и обещание не
+// завершалось НИКОГДА. Снаружи это выглядело так: тренер жмёт «Отправить
+// клиенту», «В архив», «Написать» — и ничего не происходит, без единого
+// сообщения. В Telegram те же кнопки работали, потому что там showConfirm
+// настоящий (жалоба Романа, VK).
+//
+// Свой диалог убирает разницу между площадками совсем: одинаково работает во
+// VK, в Telegram и в обычном браузере, и ничего не может «молча не ответить».
+var _confirmResolve = null;
+
+function _closeAppConfirm(answer) {
+    var box = document.getElementById('app-confirm');
+    if (box) box.classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+    var fn = _confirmResolve;
+    _confirmResolve = null;
+    if (fn) fn(!!answer);
+}
+
+// Своё окно ВВОДА — по той же причине, что и tgConfirm выше: браузерный
+// prompt() встроенный браузер VK не поддерживает вообще («prompt() is not
+// supported»), и кнопка «Написать» у тренера просто падала с ошибкой, ничего
+// не показав. В Telegram работало, поэтому баг долго не всплывал.
+var _promptResolve = null;
+
+function _closeAppPrompt(value) {
+    var box = document.getElementById('app-prompt');
+    if (box) box.classList.add('hidden');
+    document.body.classList.remove('no-scroll');
+    var fn = _promptResolve;
+    _promptResolve = null;
+    if (fn) fn(value);
+}
+
+function tgPrompt(message, initial, okText) {
     return new Promise(function(resolve) {
-        try {
-            if (tg && tg.showConfirm) {
-                tg.showConfirm(message, function(ok) { resolve(!!ok); });
-            } else {
-                resolve(confirm(message));
-            }
-        } catch (e) {
-            console.error('tgConfirm: showConfirm failed, falling back to native confirm', e);
-            resolve(confirm(message));
+        if (_promptResolve) _closeAppPrompt(null);
+        var box = document.getElementById('app-prompt');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'app-prompt';
+            box.className = 'app-confirm hidden';
+            box.innerHTML =
+                '<div class="app-confirm-backdrop"></div>' +
+                '<div class="app-confirm-card" role="dialog" aria-modal="true">' +
+                    '<div class="app-confirm-text" id="app-prompt-text"></div>' +
+                    '<textarea class="app-prompt-input" id="app-prompt-input" rows="3"></textarea>' +
+                    '<div class="app-confirm-actions">' +
+                        '<button type="button" class="app-confirm-btn app-confirm-no" id="app-prompt-no">Отмена</button>' +
+                        '<button type="button" class="app-confirm-btn app-confirm-yes" id="app-prompt-yes">Отправить</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(box);
+            box.querySelector('#app-prompt-no').addEventListener('click', function() { _closeAppPrompt(null); });
+            box.querySelector('#app-prompt-yes').addEventListener('click', function() {
+                _closeAppPrompt(document.getElementById('app-prompt-input').value);
+            });
+            box.querySelector('.app-confirm-backdrop').addEventListener('click', function() { _closeAppPrompt(null); });
         }
+        document.getElementById('app-prompt-text').textContent = String(message == null ? '' : message);
+        document.getElementById('app-prompt-input').value = initial == null ? '' : String(initial);
+        document.getElementById('app-prompt-yes').textContent = okText || 'Отправить';
+        _promptResolve = resolve;
+        box.classList.remove('hidden');
+        document.body.classList.add('no-scroll');
+        setTimeout(function() { try { document.getElementById('app-prompt-input').focus(); } catch (_) {} }, 50);
+    });
+}
+
+function tgConfirm(message, okText) {
+    return new Promise(function(resolve) {
+        // Если предыдущий диалог почему-то остался висеть — закрываем его
+        // отказом, чтобы не потерять этот вызов.
+        if (_confirmResolve) _closeAppConfirm(false);
+        var box = document.getElementById('app-confirm');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'app-confirm';
+            box.className = 'app-confirm hidden';
+            box.innerHTML =
+                '<div class="app-confirm-backdrop"></div>' +
+                '<div class="app-confirm-card" role="dialog" aria-modal="true">' +
+                    '<div class="app-confirm-text" id="app-confirm-text"></div>' +
+                    '<div class="app-confirm-actions">' +
+                        '<button type="button" class="app-confirm-btn app-confirm-no" id="app-confirm-no">Отмена</button>' +
+                        '<button type="button" class="app-confirm-btn app-confirm-yes" id="app-confirm-yes">Да</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(box);
+            box.querySelector('#app-confirm-no').addEventListener('click', function() { _closeAppConfirm(false); });
+            box.querySelector('#app-confirm-yes').addEventListener('click', function() { _closeAppConfirm(true); });
+            box.querySelector('.app-confirm-backdrop').addEventListener('click', function() { _closeAppConfirm(false); });
+        }
+        document.getElementById('app-confirm-text').textContent = String(message == null ? '' : message);
+        document.getElementById('app-confirm-yes').textContent = okText || 'Да';
+        _confirmResolve = resolve;
+        box.classList.remove('hidden');
+        document.body.classList.add('no-scroll');
     });
 }
 
@@ -8953,12 +9044,7 @@ async function renameCurrentDay() {
     closeDayActionsDialog();
     if (!oldName || !currentClientCard) return;
 
-    var newName = await new Promise(function(resolve) {
-        if (tg && typeof tg.showPopup === 'function' && false) {
-            // showPopup не умеет принимать ввод текста — используем JS prompt
-        }
-        resolve(prompt('Новое название дня:', oldName));
-    });
+    var newName = await tgPrompt('Новое название дня:', oldName, 'Сохранить');
     if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
 
     try {
@@ -9696,8 +9782,8 @@ function renderMeasurementsHistory() {
     }).join('');
 }
 
-function messageClient(chatId, name) {
-    var msg = prompt('Сообщение для ' + name + ':');
+async function messageClient(chatId, name) {
+    var msg = await tgPrompt('Сообщение для ' + name + ':');
     if (!msg || !msg.trim()) return;
     var text = '💬 Сообщение от тренера:\n\n' + msg;
     fetch(APPS_SCRIPT_URL + '?action=notifyClient&targetChatId=' + encodeURIComponent(chatId) + '&message=' + encodeURIComponent(text))
