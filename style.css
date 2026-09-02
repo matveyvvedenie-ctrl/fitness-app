@@ -8306,3 +8306,25 @@ body.theme-dark #workout-tab::after {
     #home-tab .home-today { grid-template-columns: 1fr; }
     #home-tab .home-prog-value { font-size: 18px; }
 }
+
+/* Своё всплывающее сообщение — см. appToast в app.js. Браузерный alert()
+   во встроенном браузере VK заблокирован, и подтверждений действий не было
+   видно вообще. */
+.app-toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--nav-total, 84px) + 16px);
+    transform: translateX(-50%);
+    z-index: 10001;
+    max-width: calc(100% - 40px);
+    padding: 12px 18px;
+    border-radius: 12px;
+    background: rgba(22, 24, 26, .94);
+    color: #fff;
+    font-size: 14px;
+    line-height: 1.35;
+    text-align: center;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .3);
+    pointer-events: none;
+}
+.app-toast.hidden { display: none; }

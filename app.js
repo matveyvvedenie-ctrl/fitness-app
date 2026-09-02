@@ -1877,9 +1877,12 @@ if (vkLaunchUserId) {
     tg = {
         initDataUnsafe: { user: { id: 'vk_' + vkLaunchUserId } },
         showAlert: function(msg) {
+            // Snackbar есть только в приложении VK; во встроенном браузере он
+            // молча не работает, а alert() там заблокирован — показываем своё.
             try {
-                window.vkBridge.send('VKWebAppShowSnackbar', { text: String(msg) }).catch(function() { alert(msg); });
-            } catch (_) { alert(msg); }
+                window.vkBridge.send('VKWebAppShowSnackbar', { text: String(msg) })
+                    .catch(function() { appToast(msg); });
+            } catch (_) { appToast(msg); }
         },
         showConfirm: function(msg, callback) {
             try {
@@ -2027,6 +2030,28 @@ function _myChatId() {
 //
 // Свой диалог убирает разницу между площадками совсем: одинаково работает во
 // VK, в Telegram и в обычном браузере, и ничего не может «молча не ответить».
+// Своё всплывающее сообщение вместо браузерного alert(). Причина та же, что
+// у tgConfirm и tgPrompt: во VK alert() заблокирован. VKWebAppShowSnackbar —
+// метод НАТИВНОГО приложения VK, во встроенном браузере (m.vk.ru) он не
+// срабатывает и уходит в откат на alert(), который бросает исключение. Из-за
+// этого «Сохранить анкету» выглядело как «кнопка не нажимается»: анкета на
+// самом деле сохранялась, но человек не видел ни единого подтверждения.
+var _toastTimer = null;
+
+function appToast(message) {
+    var box = document.getElementById('app-toast');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'app-toast';
+        box.className = 'app-toast hidden';
+        document.body.appendChild(box);
+    }
+    box.textContent = String(message == null ? '' : message);
+    box.classList.remove('hidden');
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function() { box.classList.add('hidden'); }, 3200);
+}
+
 var _confirmResolve = null;
 
 function _closeAppConfirm(answer) {
@@ -5734,7 +5759,8 @@ function renderAdminClients() {
                 failBadge +
                 '<div class="admin-card-actions">' +
                     '<button class="admin-card-btn admin-card-btn-primary" onclick="openClientCard(\'' + c.chatId + '\')">👁 Открыть</button>' +
-                    '<button class="admin-card-btn" onclick="messageClient(\'' + c.chatId + '\', \'' + safeName + '\')">✉️ Написать</button>' +
+                    '<button class="admin-card-btn" onclick="editHomeMessage(\'' + c.chatId + '\', \'' + safeName + '\')">💬 Сообщение</button>' +
+                        '<button class="admin-card-btn" onclick="messageClient(\'' + c.chatId + '\', \'' + safeName + '\')">✉️ Написать</button>' +
                     archiveBtn +
                 '</div>' +
             '</div>';
@@ -8008,8 +8034,6 @@ function fillProfileForm(p) {
     document.getElementById('prof-height').value = p.height || '';
     document.getElementById('prof-weight').value = p.weight || '';
     document.getElementById('prof-goal').value = p.goal || '';
-    var hm = document.getElementById('prof-home-message');
-    if (hm) hm.value = p.homeMessage || '';
     document.getElementById('prof-level').value = p.level || '';
     document.getElementById('prof-frequency').value = p.frequency || '';
     document.getElementById('prof-inventory').value = p.inventory || '';
@@ -8050,10 +8074,10 @@ function collectProfileForm() {
         level: document.getElementById('prof-level').value,
         frequency: document.getElementById('prof-frequency').value,
         limitations: limits.join(','),
-        inventory: document.getElementById('prof-inventory').value,
-        // Короткая строчка, которую клиент видит на главной в блоке
-        // «От тренера». Не путать с заметками — те приватные.
-        homeMessage: (document.getElementById('prof-home-message') || {}).value || ''
+        inventory: document.getElementById('prof-inventory').value
+        // homeMessage сюда НЕ добавляем: сообщение правится кнопкой в списке
+        // клиентов (editHomeMessage). Если положить его в анкету, сохранение
+        // анкеты будет затирать сообщение пустой строкой.
     };
 }
 
@@ -9969,6 +9993,35 @@ function renderMeasurementsHistory() {
             '<div class="measurement-row-values">' + values + '</div>' +
         '</div>';
     }).join('');
+}
+
+// Сообщение клиенту на его главную — правится прямо из списка клиентов, без
+// захода в анкету: тренеру это нужно часто и на бегу («сегодня работаем на
+// 50%»), а анкета — длинная форма, куда лезут раз в жизни.
+// Пустой ответ стирает сообщение, отмена ничего не меняет.
+async function editHomeMessage(chatId, name) {
+    var current = '';
+    try {
+        var r = await fetch(APPS_SCRIPT_URL + '?action=getClientProfile&targetChatId=' + encodeURIComponent(chatId));
+        var d = await r.json();
+        current = (((d && (d.profile || d)) || {}).homeMessage || '').toString();
+    } catch (_) {}
+    var msg = await tgPrompt('Сообщение на главной у «' + name + '»:', current, 'Сохранить');
+    if (msg === null) return;                    // отмена
+    try {
+        var qs = 'action=updateClientProfile&targetChatId=' + encodeURIComponent(chatId) +
+                 '&homeMessage=' + encodeURIComponent(msg.trim());
+        var resp = await fetch(APPS_SCRIPT_URL + '?' + qs);
+        var data = await resp.json();
+        if (data && data.success === false) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        tg.showAlert(msg.trim() ? 'Сообщение сохранено' : 'Сообщение убрано');
+    } catch (e) {
+        tg.showAlert('Ошибка соединения');
+    }
 }
 
 async function messageClient(chatId, name) {
