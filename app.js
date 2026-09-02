@@ -712,6 +712,15 @@ var NEW_API_ACTIONS = {
             return _fakeJsonResponse(res.data, 200);
         });
     },
+    getTrainerPaymentsCalendar: function(nativeFetch, params) {
+        var path = '/admin/trainer-payments-calendar?asChatId=' + encodeURIComponent(_myChatId()) +
+            '&start=' + encodeURIComponent(params.get('start') || '') +
+            '&end=' + encodeURIComponent(params.get('end') || '');
+        return _newApiCall(nativeFetch, path).then(function(res) {
+            if (!res.ok) return _fakeJsonResponse({ payments: [] }, 200);
+            return _fakeJsonResponse(res.data, 200);
+        });
+    },
     getFinances: function(nativeFetch) {
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/finances';
         return _newApiCall(nativeFetch, path).then(function(res) {
@@ -1316,6 +1325,17 @@ var NEW_API_ACTIONS = {
             });
         });
     },
+    deleteTrainer: function(nativeFetch, params) {
+        var asChatId = encodeURIComponent(_myChatId());
+        var path = '/admin/trainers/' + encodeURIComponent(params.get('targetTrainerId') || '') +
+            '?asChatId=' + asChatId;
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'DELETE', headers: _newApiHeaders()
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse(data, 200);
+        }); });
+    },
     saveTrainerPayment: function(nativeFetch, params) {
         var asChatId = encodeURIComponent(_myChatId());
         var targetTrainerId = params.get('targetTrainerId') || '';
@@ -1325,7 +1345,8 @@ var NEW_API_ACTIONS = {
             body: JSON.stringify({
                 amount: parseFloat(params.get('amount')) || 0,
                 months: parseInt(params.get('months'), 10) || 1,
-                comment: params.get('comment') || ''
+                comment: params.get('comment') || '',
+                date: params.get('date') || ''
             })
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
@@ -4168,6 +4189,7 @@ function renderSuperAdminTrainers(trainers) {
                     '<button class="superadmin-toggle-btn" onclick="cycleTrainerTheme(\'' + t.trainerId + '\', \'' + (t.themeMode || '') + '\')">' +
                         THEME_LABELS[t.themeMode || ''] +
                     '</button>' +
+                    '<button class="superadmin-toggle-btn superadmin-del-btn" onclick="deleteTrainerFlow(\'' + t.trainerId + '\', \'' + name.replace(/'/g, "\\'") + '\')">🗑 Удалить</button>' +
                     '<button class="superadmin-toggle-btn' + (isDisabled ? ' is-disabled' : '') +
                         '" onclick="toggleTrainerStatus(\'' + t.trainerId + '\', \'' + (isDisabled ? 'active' : 'disabled') + '\')">' +
                         (isDisabled ? 'Включить' : 'Отключить') +
@@ -4296,6 +4318,15 @@ function openTrainerPaymentModal(trainerId, displayName) {
     document.getElementById('tp-amount').value = '';
     document.getElementById('tp-months').value = '1';
     document.getElementById('tp-comment').value = '';
+    // По умолчанию сегодня, но дату можно поменять: деньги нередко заносят
+    // не в тот день, когда их получили.
+    var dEl = document.getElementById('tp-date');
+    if (dEl) {
+        var n = new Date();
+        dEl.value = n.getFullYear() + '-' +
+            String(n.getMonth() + 1).padStart(2, '0') + '-' +
+            String(n.getDate()).padStart(2, '0');
+    }
     var btn = document.getElementById('tp-save-btn');
     btn.disabled = false;
     btn.textContent = '💾 Записать';
@@ -4324,7 +4355,8 @@ async function saveTrainerPaymentFromModal() {
             '&targetTrainerId=' + encodeURIComponent(currentPaymentTrainer.trainerId) +
             '&amount=' + encodeURIComponent(amount) +
             '&months=' + encodeURIComponent(months) +
-            '&comment=' + encodeURIComponent(comment);
+            '&comment=' + encodeURIComponent(comment) +
+            '&date=' + encodeURIComponent((document.getElementById('tp-date') || {}).value || '');
         var resp = await fetch(url);
         var data = await resp.json();
         if (!data.success) {
@@ -4384,6 +4416,32 @@ async function editTrainerTagline(trainerId) {
         var data = await resp.json();
         if (data && data.success === false) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
         tg.showAlert(text.trim() ? 'Подпись сохранена' : 'Подпись убрана');
+        loadSuperAdminTrainers();
+    } catch (e) { tg.showAlert('Ошибка соединения'); }
+}
+
+// Полное удаление тренера вместе со всеми его данными. Нужно, чтобы
+// вычистить тестовые записи, накопившиеся за время наладки. Действие
+// необратимое, поэтому спрашиваем дважды и показываем, сколько клиентов
+// уйдёт вместе с ним.
+async function deleteTrainerFlow(trainerId, displayName) {
+    var t = (superAdminTrainersCache || []).filter(function(x) { return x.trainerId === trainerId; })[0] || {};
+    var ok = await tgConfirm(
+        'Удалить тренера «' + displayName + '» и ВСЕ его данные?\n\n' +
+        'Уйдут его клиенты, их программы, история, замеры, питание и платежи. ' +
+        'Восстановить будет нельзя.',
+        'Удалить'
+    );
+    if (!ok) return;
+    var sure = await tgConfirm('Точно удалить «' + displayName + '»? Это последнее предупреждение.', 'Да, удалить');
+    if (!sure) return;
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=deleteTrainer&targetTrainerId=' +
+            encodeURIComponent(trainerId));
+        var data = await resp.json();
+        if (data && data.success === false) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
+        var d = (data && data.deleted) || {};
+        tg.showAlert('Удалён «' + displayName + '»' + (d.clients ? ', клиентов: ' + d.clients : ''));
         loadSuperAdminTrainers();
     } catch (e) { tg.showAlert('Ошибка соединения'); }
 }
@@ -5160,6 +5218,17 @@ async function loadPaymentCalendar() {
             '&start=' + _isoDay(first) + '&end=' + _isoDay(last));
         var data = await resp.json();
         payCalPayments = (data && data.payments) || [];
+        // Оплаты САМИХ тренеров площадке — тоже в этот календарь, но только у
+        // супер-админа: обычному тренеру чужие деньги видеть незачем, и
+        // маршрут их ему не отдаст. Помечены kind: 'trainer'.
+        if (isMatveySuperAdmin(_myChatId())) {
+            try {
+                var tResp = await fetch(APPS_SCRIPT_URL + '?action=getTrainerPaymentsCalendar' +
+                    '&start=' + _isoDay(first) + '&end=' + _isoDay(last));
+                var tData = await tResp.json();
+                payCalPayments = payCalPayments.concat((tData && tData.payments) || []);
+            } catch (e) { console.warn('оплаты тренеров в календарь не попали:', e); }
+        }
     } catch (e) {
         console.error('loadPaymentCalendar failed:', e);
         grid.innerHTML = '<div class="no-data">Не удалось загрузить календарь ❌</div>';
@@ -5243,7 +5312,8 @@ function renderPaymentDayDetails() {
     info.paid.forEach(function(p) {
         rows += '<div class="pay-cal-row">' +
             '<i class="pay-dot pay-dot-in"></i>' +
-            '<span class="pay-cal-name">' + _escHtml(p.name) + '</span>' +
+            '<span class="pay-cal-name">' + _escHtml(p.name) +
+                (p.kind === 'trainer' ? '<span class="pay-cal-tag">тренер</span>' : '') + '</span>' +
             '<span class="pay-cal-meta">оплата ' + Math.round(p.amount) + ' ₽' +
                 (p.months ? ' · ' + p.months + ' мес.' : '') + '</span>' +
         '</div>';
@@ -5251,7 +5321,8 @@ function renderPaymentDayDetails() {
     info.ends.forEach(function(p) {
         rows += '<div class="pay-cal-row">' +
             '<i class="pay-dot pay-dot-end"></i>' +
-            '<span class="pay-cal-name">' + _escHtml(p.name) + '</span>' +
+            '<span class="pay-cal-name">' + _escHtml(p.name) +
+                (p.kind === 'trainer' ? '<span class="pay-cal-tag">тренер</span>' : '') + '</span>' +
             '<span class="pay-cal-meta">заканчивается абонемент</span>' +
         '</div>';
     });
