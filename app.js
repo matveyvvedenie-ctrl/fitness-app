@@ -1367,10 +1367,15 @@ var NEW_API_ACTIONS = {
             '/theme?asChatId=' + asChatId;
         return nativeFetch(NEW_API_BASE + path, {
             method: 'PATCH', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({
-                themeMode: params.get('themeMode') || '',
-                themePrimary: params.get('themePrimary') || ''
-            })
+            // Шлём ТОЛЬКО присланные поля: кнопка «Подпись» меняет одну
+            // подпись, и затирать ей тему с цветом было бы неожиданно.
+            body: JSON.stringify((function() {
+                var out = {};
+                ['themeMode', 'themePrimary', 'themeTagline'].forEach(function(k) {
+                    if (params.has(k)) out[k] = params.get(k);
+                });
+                return out;
+            })())
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
             return _fakeJsonResponse(data, 200);
@@ -2219,6 +2224,11 @@ async function init() {
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('main-screen').classList.remove('hidden');
         initializeTabs();
+        // Оформление главной (баннер, иконки, чипы самочувствия) рисуем ВСЕГДА,
+        // не дожидаясь программы: у тренера своей программы нет вовсе, и
+        // _renderHomeUI до него просто не доходил — на экране оставались
+        // пустые серые кружки вместо иконок и пустая строка вместо чипов.
+        try { _renderHomeShell(null); } catch (e) { console.error('home shell:', e); }
         initAdminTab();
         initSuperAdminTab();
         // 01.09. Опрос самочувствия больше НЕ выскакивает окном при входе:
@@ -3307,18 +3317,18 @@ function _homeDayLabel(day) {
 // Раскладка одна на всех тренеров, цвета и баннер берутся из темы тенанта,
 // поэтому у Анны экран бежевый, у Matvey тёмный с петролью, у Романа красный.
 function _renderHomeShell(pick) {
-    // Баннер тренера — та же картинка, что раньше уходила в фон страницы.
-    var ban = document.getElementById('home-banner');
-    var banImg = document.getElementById('home-banner-img');
-    var logo = (tenantTheme && tenantTheme.logo) || '';
-    if (ban && banImg) {
-        if (logo) {
-            banImg.src = logo;
-            banImg.onerror = function() { ban.classList.add('hidden'); };
-            ban.classList.remove('hidden');
-        } else {
-            ban.classList.add('hidden');
-        }
+    if (pick === null) pick = undefined;
+    // Баннер тренера рисует _syncTenantBanner — он был в приложении и до
+    // новой главной. Свой второй баннер здесь был лишним: тренеры увидели
+    // две одинаковые картинки одну под другой.
+
+    // Подпись под баннером — своя у каждого тренера, задаётся в списке
+    // тренеров кнопкой «Подпись». Пусто — блока нет.
+    var tag = document.getElementById('home-tagline');
+    if (tag) {
+        var line = (tenantTheme && tenantTheme.tagline) || '';
+        tag.textContent = line;
+        tag.classList.toggle('hidden', !line);
     }
 
     // Иконки в новых блоках — из общего набора, отдельных картинок не заводим.
@@ -3336,7 +3346,9 @@ function _renderHomeShell(pick) {
     // Плитка «Тренировка» в строке «Сегодня» повторяет карточку-герой.
     var wSub = document.getElementById('home-today-workout-sub');
     var wMeta = document.getElementById('home-today-workout-meta');
-    if (wSub) {
+    // pick === undefined значит «зовут до загрузки программы» — тогда текст не
+    // трогаем вообще, его проставит второй вызов из _renderHomeUI.
+    if (wSub && pick !== undefined) {
         wSub.textContent = pick
             ? (pick.day || 'Тренировка').toString().replace(/^[А-Яа-я]{2}\s*[—–-]\s*/, '').trim()
             : 'На сегодня нет';
@@ -3461,7 +3473,7 @@ function _renderHomeUI(trainingDays, doneDays) {
             titleEl.textContent = trainingDays.length ? 'Все тренировки выполнены' : 'Тренировок ещё нет';
             descEl.textContent = trainingDays.length ? 'Отличная работа' : 'Тренер скоро добавит план';
         } else {
-            whenEl.textContent = todayDay ? 'Сегодня' : 'Ближайшая';
+            whenEl.textContent = todayDay ? 'Сегодня' : 'Ближайшая тренировка';
             // Убираем служебный префикс вида «ПН — », оставляем название
             titleEl.textContent = (pick.day || 'Тренировка').toString()
                 .replace(/^[А-Яа-я]{2}\s*[—–-]\s*/, '').trim() || 'Тренировка';
@@ -4094,7 +4106,12 @@ async function loadSuperAdminTrainers() {
     }
 }
 
+// Последний загруженный список тренеров — нужен кнопке «Подпись», чтобы
+// подставить в окно текущее значение, а не пустоту.
+var superAdminTrainersCache = [];
+
 function renderSuperAdminTrainers(trainers) {
+    superAdminTrainersCache = trainers || [];
     var container = document.getElementById('superadmin-trainers-list');
     if (!trainers.length) {
         container.innerHTML = '<div class="no-data">Тренеров пока нет</div>';
@@ -4141,6 +4158,7 @@ function renderSuperAdminTrainers(trainers) {
                         (t.themeAvatar ? '👤 Сменить фото' : '👤 Фото') +
                     '</button>' +
                     (t.themeAvatar ? '<button class="superadmin-toggle-btn" onclick="removeTrainerAvatar(\'' + t.trainerId + '\')">✕ Убрать фото</button>' : '') +
+                    '<button class="superadmin-toggle-btn" onclick="editTrainerTagline(\'' + t.trainerId + '\')">✍ Подпись</button>' +
                     '<button class="superadmin-toggle-btn" onclick="cycleTrainerTheme(\'' + t.trainerId + '\', \'' + (t.themeMode || '') + '\')">' +
                         THEME_LABELS[t.themeMode || ''] +
                     '</button>' +
@@ -4341,6 +4359,27 @@ function openAsTrainer(vkGroupId) {
     var params = new URLSearchParams(window.location.search);
     params.set('superadmin_view_trainer_id', vkGroupId);
     window.location.search = params.toString();
+}
+
+// Подпись под баннером на главной у клиентов этого тренера. Правится тем же
+// окном ввода, что и сообщение клиенту: своих диалогов у площадки нет, а
+// браузерные во VK заблокированы.
+async function editTrainerTagline(trainerId) {
+    var cur = '';
+    try {
+        var list = (superAdminTrainersCache || []).filter(function(t) { return t.trainerId === trainerId; })[0];
+        cur = (list && list.themeTagline) || '';
+    } catch (_) {}
+    var text = await tgPrompt('Подпись под баннером (видят клиенты этого тренера):', cur, 'Сохранить');
+    if (text === null) return;
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=setTrainerTheme&targetTrainerId=' +
+            encodeURIComponent(trainerId) + '&themeTagline=' + encodeURIComponent(text.trim()));
+        var data = await resp.json();
+        if (data && data.success === false) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
+        tg.showAlert(text.trim() ? 'Подпись сохранена' : 'Подпись убрана');
+        loadSuperAdminTrainers();
+    } catch (e) { tg.showAlert('Ошибка соединения'); }
 }
 
 function openNewTrainerForm() {

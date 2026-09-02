@@ -8108,21 +8108,6 @@ body.theme-dark #workout-tab::after {
    (--accent-*, --ds-*), поэтому у Анны она бежевая, у Matvey тёмная с
    петролью, у Романа красная. Ничего не прибито к конкретной теме. */
 
-#home-tab .home-banner {
-    margin: 0 0 var(--gap-4);
-    border-radius: var(--radius-3);
-    overflow: hidden;
-    background: var(--ds-surface-2);
-}
-#home-tab .home-banner.hidden { display: none; }
-#home-tab .home-banner img {
-    display: block;
-    width: 100%;
-    height: auto;
-    max-height: 220px;
-    object-fit: cover;
-}
-
 /* Мелкий заголовок-разделитель («СЕГОДНЯ», «КАК ТЫ СЕБЯ ЧУВСТВУЕШЬ») */
 #home-tab .home-sec-cap {
     margin: var(--gap-5) 0 var(--gap-3);
@@ -8157,6 +8142,20 @@ body.theme-dark #workout-tab::after {
     cursor: pointer;
 }
 #home-tab .home-today-card:active { background: var(--ds-surface-2); }
+/* Встроенный браузер VK красит текст внутри <button> в системный синий, если
+   цвет не задан явно на самой кнопке. Отсюда «Тренировка» и «Самочувствие»
+   синими на телефоне, хотя на компьютере всё было чёрным. */
+#home-tab .home-today-card,
+#home-tab .home-well-chip,
+#home-tab .home-sec-link {
+    -webkit-appearance: none;
+    appearance: none;
+    color: var(--ds-text-primary, #16181A);
+    -webkit-text-fill-color: currentColor;
+}
+#home-tab .home-sec-link { color: var(--accent-600, #16706B); }
+#home-tab .home-well-chip { color: var(--ds-text-secondary, #4B5563); }
+#home-tab .home-well-chip.active { color: var(--accent-700, #0F5551); }
 #home-tab .home-today-ico {
     flex: 0 0 auto;
     display: flex;
@@ -8280,15 +8279,17 @@ body.theme-dark #workout-tab::after {
 #home-tab .home-prog-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--gap-3);
-}
-#home-tab .home-prog-card {
-    padding: var(--gap-4) var(--gap-3);
+    gap: 0;
     border: 1px solid var(--ds-border);
     border-radius: var(--radius-3);
     background: var(--ds-surface-1);
+    overflow: hidden;
+}
+#home-tab .home-prog-card {
+    padding: var(--gap-4) var(--gap-3);
     min-width: 0;
 }
+#home-tab .home-prog-card + .home-prog-card { border-left: 1px solid var(--ds-border); }
 #home-tab .home-prog-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: var(--ds-text-muted); }
 #home-tab .home-prog-head svg { width: 15px; height: 15px; }
 #home-tab .home-prog-label { font-size: 11px; font-weight: 600; }
@@ -8328,3 +8329,16 @@ body.theme-dark #workout-tab::after {
     pointer-events: none;
 }
 .app-toast.hidden { display: none; }
+
+/* Подпись под баннером на главной — своя у каждого тренера. */
+#home-tab .home-tagline {
+    margin: -8px 0 var(--gap-4);
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ds-text-muted);
+    line-height: 1.5;
+}
+#home-tab .home-tagline.hidden { display: none; }
