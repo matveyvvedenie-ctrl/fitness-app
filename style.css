@@ -8051,8 +8051,8 @@ body.theme-dark #workout-tab::after {
     max-width: 340px;
     padding: 20px;
     border-radius: 16px;
-    background: var(--ds-surface-1, var(--surface-1, #ffffff));
-    color: var(--ds-text-primary, var(--text-primary, #16181A));
+    background: var(--ds-surface, #ffffff);
+    color: var(--ds-text, #16181A);
     box-shadow: 0 12px 40px rgba(0, 0, 0, .28);
 }
 .app-confirm-text {
@@ -8076,8 +8076,8 @@ body.theme-dark #workout-tab::after {
     cursor: pointer;
 }
 .app-confirm-no {
-    background: var(--ds-surface-3, var(--surface-2, #EFEFEF));
-    color: var(--ds-text-secondary, var(--text-muted, #55595E));
+    background: var(--ds-surface-3, #EFEFEF);
+    color: var(--ds-text-muted, #55595E);
 }
 .app-confirm-yes {
     background: var(--accent-500, var(--color-primary, #16706B));
@@ -8090,8 +8090,8 @@ body.theme-dark #workout-tab::after {
     padding: 10px 12px;
     border: 1px solid var(--ds-border, var(--border, #E3E4E6));
     border-radius: 10px;
-    background: var(--ds-surface-2, var(--surface-2, #F5F5F7));
-    color: var(--ds-text-primary, var(--text-primary, #16181A));
+    background: var(--ds-surface-2, #F5F5F7);
+    color: var(--ds-text, #16181A);
     font-family: inherit;
     font-size: 15px;
     line-height: 1.4;
@@ -8136,7 +8136,7 @@ body.theme-dark #workout-tab::after {
     padding: var(--gap-4);
     border: 1px solid var(--ds-border);
     border-radius: var(--radius-3);
-    background: var(--ds-surface-1);
+    background: var(--ds-surface);
     font-family: inherit;
     text-align: left;
     cursor: pointer;
@@ -8150,11 +8150,11 @@ body.theme-dark #workout-tab::after {
 #home-tab .home-sec-link {
     -webkit-appearance: none;
     appearance: none;
-    color: var(--ds-text-primary, #16181A);
+    color: var(--ds-text, #16181A);
     -webkit-text-fill-color: currentColor;
 }
 #home-tab .home-sec-link { color: var(--accent-600, #16706B); }
-#home-tab .home-well-chip { color: var(--ds-text-secondary, #4B5563); }
+#home-tab .home-well-chip { color: var(--ds-text-muted, #4B5563); }
 #home-tab .home-well-chip.active { color: var(--accent-700, #0F5551); }
 #home-tab .home-today-ico {
     flex: 0 0 auto;
@@ -8169,7 +8169,7 @@ body.theme-dark #workout-tab::after {
 }
 #home-tab .home-today-ico svg { width: 17px; height: 17px; }
 #home-tab .home-today-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-#home-tab .home-today-ttl { font-size: 14px; font-weight: 600; color: var(--ds-text-primary); }
+#home-tab .home-today-ttl { font-size: 14px; font-weight: 600; color: var(--ds-text); }
 #home-tab .home-today-sub,
 #home-tab .home-today-meta {
     font-size: 12px;
@@ -8204,11 +8204,11 @@ body.theme-dark #workout-tab::after {
     padding: 12px 10px;
     border: 1px solid var(--ds-border);
     border-radius: var(--radius-3);
-    background: var(--ds-surface-1);
+    background: var(--ds-surface);
     font-family: inherit;
     font-size: 12px;
     font-weight: 500;
-    color: var(--ds-text-secondary);
+    color: var(--ds-text-muted);
     cursor: pointer;
 }
 #home-tab .home-well-chip svg { width: 20px; height: 20px; color: var(--ds-text-muted); }
@@ -8233,7 +8233,7 @@ body.theme-dark #workout-tab::after {
     padding: var(--gap-4);
     border: 1px solid var(--ds-border);
     border-radius: var(--radius-3);
-    background: var(--ds-surface-1);
+    background: var(--ds-surface);
 }
 #home-tab .home-coach.hidden { display: none; }
 #home-tab .home-coach-ava {
@@ -8258,7 +8258,7 @@ body.theme-dark #workout-tab::after {
     color: var(--ds-text-faint);
     margin-bottom: 4px;
 }
-#home-tab .home-coach-text { font-size: 14px; line-height: 1.45; color: var(--ds-text-primary); white-space: pre-line; }
+#home-tab .home-coach-text { font-size: 14px; line-height: 1.45; color: var(--ds-text); white-space: pre-line; }
 
 /* «Твой прогресс» — три плитки и ссылка на динамику */
 #home-tab .home-sec-link {
@@ -8282,7 +8282,7 @@ body.theme-dark #workout-tab::after {
     gap: 0;
     border: 1px solid var(--ds-border);
     border-radius: var(--radius-3);
-    background: var(--ds-surface-1);
+    background: var(--ds-surface);
     overflow: hidden;
 }
 #home-tab .home-prog-card {
@@ -8293,9 +8293,9 @@ body.theme-dark #workout-tab::after {
 #home-tab .home-prog-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: var(--ds-text-muted); }
 #home-tab .home-prog-head svg { width: 15px; height: 15px; }
 #home-tab .home-prog-label { font-size: 11px; font-weight: 600; }
-#home-tab .home-prog-value { font-size: 20px; font-weight: 700; color: var(--ds-text-primary); line-height: 1.15; }
+#home-tab .home-prog-value { font-size: 20px; font-weight: 700; color: var(--ds-text); line-height: 1.15; }
 #home-tab .home-prog-delta { font-size: 12px; font-weight: 600; margin-top: 2px; }
-#home-tab .home-prog-delta.good { color: var(--ds-success, #1E8E5A); }
+#home-tab .home-prog-delta.good { color: var(--ds-fg-success, #1E8E5A); }
 #home-tab .home-prog-delta.bad { color: var(--ds-text-muted); }
 #home-tab .home-prog-sub { font-size: 11px; color: var(--ds-text-faint); margin-top: 2px; }
 #home-tab .home-prog-spark { margin-top: 6px; height: 22px; }
@@ -8342,3 +8342,26 @@ body.theme-dark #workout-tab::after {
     line-height: 1.5;
 }
 #home-tab .home-tagline.hidden { display: none; }
+
+/* Тёмная тема: карточка тренировки должна оставаться ТЁМНОЙ.
+   Общий градиент идёт через акцент (--accent-700 → --accent-500), а в тёмной
+   теме акцент специально осветляется ради читаемости — из-за этого у Романа
+   карточка получалась бледно-красной и выбивалась из чёрного оформления.
+   Здесь берём почти чёрную основу и лишь намёк на акцент в углу. */
+body.theme-dark .home-hero {
+    background: linear-gradient(135deg, #131417 0%, #1B1518 58%, rgba(var(--accent-rgb), .32) 100%);
+    border: 1px solid var(--ds-border);
+    box-shadow: none;
+}
+/* Картинка-подложка лежит ОТДЕЛЬНЫМ слоем поверх карточки (.home-hero-media,
+   position: absolute), поэтому одного фона у .home-hero мало — светлый
+   градиент перекрывал его целиком. */
+body.theme-dark .home-hero-media {
+    background: linear-gradient(135deg, #131417 0%, #1B1518 58%, rgba(var(--accent-rgb), .30) 100%);
+}
+/* Кнопка внутри — сплошной акцент без свечения, иначе она «горит» на чёрном. */
+body.theme-dark .home-start-btn {
+    background: var(--accent-600);
+    color: #fff;
+    box-shadow: none;
+}
