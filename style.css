@@ -8102,3 +8102,207 @@ body.theme-dark #workout-tab::after {
     outline: none;
     border-color: var(--accent-500, var(--color-primary, #16706B));
 }
+
+/* ═══ ГЛАВНАЯ: раскладка по макету Анны (01.09) ═══════════════════════════════
+   Раскладка одна на всех тренеров, цвета и баннер — из темы тенанта
+   (--accent-*, --ds-*), поэтому у Анны она бежевая, у Matvey тёмная с
+   петролью, у Романа красная. Ничего не прибито к конкретной теме. */
+
+#home-tab .home-banner {
+    margin: 0 0 var(--gap-4);
+    border-radius: var(--radius-3);
+    overflow: hidden;
+    background: var(--ds-surface-2);
+}
+#home-tab .home-banner.hidden { display: none; }
+#home-tab .home-banner img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 220px;
+    object-fit: cover;
+}
+
+/* Мелкий заголовок-разделитель («СЕГОДНЯ», «КАК ТЫ СЕБЯ ЧУВСТВУЕШЬ») */
+#home-tab .home-sec-cap {
+    margin: var(--gap-5) 0 var(--gap-3);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ds-text-faint);
+}
+
+/* Строка «Сегодня» — плитки-ссылки */
+#home-tab .home-today {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap-3);
+    margin-bottom: var(--gap-4);
+}
+/* Без min-width: 0 длинное название дня распирает колонку, и вторая плитка
+   уезжает за край экрана. */
+#home-tab .home-today > * { min-width: 0; }
+#home-tab .home-today-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--gap-3);
+    width: 100%;
+    padding: var(--gap-4);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-3);
+    background: var(--ds-surface-1);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+#home-tab .home-today-card:active { background: var(--ds-surface-2); }
+#home-tab .home-today-ico {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(var(--accent-rgb), .12);
+    color: var(--accent-600);
+}
+#home-tab .home-today-ico svg { width: 17px; height: 17px; }
+#home-tab .home-today-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+#home-tab .home-today-ttl { font-size: 14px; font-weight: 600; color: var(--ds-text-primary); }
+#home-tab .home-today-sub,
+#home-tab .home-today-meta {
+    font-size: 12px;
+    color: var(--ds-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+#home-tab .home-today-meta { -webkit-line-clamp: 1; }
+#home-tab .home-today-arrow { flex: 0 0 auto; color: var(--ds-text-faint); }
+#home-tab .home-today-arrow svg { width: 16px; height: 16px; }
+
+/* Самочувствие — чипами прямо на экране, без выскакивающего окна */
+#home-tab .home-well-row {
+    display: flex;
+    gap: var(--gap-2);
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+#home-tab .home-well-row::-webkit-scrollbar { display: none; }
+#home-tab .home-well-chip {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 84px;
+    padding: 12px 10px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-3);
+    background: var(--ds-surface-1);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ds-text-secondary);
+    cursor: pointer;
+}
+#home-tab .home-well-chip svg { width: 20px; height: 20px; color: var(--ds-text-muted); }
+#home-tab .home-well-chip.active {
+    border-color: var(--accent-500);
+    background: rgba(var(--accent-rgb), .10);
+    color: var(--accent-700);
+}
+#home-tab .home-well-chip.active svg { color: var(--accent-600); }
+#home-tab .home-well-hint {
+    margin-top: var(--gap-2);
+    font-size: 12px;
+    color: var(--ds-text-faint);
+    text-align: center;
+}
+
+/* Сообщение тренера */
+#home-tab .home-coach {
+    display: flex;
+    gap: var(--gap-3);
+    margin-top: var(--gap-5);
+    padding: var(--gap-4);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-3);
+    background: var(--ds-surface-1);
+}
+#home-tab .home-coach.hidden { display: none; }
+#home-tab .home-coach-ava {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--accent-600);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+#home-tab .home-coach-ava img { width: 100%; height: 100%; object-fit: cover; }
+#home-tab .home-coach-cap {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ds-text-faint);
+    margin-bottom: 4px;
+}
+#home-tab .home-coach-text { font-size: 14px; line-height: 1.45; color: var(--ds-text-primary); white-space: pre-line; }
+
+/* «Твой прогресс» — три плитки и ссылка на динамику */
+#home-tab .home-sec-link {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-600);
+    cursor: pointer;
+}
+#home-tab .home-sec-link svg { width: 15px; height: 15px; transform: rotate(-90deg); }
+#home-tab .home-sec-link span:last-child { display: flex; }
+#home-tab .home-prog-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap-3);
+}
+#home-tab .home-prog-card {
+    padding: var(--gap-4) var(--gap-3);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-3);
+    background: var(--ds-surface-1);
+    min-width: 0;
+}
+#home-tab .home-prog-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: var(--ds-text-muted); }
+#home-tab .home-prog-head svg { width: 15px; height: 15px; }
+#home-tab .home-prog-label { font-size: 11px; font-weight: 600; }
+#home-tab .home-prog-value { font-size: 20px; font-weight: 700; color: var(--ds-text-primary); line-height: 1.15; }
+#home-tab .home-prog-delta { font-size: 12px; font-weight: 600; margin-top: 2px; }
+#home-tab .home-prog-delta.good { color: var(--ds-success, #1E8E5A); }
+#home-tab .home-prog-delta.bad { color: var(--ds-text-muted); }
+#home-tab .home-prog-sub { font-size: 11px; color: var(--ds-text-faint); margin-top: 2px; }
+#home-tab .home-prog-spark { margin-top: 6px; height: 22px; }
+#home-tab .home-prog-spark svg { width: 100%; height: 100%; }
+
+#home-tab .home-trend-solo { grid-column: 1 / -1; }
+
+@media (max-width: 360px) {
+    #home-tab .home-today { grid-template-columns: 1fr; }
+    #home-tab .home-prog-value { font-size: 18px; }
+}

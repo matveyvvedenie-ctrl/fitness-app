@@ -385,6 +385,13 @@ function _fmtDateTime(iso) {
 
 // ISO-дата ("yyyy-MM-dd", без времени) -> "dd.MM.yyyy". Вынесено сюда, было
 // продублировано в getClientHistory и getFinances.
+// Обратно: «01.09.2026» → «2026-09-01». Нужно, чтобы отобрать тренировки
+// текущего месяца: история отдаёт даты уже в русском виде.
+function _ruDateToIso(ru) {
+    var m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(String(ru || '').trim());
+    return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
+}
+
 function _isoDateToRu(iso) {
     if (!iso) return '';
     var parts = iso.split('-');
@@ -1437,7 +1444,7 @@ var NEW_API_ACTIONS = {
     }
 };
 NEW_API_ACTIONS.getExerciseMediaLibrary = NEW_API_ACTIONS.getExerciseLibrary;
-var _PROFILE_KEYS = ['gender', 'age', 'height', 'weight', 'goal', 'level', 'frequency', 'limitations', 'inventory'];
+var _PROFILE_KEYS = ['gender', 'age', 'height', 'weight', 'goal', 'level', 'frequency', 'limitations', 'inventory', 'homeMessage'];
 
 (function() {
     var nativeFetch = window.fetch.bind(window);
@@ -2189,12 +2196,12 @@ async function init() {
         initializeTabs();
         initAdminTab();
         initSuperAdminTab();
-        // Опрос самочувствия — один раз при первом входе в тренировку.
-        // Если клиент закроет/пропустит — считается «Бодрый», веса как есть.
-        if (!wellnessAsked && workoutData.length > 0) {
-            wellnessAsked = true;
-            setTimeout(openWellnessModal, 400);
-        }
+        // 01.09. Опрос самочувствия больше НЕ выскакивает окном при входе:
+        // теперь он стоит чипами прямо на главной (см. _renderWellnessChips),
+        // человек видит выбор сразу и может поменять его в любой момент. Само
+        // окно остаётся — его открывает ссылка «изменить» в баннере на экране
+        // тренировки, — но лезть первым делом ему незачем.
+        if (!wellnessAsked && workoutData.length > 0) wellnessAsked = true;
         // Позже опроса самочувствия: два системных окна подряд — перебор,
         // а это разрешение ничего не блокирует и может подождать секунду.
         setTimeout(maybeAskVkMessagesPermission, 1600);
@@ -2645,14 +2652,18 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
 }
 
 // ─── Самочувствие клиента (per session, спрашивается при входе) ────────
+// Ключи (good/tired/sick/pms/swelling) — то, что уходит в расчёт и запоминается
+// на сессию. Подписи поменяны под макет 01.09; ключи НЕ трогаем, иначе
+// разъедется с уже выбранным состоянием.
 var WELLNESS_MAP = {
-    good:  { multiplier: 1.00, emoji: '💪', label: 'Бодрый',     factor: '' },
-    tired: { multiplier: 0.90, emoji: '😴', label: 'Устал',      factor: '−10%' },
-    sick:  { multiplier: 0.85, emoji: '🤧', label: 'Приболел',   factor: '−15%' },
-    pms:   { multiplier: 0.90, emoji: '🩸', label: 'ПМС',        factor: '−10%' }
+    good:     { multiplier: 1.00, emoji: '💪', label: 'Отлично',     factor: '' },
+    tired:    { multiplier: 0.90, emoji: '😴', label: 'Не выспалась', factor: '−10%' },
+    sick:     { multiplier: 0.85, emoji: '🤧', label: 'Приболела',   factor: '−15%' },
+    swelling: { multiplier: 0.95, emoji: '💧', label: 'Отёчность',   factor: '−5%' },
+    pms:      { multiplier: 0.90, emoji: '🩸', label: 'КД',          factor: '−10%' }
 };
 // Иконка состояния для баннера. Ключи те же, что в WELLNESS_MAP.
-var WELLNESS_ICONS = { good: 'smile', tired: 'moon', sick: 'thermometer', pms: 'droplet' };
+var WELLNESS_ICONS = { good: 'smile', tired: 'moon', sick: 'thermometer', swelling: 'droplet', pms: 'droplet' };
 
 var sessionWellness = 'good';
 var wellnessAsked = false;
@@ -3247,6 +3258,8 @@ var _HOME_ICONS = {
     weight: '<circle cx="12" cy="5" r="3"/><path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z"/>',
     dumbbell: '<path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/><path d="m2.5 21.5 1.4-1.4"/><path d="m20.1 3.9 1.4-1.4"/><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/><path d="m9.6 14.4 4.8-4.8"/>',
     flame: '<path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/>',
+    // Линейка (Lucide ruler) — плитка «Талия» на главной.
+    ruler: '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/>',
     dashed: '<path d="M10.1 2.182a10 10 0 0 1 3.8 0"/><path d="M13.9 21.818a10 10 0 0 1-3.8 0"/><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/><path d="M2.182 13.9a10 10 0 0 1 0-3.8"/><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/><path d="M21.818 10.1a10 10 0 0 1 0 3.8"/><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/>'
 };
 
@@ -3261,6 +3274,130 @@ function _homeDayLabel(day) {
     return (day || '').toString()
         .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
         .trim().substring(0, 2).toUpperCase();
+}
+
+
+// ── Новая главная (01.09): баннер, строка «Сегодня», чипы самочувствия,
+//    сообщение тренера и иконки в блоке «Твой прогресс» ────────────────────
+// Раскладка одна на всех тренеров, цвета и баннер берутся из темы тенанта,
+// поэтому у Анны экран бежевый, у Matvey тёмный с петролью, у Романа красный.
+function _renderHomeShell(pick) {
+    // Баннер тренера — та же картинка, что раньше уходила в фон страницы.
+    var ban = document.getElementById('home-banner');
+    var banImg = document.getElementById('home-banner-img');
+    var logo = (tenantTheme && tenantTheme.logo) || '';
+    if (ban && banImg) {
+        if (logo) {
+            banImg.src = logo;
+            banImg.onerror = function() { ban.classList.add('hidden'); };
+            ban.classList.remove('hidden');
+        } else {
+            ban.classList.add('hidden');
+        }
+    }
+
+    // Иконки в новых блоках — из общего набора, отдельных картинок не заводим.
+    var icons = {
+        'home-today-workout-ico': 'dumbbell', 'home-today-workout-arrow': 'chevron',
+        'home-today-wellness-ico': 'smile', 'home-today-wellness-arrow': 'chevron',
+        'home-progress-link-ico': 'chevron', 'home-prog-weight-ico': 'weight',
+        'home-prog-waist-ico': 'ruler', 'home-prog-count-ico': 'dumbbell'
+    };
+    for (var id in icons) {
+        var el = document.getElementById(id);
+        if (el && !el.innerHTML) el.innerHTML = _homeIcon(icons[id]);
+    }
+
+    // Плитка «Тренировка» в строке «Сегодня» повторяет карточку-герой.
+    var wSub = document.getElementById('home-today-workout-sub');
+    var wMeta = document.getElementById('home-today-workout-meta');
+    if (wSub) {
+        wSub.textContent = pick
+            ? (pick.day || 'Тренировка').toString().replace(/^[А-Яа-я]{2}\s*[—–-]\s*/, '').trim()
+            : 'На сегодня нет';
+        if (wMeta) wMeta.textContent = pick ? (pick.exercises.length + ' упр.') : '';
+    }
+    var wBtn = document.getElementById('home-today-workout');
+    if (wBtn && !wBtn.dataset.bound) {
+        wBtn.dataset.bound = '1';
+        wBtn.addEventListener('click', function() {
+            var t = document.querySelector('.tab-btn[data-tab="workout"]');
+            if (t) t.click();
+        });
+    }
+    var lnk = document.getElementById('home-progress-link');
+    if (lnk && !lnk.dataset.bound) {
+        lnk.dataset.bound = '1';
+        lnk.addEventListener('click', function() {
+            var t = document.querySelector('.tab-btn[data-tab="progress"]');
+            if (t) t.click();
+        });
+    }
+    var wellBtn = document.getElementById('home-today-wellness');
+    if (wellBtn && !wellBtn.dataset.bound) {
+        wellBtn.dataset.bound = '1';
+        wellBtn.addEventListener('click', function() {
+            var row = document.getElementById('home-well-row');
+            if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    }
+
+    _renderWellnessChips();
+    _renderHomeCoach();
+}
+
+// Самочувствие теперь стоит прямо на экране, а не выскакивает окном при входе:
+// человек видит выбор сразу и может поменять его в любой момент.
+function _renderWellnessChips() {
+    var row = document.getElementById('home-well-row');
+    if (!row) return;
+    row.innerHTML = Object.keys(WELLNESS_MAP).map(function(key) {
+        var w = WELLNESS_MAP[key];
+        return '<button type="button" class="home-well-chip' +
+                    (sessionWellness === key ? ' active' : '') + '" data-well="' + key + '">' +
+                    _homeIcon(WELLNESS_ICONS[key] || 'smile') +
+                    '<span>' + _escHtml(w.label) + '</span>' +
+               '</button>';
+    }).join('');
+    if (!row.dataset.bound) {
+        row.dataset.bound = '1';
+        row.addEventListener('click', function(e) {
+            var chip = e.target.closest('.home-well-chip');
+            if (!chip) return;
+            setWellness(chip.dataset.well);
+            _renderWellnessChips();
+            var sub = document.getElementById('home-today-wellness-sub');
+            var w = WELLNESS_MAP[sessionWellness];
+            if (sub && w) sub.textContent = w.label + (w.factor ? ' · ' + w.factor : '');
+        });
+    }
+    var sub = document.getElementById('home-today-wellness-sub');
+    if (sub && wellnessAsked) {
+        var cur = WELLNESS_MAP[sessionWellness];
+        if (cur) sub.textContent = cur.label + (cur.factor ? ' · ' + cur.factor : '');
+    }
+}
+
+// Короткое сообщение тренера клиенту (profile.homeMessage). Фото — то же, что
+// в кружке приветствия: клиент видит лицо своего тренера.
+function _renderHomeCoach() {
+    var box = document.getElementById('home-coach');
+    if (!box) return;
+    _getMyProfile().then(function(prof) {
+        var msg = (prof && prof.homeMessage || '').toString().trim();
+        if (!msg) { box.classList.add('hidden'); return; }
+        document.getElementById('home-coach-text').textContent = msg;
+        var ava = document.getElementById('home-coach-ava');
+        if (ava) {
+            if (_tenantAvatarUrl) {
+                ava.innerHTML = '<img src="' + _escHtmlAttr(_tenantAvatarUrl) + '" alt="">';
+            } else {
+                var dn = (tenantTheme && tenantTheme.displayName) || '';
+                ava.textContent = (dn.replace(/[^A-Za-zА-Яа-яЁё]/g, '').charAt(0) || 'Т').toUpperCase();
+            }
+        }
+        box.classList.remove('hidden');
+    }).catch(function() { box.classList.add('hidden'); });
 }
 
 function _renderHomeUI(trainingDays, doneDays) {
@@ -3309,6 +3446,8 @@ function _renderHomeUI(trainingDays, doneDays) {
             descEl.textContent = n + ' ' + word;
         }
     }
+
+    _renderHomeShell(pick);
 
     // Плитки «Твои результаты» — счётчики по текущей неделе
     var pct = totalExercises > 0 ? Math.round(completedCount / totalExercises * 100) : 0;
@@ -3518,19 +3657,64 @@ async function loadHomeExtras() {
                                   .filter(function(w) { return w > 0; });
                 var wSpark = document.getElementById('home-weight-spark');
                 if (wSpark) wSpark.innerHTML = _sparkline(wSeries);
-                if (meas.length >= 2) {
-                    var prev = meas[meas.length - 2];
-                    if (prev.weight) {
-                        // Раньше здесь были эмодзи 📈📉➡️. Направление теперь
-                        // показывает цвет: для веса снижение — хорошая динамика.
-                        var diff = (parseFloat(last.weight) - parseFloat(prev.weight));
-                        document.getElementById('home-weight-sub').textContent = 'с прошлого замера';
-                        _trendDelta(document.getElementById('home-weight-delta'), diff, 'кг', true);
+                // 01.09. Считаем от ПЕРВОГО замера, а не от предыдущего: человеку
+                // важно, сколько он прошёл с начала работы, а не рябь между
+                // двумя соседними взвешиваниями.
+                var firstW = null;
+                for (var iw = 0; iw < meas.length; iw++) {
+                    if (meas[iw].weight) { firstW = parseFloat(meas[iw].weight); break; }
+                }
+                if (firstW !== null && meas.length >= 2) {
+                    document.getElementById('home-weight-sub').textContent = 'с начала работы';
+                    _trendDelta(document.getElementById('home-weight-delta'),
+                                parseFloat(last.weight) - firstW, 'кг', true);
+                }
+            }
+            // Талия — та же логика, от первого замера. Снижение это хорошо.
+            var waistEl = document.getElementById('home-waist');
+            if (waistEl) {
+                var firstWa = null, lastWa = null;
+                meas.forEach(function(m) {
+                    var v = parseFloat(m.waist);
+                    if (!isFinite(v) || v <= 0) return;
+                    if (firstWa === null) firstWa = v;
+                    lastWa = v;
+                });
+                if (lastWa !== null) {
+                    waistEl.textContent = lastWa + ' см';
+                    if (firstWa !== null && firstWa !== lastWa) {
+                        _trendDelta(document.getElementById('home-waist-delta'), lastWa - firstWa, 'см', true);
                     }
                 }
             }
         }
     } catch (e) { console.warn('home extras (meas) fail:', e); }
+
+    // Тренировки за месяц. План берём из анкеты: сколько тренировок в неделю
+    // расписал тренер, столько × 4 и получается план на месяц (3 в неделю →
+    // 12). Отдельного поля «план на месяц» в системе нет и заводить его ради
+    // одной плитки незачем.
+    try {
+        var histRes2 = await fetch(APPS_SCRIPT_URL + '?action=getSelfHistory&chatId=' +
+            encodeURIComponent(chatId) + '&limit=120');
+        var histJson2 = await histRes2.json();
+        var now = new Date();
+        var ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        var daysThisMonth = {};
+        (histJson2.history || []).forEach(function(d) {
+            var iso = _ruDateToIso(d.date) || d.date || '';
+            if (String(iso).slice(0, 7) === ym) daysThisMonth[iso] = true;
+        });
+        var doneMonth = Object.keys(daysThisMonth).length;
+        var cntEl = document.getElementById('home-stat-workouts');
+        if (cntEl) {
+            var prof = await _getMyProfile();
+            var perWeek = parseInt(String(prof.frequency || '').replace(/\D/g, ''), 10);
+            var planMonth = (perWeek >= 1 && perWeek <= 7) ? perWeek * 4 : 0;
+            cntEl.textContent = planMonth ? (doneMonth + ' / ' + planMonth) : String(doneMonth);
+            document.getElementById('home-stat-workouts-sub').textContent = 'в этом месяце';
+        }
+    } catch (e) { console.warn('home extras (month) fail:', e); }
 }
  
 async function loadProgressData() {
@@ -7824,6 +8008,8 @@ function fillProfileForm(p) {
     document.getElementById('prof-height').value = p.height || '';
     document.getElementById('prof-weight').value = p.weight || '';
     document.getElementById('prof-goal').value = p.goal || '';
+    var hm = document.getElementById('prof-home-message');
+    if (hm) hm.value = p.homeMessage || '';
     document.getElementById('prof-level').value = p.level || '';
     document.getElementById('prof-frequency').value = p.frequency || '';
     document.getElementById('prof-inventory').value = p.inventory || '';
@@ -7864,7 +8050,10 @@ function collectProfileForm() {
         level: document.getElementById('prof-level').value,
         frequency: document.getElementById('prof-frequency').value,
         limitations: limits.join(','),
-        inventory: document.getElementById('prof-inventory').value
+        inventory: document.getElementById('prof-inventory').value,
+        // Короткая строчка, которую клиент видит на главной в блоке
+        // «От тренера». Не путать с заметками — те приватные.
+        homeMessage: (document.getElementById('prof-home-message') || {}).value || ''
     };
 }
 

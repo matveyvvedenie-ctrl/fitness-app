@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260901a">
+    <link rel="stylesheet" href="style.css?v=20260902a">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -152,12 +152,14 @@
 
         <!-- Home Tab -->
         <div id="home-tab" class="tab-content active">
-            <!-- Шапка: приветствие и аватар. Аватар — инициалы из имени клиента:
-                 фотографии пользователя в системе нет, а рисовать пустой кружок
-                 или чужое лицо нельзя. Колокольчика уведомлений здесь нет
-                 сознательно — у клиента в приложении нет ленты уведомлений,
-                 тренер пишет ему в чат бота. -->
-            <div class="home-head">
+                <!-- Баннер тренера: та же картинка, что раньше растягивалась
+                     фоном под всем экраном. Отдельной плашкой сверху она
+                     читается и не мешает тексту. Нет баннера — блок скрыт. -->
+                <div class="home-banner hidden" id="home-banner">
+                    <img id="home-banner-img" alt="">
+                </div>
+
+                <div class="home-head">
                 <div class="home-head-txt">
                     <div class="home-greet" id="home-greet">Привет!</div>
                     <div class="home-subtitle" id="home-subtitle">Готов к тренировке?</div>
@@ -165,11 +167,28 @@
                 <div class="home-avatar" id="home-avatar" aria-hidden="true"></div>
             </div>
 
-            <!-- Карточка ближайшей тренировки. Картинки тренировок в системе
-                 пока нет, поэтому под текстом лежит акцентная подложка с
-                 водяным знаком. Появится фото — достаточно поставить
-                 --home-hero-photo, разметку менять не придётся. -->
-            <div class="home-hero">
+                <div class="home-sec-cap">Сегодня</div>
+                <div class="home-today">
+                    <button type="button" class="home-today-card" id="home-today-workout">
+                        <span class="home-today-ico" id="home-today-workout-ico"></span>
+                        <span class="home-today-txt">
+                            <span class="home-today-ttl">Тренировка</span>
+                            <span class="home-today-sub" id="home-today-workout-sub">—</span>
+                            <span class="home-today-meta" id="home-today-workout-meta"></span>
+                        </span>
+                        <span class="home-today-arrow" id="home-today-workout-arrow"></span>
+                    </button>
+                    <button type="button" class="home-today-card" id="home-today-wellness">
+                        <span class="home-today-ico" id="home-today-wellness-ico"></span>
+                        <span class="home-today-txt">
+                            <span class="home-today-ttl">Самочувствие</span>
+                            <span class="home-today-sub" id="home-today-wellness-sub">Как ты сегодня?</span>
+                        </span>
+                        <span class="home-today-arrow" id="home-today-wellness-arrow"></span>
+                    </button>
+                </div>
+
+                <div class="home-hero">
                 <div class="home-hero-media"><svg class="home-hero-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" /> <path d="m2.5 21.5 1.4-1.4" /> <path d="m20.1 3.9 1.4-1.4" /> <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" /> <path d="m9.6 14.4 4.8-4.8" /></svg></div>
                 <div class="home-hero-body">
                     <div class="home-hero-badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></svg><span id="home-hero-when">Сегодня</span></div>
@@ -181,60 +200,57 @@
                 </div>
             </div>
 
-            <!-- Текущая неделя: дни тренировок с состояниями -->
-            <div class="home-card">
-                <div class="home-sec-head">
-                    <div class="home-sec-title">Текущая неделя</div>
-                    <div class="home-sec-meta" id="home-week-summary">— из —</div>
-                </div>
-                <div class="home-week-chip"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></svg><span id="home-week-num">—</span></div>
-                <div class="home-week-dots" id="home-week-dots"></div>
-            </div>
+                <div class="home-sec-cap">Как ты себя чувствуешь сегодня?</div>
+                <div class="home-well-row" id="home-well-row"></div>
+                <div class="home-well-hint">Мы скорректируем план с учётом твоего состояния</div>
 
-            <!-- Твои результаты -->
-            <div class="home-sec-head home-sec-head-bare">
-                <div class="home-sec-title">Твои результаты</div>
-            </div>
-            <!-- Компактные показатели -->
-            <div class="home-info-grid">
-                <div class="home-info-card">
-                    <div class="home-info-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" /> <path d="m2.5 21.5 1.4-1.4" /> <path d="m20.1 3.9 1.4-1.4" /> <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" /> <path d="m9.6 14.4 4.8-4.8" /></svg><span class="home-info-label">Тренировок</span></div>
-                    <div class="home-info-value" id="home-stat-workouts">—</div>
-                    <div class="home-info-sub" id="home-stat-workouts-sub"></div>
+                <!-- Сообщение тренера клиенту: пишет тренер в карточке клиента,
+                     хранится в анкете (profile.homeMessage). Пусто — блока нет.
+                     Заметки тренера сюда не годятся, они приватные. -->
+                <div class="home-coach hidden" id="home-coach">
+                    <div class="home-coach-ava" id="home-coach-ava" aria-hidden="true"></div>
+                    <div class="home-coach-body">
+                        <div class="home-coach-cap">От тренера</div>
+                        <div class="home-coach-text" id="home-coach-text"></div>
+                    </div>
                 </div>
-                <div class="home-info-card">
-                    <div class="home-info-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 7h6v6" /> <path d="m22 7-8.5 8.5-5-5L2 17" /></svg><span class="home-info-label">Прогресс</span></div>
-                    <div class="home-info-value" id="home-stat-progress">—</div>
-                    <div class="home-info-sub" id="home-stat-progress-sub"></div>
-                </div>
-            </div>
 
-            <!-- Рекорд и вес — с мини-графиком динамики. Значения и подписи
-                 те же id, что были: их наполняет loadHomeExtras. График
-                 рисуется из данных, которые она и так загружает, — новых
-                 запросов не появилось. -->
-            <div class="home-trend-grid">
-                <div class="home-trend-card">
+                <div class="home-sec-head home-sec-head-bare">
+                    <div class="home-sec-title">Твой прогресс</div>
+                    <button type="button" class="home-sec-link" id="home-progress-link">
+                        <span>Посмотреть динамику</span><span id="home-progress-link-ico"></span>
+                    </button>
+                </div>
+                <div class="home-prog-grid">
+                    <div class="home-prog-card">
+                        <div class="home-prog-head"><span id="home-prog-weight-ico"></span><span class="home-prog-label">Вес</span></div>
+                        <div class="home-prog-value" id="home-weight">—</div>
+                        <div class="home-prog-delta" id="home-weight-delta"></div>
+                        <div class="home-prog-sub" id="home-weight-sub">с начала работы</div>
+                        <div class="home-prog-spark" id="home-weight-spark"></div>
+                    </div>
+                    <div class="home-prog-card">
+                        <div class="home-prog-head"><span id="home-prog-waist-ico"></span><span class="home-prog-label">Талия</span></div>
+                        <div class="home-prog-value" id="home-waist">—</div>
+                        <div class="home-prog-delta" id="home-waist-delta"></div>
+                        <div class="home-prog-sub" id="home-waist-sub">с начала работы</div>
+                    </div>
+                    <div class="home-prog-card">
+                        <div class="home-prog-head"><span id="home-prog-count-ico"></span><span class="home-prog-label">Тренировки</span></div>
+                        <div class="home-prog-value" id="home-stat-workouts">—</div>
+                        <div class="home-prog-sub" id="home-stat-workouts-sub">в этом месяце</div>
+                    </div>
+                </div>
+
+                <div class="home-trend-card home-trend-solo">
                     <div class="home-info-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" /> <path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" /> <path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" /> <path d="M4 22h16" /> <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" /> <path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" /></svg><span class="home-info-label">Рекорд</span></div>
                     <div class="home-trend-sub" id="home-last-pr-sub"></div>
                     <div class="home-trend-value" id="home-last-pr">—</div>
                     <div class="home-trend-delta" id="home-last-pr-delta"></div>
                     <div class="home-trend-spark" id="home-pr-spark"></div>
                 </div>
-                <div class="home-trend-card">
-                    <div class="home-info-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18" /> <path d="m19 8 3 8a5 5 0 0 1-6 0zV7" /> <path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1" /> <path d="m5 8 3 8a5 5 0 0 1-6 0zV7" /> <path d="M7 21h10" /></svg><span class="home-info-label">Текущий вес</span></div>
-                    <div class="home-trend-sub" id="home-weight-sub"></div>
-                    <div class="home-trend-value" id="home-weight">—</div>
-                    <div class="home-trend-delta" id="home-weight-delta"></div>
-                    <div class="home-trend-spark" id="home-weight-spark"></div>
-                </div>
-            </div>
 
-            <!-- Твоя цель. Показывается, только когда цель реально заполнена в
-                 анкете клиента. Процент — выполнение текущей недели: отдельного
-                 показателя «продвижение к цели» в системе нет, и выдумывать его
-                 нельзя, поэтому подпись под полосой говорит, что именно считаем. -->
-            <div class="home-goal hidden" id="home-goal">
+                <div class="home-goal hidden" id="home-goal">
                 <div class="home-goal-head">
                     <div class="home-goal-ttl"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg><span>Твоя цель</span></div>
                     <div class="home-goal-pct" id="home-goal-pct">—</div>
@@ -243,9 +259,17 @@
                 <div class="home-goal-track"><div class="home-goal-fill" id="home-goal-fill"></div></div>
                 <div class="home-goal-msg" id="home-goal-msg"></div>
             </div>
-        </div>
 
-        <!-- Workout Tab -->
+                <div class="home-card">
+                <div class="home-sec-head">
+                    <div class="home-sec-title">Текущая неделя</div>
+                    <div class="home-sec-meta" id="home-week-summary">— из —</div>
+                </div>
+                <div class="home-week-chip"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></svg><span id="home-week-num">—</span></div>
+                <div class="home-week-dots" id="home-week-dots"></div>
+            </div>
+            </div>
+
         <div id="workout-tab" class="tab-content">
             <!-- Шапка экрана: название, неделя, счётчик выполненного.
                  Кнопки «назад» и «…» из макета здесь нет: «Тренировка» —
@@ -1293,6 +1317,11 @@
                                 <option value="home_none">Дом без инвентаря</option>
                             </select>
                         </div>
+                        <div class="prof-field prof-field-full">
+                            <label>Сообщение на главной у клиента</label>
+                            <textarea id="prof-home-message" class="prof-input" rows="3"
+                                      placeholder="Например: сегодня работаем без отказа, в основных упражнениях держим RPE 7–8"></textarea>
+                        </div>
                     </div>
                     <button class="notes-save-btn" onclick="saveClientProfile()">💾 Сохранить анкету</button>
                 </div>
@@ -1827,6 +1856,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260901a" defer></script>
+    <script src="app.js?v=20260902a" defer></script>
 </body>
 </html>
