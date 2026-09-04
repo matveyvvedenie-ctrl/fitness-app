@@ -2452,7 +2452,9 @@ function renderWorkout() {
             // выглядела наполовину короче, чем расписал тренер.
             if (group.type === 'superset' || group.type === 'triset' || blockTypeInfo(group.type)) {
                 var wrap = document.createElement('div');
-                wrap.className = 'exercise-group-block';
+                // Класс по типу связки — у каждой своя подсветка, чтобы
+                // клиент отличал их с одного взгляда, не вчитываясь в подпись.
+                wrap.className = 'exercise-group-block group-' + group.type;
                 var label = document.createElement('div');
                 label.className = 'exercise-group-label';
                 var blockInfo = blockTypeInfo(group.type);

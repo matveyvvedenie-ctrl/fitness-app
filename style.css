@@ -980,6 +980,12 @@ body.theme-dark .save-btn.success {
 
 /* Суперсет/трисет в тренировке клиента — обёртка вокруг 2-3 exercise-card,
    с общей подписью, чтобы было видно что это один блок, а не разные упражнения */
+/* Связки у клиента: у каждого вида своя подсветка — суперсет, трисет,
+   круговая, разминка, заминка. Цвет несёт смысл «сколько упражнений идёт
+   вместе»: клиент видит границы блока раньше, чем читает подпись. Оттенки
+   заданы полупрозрачными, поэтому одинаково работают и на светлом фоне, и
+   на бежевом, и на тёмном. Одиночное упражнение остаётся белой карточкой
+   без рамки — это тоже опознавательный знак, самый частый. */
 .exercise-group-block {
     margin: 8px;
     padding: 10px 0 2px;
@@ -987,6 +993,32 @@ body.theme-dark .save-btn.success {
     background: rgba(63, 81, 181, 0.06);
     border: 1px solid rgba(63, 81, 181, 0.15);
 }
+
+.exercise-group-block.group-triset {
+    background: rgba(123, 31, 162, 0.06);
+    border-color: rgba(123, 31, 162, 0.16);
+}
+
+.exercise-group-block.group-circuit {
+    background: rgba(0, 137, 123, 0.07);
+    border-color: rgba(0, 137, 123, 0.18);
+}
+
+.exercise-group-block.group-warmup {
+    background: rgba(239, 108, 0, 0.07);
+    border-color: rgba(239, 108, 0, 0.18);
+}
+
+.exercise-group-block.group-cooldown {
+    background: rgba(2, 119, 189, 0.07);
+    border-color: rgba(2, 119, 189, 0.18);
+}
+
+/* Подпись блока — тем же цветом, что и рамка вокруг него. */
+.group-triset .exercise-group-label   { background: #7B1FA2; }
+.group-circuit .exercise-group-label  { background: #00897B; }
+.group-warmup .exercise-group-label   { background: #EF6C00; }
+.group-cooldown .exercise-group-label { background: #0277BD; }
 .exercise-group-block .exercise-card {
     margin: 6px 10px;
 }
@@ -3511,8 +3543,14 @@ body.theme-dark .save-btn.success {
 }
 
 .cc-block-header-cooldown {
-    background: #5E35B1;
+    background: #0277BD;
 }
+
+/* Та же гамма в карточке клиента у тренера: он собирает программу и видит
+   те же цвета, что потом увидит клиент. */
+.cc-exercise.cc-block-circuit  { background: rgba(0, 137, 123, 0.05); }
+.cc-exercise.cc-block-warmup   { background: rgba(239, 108, 0, 0.05); }
+.cc-exercise.cc-block-cooldown { background: rgba(2, 119, 189, 0.05); }
 
 .cc-superset-body {
     background: var(--surface);
