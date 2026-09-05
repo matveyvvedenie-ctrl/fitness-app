@@ -1101,6 +1101,22 @@ var NEW_API_ACTIONS = {
     // бэкенд его не умеет, параметр тихо игнорируется (неделя дублируется
     // как есть, план копируется, факты чистые — то же самое, что autoProgress
     // выключенный вручную).
+    // Неделя с нуля — без единого упражнения. Тренеру, который каждую
+    // неделю пишет программу заново, копировать прошлую и стирать её
+    // содержимое дольше, чем начать с чистого листа (просьба Анны).
+    blankClientWeek: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден: ' + sheetName }, 200);
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
+                encodeURIComponent(chatId) + '/program/blank-week';
+            return nativeFetch(NEW_API_BASE + path, { method: 'POST', headers: _newApiHeaders() })
+                .then(function(r) { return r.json().then(function(data) {
+                    if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                    return _fakeJsonResponse({ success: true, newTitle: data.weekTitle }, 200);
+                }); });
+        });
+    },
     duplicateClientWeek: function(nativeFetch, params) {
         var sheetName = params.get('sheetName') || '';
         return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
@@ -7071,12 +7087,25 @@ function renderExerciseRow(ex, label) {
 
 // Дублировать неделю — план остаётся, факты стираются, заголовок инкрементируется
 // (автоподбор весов временно отключён, подключим в следующей итерации через ИИ)
+var newWeekMode = 'copy';   // 'copy' — повторить прошлую, 'blank' — с чистого листа
+
+function selectNewWeekMode(mode) {
+    newWeekMode = mode;
+    document.querySelectorAll('#new-week-mode .nw-mode-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.weekMode === mode);
+    });
+    document.getElementById('new-week-copy-options').classList.toggle('hidden', mode !== 'copy');
+    document.getElementById('new-week-blank-hint').classList.toggle('hidden', mode !== 'blank');
+    document.getElementById('new-week-create-btn').textContent =
+        mode === 'blank' ? '📄 Создать пустую неделю' : '📅 Создать неделю';
+}
+
 function duplicateWeekFlow() {
     if (!currentClientCard) return;
     var name = currentClientCard.name || 'клиента';
-    document.getElementById('new-week-client-line').textContent =
-        'Для ' + name + '. План упражнений остаётся тем же, факты прошлой недели будут стёрты.';
+    document.getElementById('new-week-client-line').textContent = 'Для ' + name + '.';
     document.getElementById('new-week-autoprogress').checked = true;
+    selectNewWeekMode('copy');
     document.getElementById('new-week-modal').classList.remove('hidden');
     document.body.classList.add('no-scroll');
 }
@@ -7095,9 +7124,12 @@ async function confirmNewWeek() {
     btn.textContent = '⏳ Создание...';
 
     try {
-        var url = APPS_SCRIPT_URL + '?action=duplicateClientWeek' +
-            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
-            '&autoProgress=' + (autoProgress ? 'true' : 'false');
+        var url = newWeekMode === 'blank'
+            ? (APPS_SCRIPT_URL + '?action=blankClientWeek' +
+               '&sheetName=' + encodeURIComponent(currentClientCard.sheetName))
+            : (APPS_SCRIPT_URL + '?action=duplicateClientWeek' +
+               '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+               '&autoProgress=' + (autoProgress ? 'true' : 'false'));
         var resp = await fetch(url);
         var data = await resp.json();
         btn.disabled = false;
@@ -7114,7 +7146,9 @@ async function confirmNewWeek() {
         }
         await loadClientProgram(currentClientCard.sheetName);
         tg.showAlert('✅ Новая неделя создана: ' + (data.newTitle || '') +
-            (autoProgress ? '\n\nВеса подобраны автоматически — проверь и поправь при желании.' : ''));
+            (newWeekMode === 'blank'
+                ? '\n\nОна пустая — добавь дни и упражнения.'
+                : (autoProgress ? '\n\nВеса подобраны автоматически — проверь и поправь при желании.' : '')));
     } catch (error) {
         console.error('Duplicate week error:', error);
         btn.disabled = false;

@@ -6221,6 +6221,44 @@ body.theme-dark .save-btn.success {
     padding: 0 14px;
 }
 
+/* Выбор способа создания недели: повторить прошлую или начать с чистого
+   листа. Двумя кнопками, а не галочкой — это два разных действия, и по
+   подписи сразу видно, что получится. */
+.nw-mode {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.nw-mode-btn {
+    padding: 12px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    cursor: pointer;
+    text-align: left;
+}
+
+.nw-mode-btn.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.nw-mode-name {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.nw-mode-desc {
+    font-size: 11px;
+    line-height: 1.25;
+    opacity: 0.85;
+}
+
 .mp-day-switch {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
