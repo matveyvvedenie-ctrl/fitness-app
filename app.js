@@ -1167,13 +1167,22 @@ var NEW_API_ACTIONS = {
         return _resolveChatIdByName(nativeFetch, clientName).then(function(chatId) {
             if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден: ' + clientName }, 200);
             var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/meal-plan/generate';
-            return nativeFetch(NEW_API_BASE + path, {
+            // Повторяем при обрыве связи. Здесь это безопасно в отличие от
+            // любой записи: генерация НИЧЕГО не сохраняет — план возвращается
+            // на превью, тренер правит и сохраняет отдельной кнопкой. Значит
+            // повтор не может создать второй план.
+            //
+            // 2026-09-09: до этого один короткий обрыв сразу давал тренеру
+            // «Ошибка соединения» (жалоба Романа). Сама генерация занимает
+            // около 10 секунд — замерено на живом запросе, — так что дело
+            // было не в долгом ожидании, а в отсутствии второй попытки.
+            return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
                 method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({
                     weight: body.weight || '', height: body.height || '', age: body.age || '',
                     goal: body.goal || '', allergies: body.allergies || ''
                 })
-            }).then(function(r) { return r.json().then(function(data) {
+            }, 2).then(function(r) { return r.json().then(function(data) {
                 // food_ai.generate_meal_plan уже отдаёт {success:false, error}
                 // при провале ИИ (HTTP 200) — просто пробрасываем как есть.
                 // Только не-2xx (429 квота, 404 клиент не найден) реформатируем.
