@@ -2740,17 +2740,102 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
     return card;
 }
 
+// ─── Пол клиента: согласование окончаний в интерфейсе ─────────────────
+// 09.09. Мини-апп показывал ВСЕМ женские формы («Не выспалась», «Приболела»)
+// и пункт «КД» — подписи достались от первых клиенток. Мужчинам это неверно.
+// Пол берём из анкеты клиента (карточка клиента, поле «Пол»). Значения в базе
+// разношёрстные: male/female из формы мини-аппа и «М»/«Ж»/«Мужской»/«Женский»
+// из старой таблицы — поэтому нормализуем, а не сравниваем строкой.
+// Не заполнен — берём НЕЙТРАЛЬНУЮ форму, а не женскую, как было.
+var _clientGender = '';
+
+function _normGender(raw) {
+    var g = String(raw || '').trim().toLowerCase();
+    if (/^(m|male|м|муж)/.test(g)) return 'male';
+    if (/^(f|w|female|ж|жен)/.test(g)) return 'female';
+    return '';
+}
+
+// Подпись в нужном роде. forms = [мужская, женская, нейтральная].
+function _gw(forms) {
+    if (!forms) return '';
+    if (_clientGender === 'male') return forms[0];
+    if (_clientGender === 'female') return forms[1];
+    return forms[2];
+}
+
+// Анкета приезжает с сервера асинхронно, а главный экран рисуется сразу —
+// поэтому после ответа перерисовываем то, что уже успело нарисоваться
+// нейтральными подписями.
+function _loadClientGender() {
+    return _getMyProfile().then(function(p) {
+        _clientGender = _normGender(p && p.gender);
+    }).catch(function() {
+        _clientGender = '';
+    }).then(function() {
+        // Применяем ВСЕГДА, даже когда пол не указан: в index.html подписи
+        // лежат в мужском роде, нейтральные надо проставить отсюда.
+        _applyGenderToUi();
+        return _clientGender;
+    });
+}
+
+function _applyGenderToUi() {
+    // Мужчина не мог выбрать «КД» сам, но состояние могло остаться с момента,
+    // когда пол ещё не был известен.
+    if (_clientGender === 'male' && WELLNESS_MAP[sessionWellness] &&
+        WELLNESS_MAP[sessionWellness].femaleOnly) {
+        sessionWellness = 'good';
+    }
+    _renderWellnessChips();
+    updateWellnessBanner();
+    _applyGenderToModals();
+    if (workoutData && workoutData.length) renderAllDaysIfNeeded();
+}
+
+// Тексты в модалках лежат в index.html статикой — правим их по id.
+function _applyGenderToModals() {
+    var texts = {
+        'wm-good-t':    _gw(['Бодрый, готов', 'Бодрая, готова', 'Отличное самочувствие']),
+        'wm-tired-t':   _gw(['Устал / недосып', 'Устала / недосып', 'Недосып']),
+        'wm-sick-t':    _gw(['Приболел / выздоравливаю', 'Приболела / выздоравливаю', 'Нездоровится']),
+        'fr-title':     _gw(['Не вытянул. Почему?', 'Не вытянула. Почему?', 'Не получилось. Почему?']),
+        'fr-sleep-t':   _gw(['Плохо спал', 'Плохо спала', 'Плохо со сном']),
+        'fr-food-t':    _gw(['Ел мало / нет энергии', 'Ела мало / нет энергии', 'Мало еды / нет энергии'])
+    };
+    Object.keys(texts).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = texts[id];
+    });
+    var pms = document.getElementById('wm-pms');
+    if (pms) pms.classList.toggle('hidden', _clientGender === 'male');
+}
+
 // ─── Самочувствие клиента (per session, спрашивается при входе) ────────
 // Ключи (good/tired/sick/pms/swelling) — то, что уходит в расчёт и запоминается
 // на сессию. Подписи поменяны под макет 01.09; ключи НЕ трогаем, иначе
 // разъедется с уже выбранным состоянием.
+// labels — [мужская, женская, нейтральная] форма подписи (см. _gw выше).
 var WELLNESS_MAP = {
-    good:     { multiplier: 1.00, emoji: '💪', label: 'Отлично',     factor: '' },
-    tired:    { multiplier: 0.90, emoji: '😴', label: 'Не выспалась', factor: '−10%' },
-    sick:     { multiplier: 0.85, emoji: '🤧', label: 'Приболела',   factor: '−15%' },
-    swelling: { multiplier: 0.95, emoji: '💧', label: 'Отёчность',   factor: '−5%' },
-    pms:      { multiplier: 0.90, emoji: '🩸', label: 'КД',          factor: '−10%' }
+    good:     { multiplier: 1.00, emoji: '💪', factor: '',     labels: ['Отлично', 'Отлично', 'Отлично'] },
+    tired:    { multiplier: 0.90, emoji: '😴', factor: '−10%', labels: ['Не выспался', 'Не выспалась', 'Недосып'] },
+    sick:     { multiplier: 0.85, emoji: '🤧', factor: '−15%', labels: ['Приболел', 'Приболела', 'Нездоровится'] },
+    swelling: { multiplier: 0.95, emoji: '💧', factor: '−5%',  labels: ['Отёчность', 'Отёчность', 'Отёчность'] },
+    pms:      { multiplier: 0.90, emoji: '🩸', factor: '−10%', labels: ['КД', 'КД', 'КД'], femaleOnly: true }
 };
+
+function wellnessLabel(key) {
+    var w = WELLNESS_MAP[key];
+    return w ? _gw(w.labels) : '';
+}
+
+// Какие состояния вообще показывать: «КД» мужчине не нужны. Пол не указан —
+// показываем всё, угадывать не за что.
+function wellnessKeys() {
+    return Object.keys(WELLNESS_MAP).filter(function(k) {
+        return !(WELLNESS_MAP[k].femaleOnly && _clientGender === 'male');
+    });
+}
 // Иконка состояния для баннера. Ключи те же, что в WELLNESS_MAP.
 var WELLNESS_ICONS = { good: 'smile', tired: 'moon', sick: 'thermometer', swelling: 'droplet', pms: 'droplet' };
 
@@ -2793,7 +2878,7 @@ function updateWellnessBanner() {
     // В интерфейсе показываем иконку по тому же ключу.
     b.innerHTML = '<span class="wellness-banner-ico">' +
                       _homeIcon(WELLNESS_ICONS[sessionWellness] || 'moon') + '</span>' +
-                  '<span class="wellness-banner-txt">' + info.label +
+                  '<span class="wellness-banner-txt">' + wellnessLabel(sessionWellness) +
                       ' — рекомендуемые веса снижены на ' + info.factor + '</span>' +
                   '<button class="wellness-banner-edit" onclick="openWellnessModal()">изменить</button>';
 }
@@ -2836,8 +2921,17 @@ var RPE_FEEDBACK_MAP = {
     easy:   { rpe: 5.5, emoji: '😌', label: 'Легко' },
     normal: { rpe: 7.5, emoji: '💪', label: 'В самый раз' },
     hard:   { rpe: 9,   emoji: '🔥', label: 'Тяжело' },
-    failed: { rpe: 10,  emoji: '❌', label: 'Не вытянул' }
+    failed: { rpe: 10,  emoji: '❌', label: 'Не вытянул',
+              labels: ['Не вытянул', 'Не вытянула', 'Не получилось'] }
 };
+
+// Подпись оценки в роде клиента (у «failed» есть все три формы, у остальных
+// подпись бесполая — отдаём как есть).
+function rpeLabel(kind) {
+    var info = RPE_FEEDBACK_MAP[kind];
+    if (!info) return '';
+    return info.labels ? _gw(info.labels) : info.label;
+}
 var FAIL_REASON_LABELS = {
     too_hard: 'слишком тяжело',
     sleep:    'плохо спал',
@@ -2867,12 +2961,11 @@ function renderRpeButton(exercise, dayIndex, exIndex) {
     var html = '<div class="rpe-quick-row">';
     for (var i = 0; i < kinds.length; i++) {
         var kind = kinds[i];
-        var info = RPE_FEEDBACK_MAP[kind];
         html += '<button type="button" class="rpe-quick-btn rpe-' + kind +
             (fb === kind ? ' rpe-picked' : '') + '" ' +
             'onclick="setRpeQuick(' + dayIndex + ',' + exIndex + ',\'' + kind + '\')">' +
             _homeIcon(RPE_ICONS[kind] || 'smile') +
-            '<span>' + info.label + '</span>' +
+            '<span>' + rpeLabel(kind) + '</span>' +
             '</button>';
     }
     html += '</div>';
@@ -3433,6 +3526,7 @@ function _renderHomeShell(pick) {
         });
     }
 
+    _loadClientGender();
     _renderWellnessChips();
     _renderHomeCoach();
 }
@@ -3442,12 +3536,11 @@ function _renderHomeShell(pick) {
 function _renderWellnessChips() {
     var row = document.getElementById('home-well-row');
     if (!row) return;
-    row.innerHTML = Object.keys(WELLNESS_MAP).map(function(key) {
-        var w = WELLNESS_MAP[key];
+    row.innerHTML = wellnessKeys().map(function(key) {
         return '<button type="button" class="home-well-chip' +
                     (sessionWellness === key ? ' active' : '') + '" data-well="' + key + '">' +
                     _homeIcon(WELLNESS_ICONS[key] || 'smile') +
-                    '<span>' + _escHtml(w.label) + '</span>' +
+                    '<span>' + _escHtml(wellnessLabel(key)) + '</span>' +
                '</button>';
     }).join('');
     if (!row.dataset.bound) {
@@ -3459,13 +3552,13 @@ function _renderWellnessChips() {
             _renderWellnessChips();
             var sub = document.getElementById('home-today-wellness-sub');
             var w = WELLNESS_MAP[sessionWellness];
-            if (sub && w) sub.textContent = w.label + (w.factor ? ' · ' + w.factor : '');
+            if (sub && w) sub.textContent = wellnessLabel(sessionWellness) + (w.factor ? ' · ' + w.factor : '');
         });
     }
     var sub = document.getElementById('home-today-wellness-sub');
     if (sub && wellnessAsked) {
         var cur = WELLNESS_MAP[sessionWellness];
-        if (cur) sub.textContent = cur.label + (cur.factor ? ' · ' + cur.factor : '');
+        if (cur) sub.textContent = wellnessLabel(sessionWellness) + (cur.factor ? ' · ' + cur.factor : '');
     }
 }
 
@@ -7587,11 +7680,15 @@ function renderClientHistory(history, containerId) {
             // Бейдж с фидбэком (Легко/Норм/Тяжело/Не вытянул) — приходит с бэка
             var feedbackHtml = '';
             if (ex.feedback && ex.feedback.label) {
+                // Своя история — подпись в роде клиента. Тренеру оставляем
+                // прежнюю формулировку: там перечислены чужие тренировки.
+                var fbLabel = ex.feedback.label;
+                if (isClient && ex.feedback.code === 'failed') fbLabel = rpeLabel('failed');
                 feedbackHtml = '<span class="hh-ex-feedback hh-fb-' + ex.feedback.code + '">' +
                     (isClient
                         ? ico(HH_FB_ICONS[ex.feedback.code] || 'smile')
                         : ex.feedback.emoji + ' ') +
-                    '<span>' + ex.feedback.label + '</span>' +
+                    '<span>' + fbLabel + '</span>' +
                 '</span>';
             }
 

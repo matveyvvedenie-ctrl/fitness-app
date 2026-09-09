@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260909a">
+    <link rel="stylesheet" href="style.css?v=20260909b">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -1791,25 +1791,25 @@
             <button class="rpe-btn wellness-good" onclick="setWellness('good')">
                 <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 10V9" /> <path d="M16.472 15a6 6 0 01-8.943 0" /> <path d="M9 10V9" /> <circle cx="12" cy="12" r="10" /></svg></span>
                 <span class="rpe-btn-text">
-                    <strong>Бодрый, готов</strong>
+                    <strong id="wm-good-t">Бодрый, готов</strong>
                     <small>работаем по плану</small>
                 </span>
             </button>
             <button class="rpe-btn wellness-tired" onclick="setWellness('tired')">
                 <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></svg></span>
                 <span class="rpe-btn-text">
-                    <strong>Устал / недосып</strong>
+                    <strong id="wm-tired-t">Устал / недосып</strong>
                     <small>веса будут снижены на 10%</small>
                 </span>
             </button>
             <button class="rpe-btn wellness-sick" onclick="setWellness('sick')">
                 <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" /></svg></span>
                 <span class="rpe-btn-text">
-                    <strong>Приболел / выздоравливаю</strong>
+                    <strong id="wm-sick-t">Приболел / выздоравливаю</strong>
                     <small>веса будут снижены на 15%</small>
                 </span>
             </button>
-            <button class="rpe-btn wellness-pms" onclick="setWellness('pms')">
+            <button class="rpe-btn wellness-pms" id="wm-pms" onclick="setWellness('pms')">
                 <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" /></svg></span>
                 <span class="rpe-btn-text">
                     <strong>ПМС / месячные</strong>
@@ -1824,7 +1824,7 @@
     <div id="fail-reason-modal" class="rpe-modal hidden">
         <div class="rpe-modal-backdrop" onclick="closeFailReasonModal()"></div>
         <div class="rpe-modal-content">
-            <div class="rpe-modal-title">Не вытянул. Почему?</div>
+            <div class="rpe-modal-title" id="fr-title">Не вытянул. Почему?</div>
             <div class="rpe-modal-summary">Это поможет правильно скорректировать программу</div>
             <button class="rpe-btn fail-too-hard" onclick="setFailReason('too_hard')">
                 <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></svg></span>
@@ -1836,7 +1836,7 @@
             <button class="rpe-btn fail-sleep" onclick="setFailReason('sleep')">
                 <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></svg></span>
                 <span class="rpe-btn-text">
-                    <strong>Плохо спал</strong>
+                    <strong id="fr-sleep-t">Плохо спал</strong>
                     <small>вес оставим как есть</small>
                 </span>
             </button>
@@ -1857,7 +1857,7 @@
             <button class="rpe-btn fail-food" onclick="setFailReason('food')">
                 <span class="rpe-btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /> <path d="M7 2v20" /> <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg></span>
                 <span class="rpe-btn-text">
-                    <strong>Ел мало / нет энергии</strong>
+                    <strong id="fr-food-t">Ел мало / нет энергии</strong>
                     <small>вес оставим как есть</small>
                 </span>
             </button>
@@ -1872,6 +1872,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260909a" defer></script>
+    <script src="app.js?v=20260909b" defer></script>
 </body>
 </html>
