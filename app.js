@@ -9421,17 +9421,30 @@ async function openExerciseLibrary() {
     var panel = document.getElementById('ex-library-panel');
     if (!panel) return;
     // Панель библиотеки — один общий элемент на два модальных окна (одиночное
-    // упражнение и суперсет/трисет). Физически она живёт внутри #ex-editor-modal;
-    // когда открыт #ex-block-modal, тот спрятан (display:none у родителя), и
-    // просто снять .hidden с самой панели недостаточно — надо перенести её узел
-    // в слот нужной модалки, иначе выпадающий список не будет виден вообще.
+    // упражнение и суперсет/трисет). Когда открыто одно окно, другое спрятано
+    // (display:none у родителя), и просто снять .hidden с самой панели
+    // недостаточно — надо перенести её узел в слот нужной модалки, иначе
+    // выпадающий список не будет виден вообще.
+    //
+    // 10.09. У одиночного редактора теперь тоже свой слот над кнопками, вне
+    // прокрутки, — как у суперсета. Раньше панель переносилась в конец
+    // прокручиваемой части и в невысоком окне (Telegram на компьютере)
+    // оказывалась за нижним краем: тренер жал на название, и ничего не
+    // происходило. Нет слота (старый index.html из кэша при новом app.js) —
+    // панель остаётся, где была, как раньше.
     var targetSlot = currentSetType === 'single'
-        ? document.querySelector('#ex-editor-modal .ex-editor-body')
+        ? document.getElementById('ex-editor-library-slot')
         : document.getElementById('ex-block-library-slot');
     if (targetSlot && panel.parentElement !== targetSlot) {
         targetSlot.appendChild(panel);
     }
     panel.classList.remove('hidden');
+    // Панель над кнопками отнимает высоту у прокручиваемой части — следим,
+    // чтобы поле, в которое печатают, не уехало из вида.
+    var typingInput = document.getElementById(activeNameInputId);
+    if (typingInput && typingInput.scrollIntoView) {
+        try { typingInput.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+    }
     librarySearchText = '';
 
     // Показываем для какого блока сейчас выбираем (только если виден переключатель — режим add с супер/трисетом)

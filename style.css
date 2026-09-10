@@ -4890,7 +4890,8 @@ body.theme-dark .save-btn.success {
     min-height: 0;
 }
 
-#ex-block-library-slot {
+#ex-block-library-slot,
+#ex-editor-library-slot {
     flex-shrink: 0;
 }
 
@@ -5019,7 +5020,11 @@ body.theme-dark .save-btn.success {
     border-radius: 12px;
     background: var(--surface);
     overflow: hidden;
-    max-height: 320px;
+    /* 10.09. Не больше половины окна: панель стоит над кнопками, вне
+       прокрутки, и в невысоком окне (Telegram на компьютере) при 320px от
+       формы оставалось ~70px — поле названия, в которое печатают, пропадало.
+       На телефоне половина окна больше 320px, там ничего не меняется. */
+    max-height: min(320px, 45vh);
     display: flex;
     flex-direction: column;
 }
@@ -5065,7 +5070,7 @@ body.theme-dark .save-btn.success {
 
 .ex-library-list {
     overflow-y: auto;
-    max-height: 240px;
+    max-height: min(240px, calc(45vh - 80px));
     padding: 4px;
 }
 
