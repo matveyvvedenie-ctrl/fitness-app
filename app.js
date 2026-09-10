@@ -94,6 +94,7 @@ function _withTimeout(promise, ms) {
 // соединения», хотя запрос был жив. Для таких действий срок отдельный.
 var SLOW_ACTIONS = {
     saveExerciseMedia: 90000,      // два фото уходят на сервер
+    setClientExercisePhoto: 90000, // фото тренажёра клиента
     addClientExercises: 120000,    // блок сохраняется по одному упражнению за раз
     generateMealPlanAI: 90000,     // на той стороне думает модель
     saveMeasurements: 60000,       // фото прогресса
@@ -352,7 +353,8 @@ function _mapProgramDays(rawDays) {
                     weightPlan: ex.weightPlan, rpe: ex.rpe, video: ex.video || '', videoVk: ex.videoVk || '',
                     note: ex.note, weightFact: ex.weightFact, repsFact: ex.repsFact,
                     completed: false, timestamp: '', comment: ex.comment,
-                    photo1: ex.photo1 || '', photo2: ex.photo2 || ''
+                    photo1: ex.photo1 || '', photo2: ex.photo2 || '',
+                    photoOwn: !!ex.photoOwn
                 };
             })
         };
@@ -1228,6 +1230,37 @@ var NEW_API_ACTIONS = {
         }).then(function(r) { return r.json().then(function(data) {
             if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
             return _fakeJsonResponse(data, 200);
+        }); });
+    },
+    // Своё фото упражнения для одного клиента (10.09) — см. ClientExercisePhoto
+    // в api/models.py. Название упражнения — в теле/параметре, не в адресе: в
+    // названиях бывает «/» (история с днём «ВТ СПИНА/ГРУДЬ»). Повтор при обрыве
+    // безопасен: сервер заменяет фото, а не добавляет второе.
+    setClientExercisePhoto: function(nativeFetch, params, init) {
+        var body;
+        try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
+            encodeURIComponent(params.get('chatId') || '') + '/exercise-photo';
+        return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
+            method: 'PUT', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({
+                exercise: body.exercise || '', photoBase64: body.photoBase64 || '',
+                photoMime: body.photoMime || 'image/jpeg'
+            })
+        }, 2).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
+            return _fakeJsonResponse(data, 200);
+        }); });
+    },
+    removeClientExercisePhoto: function(nativeFetch, params) {
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
+            encodeURIComponent(params.get('chatId') || '') + '/exercise-photo' +
+            '?exercise=' + encodeURIComponent(params.get('exercise') || '');
+        return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
+            method: 'DELETE', headers: _newApiHeaders()
+        }, 2).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            return _fakeJsonResponse({ success: true }, 200);
         }); });
     },
     // Аналог action=write/writeWorkoutData — клиент завершает тренировочный
@@ -7171,7 +7204,10 @@ function renderExerciseRow(ex, label) {
         : '';
     return '<div class="cc-ex-row">' +
         '<div class="cc-ex-name-row">' +
-            '<div class="cc-ex-name">' + labelHtml + _escHtml(cleanExerciseName(ex.exercise)) + '</div>' +
+            '<div class="cc-ex-name">' + labelHtml + _escHtml(cleanExerciseName(ex.exercise)) +
+                (ex.rowIndex ? '<span class="cc-ex-ownphoto' + (ex.photoOwn ? '' : ' hidden') +
+                    '" id="cc-ownphoto-' + ex.rowIndex + '">своё фото</span>' : '') +
+            '</div>' +
             editBtn +
         '</div>' +
         '<div class="cc-ex-grid">' +
@@ -8662,6 +8698,7 @@ function openExerciseEditor(rowIndex) {
     document.getElementById('ex-edit-sets').value = ex.sets != null ? ex.sets : '';
     document.getElementById('ex-edit-rpe').value = ex.rpe != null ? ex.rpe : '';
     document.getElementById('ex-edit-note').value = ex.note != null ? ex.note : '';
+    _renderOwnPhotoField(ex);
 
     // Кнопка «Удалить» — только в режиме редактирования
     var delBtn = document.getElementById('ex-edit-delete-btn');
@@ -8787,6 +8824,7 @@ function openAddExerciseModal(dayName) {
     if (!currentClientCard) return;
     currentEditingRow = null;
     currentEditingMode = 'add';
+    _renderOwnPhotoField(null);
     currentAddDay = dayName || '';
     currentSetType = 'single';
     currentEditingPrefix = '';
@@ -8872,9 +8910,89 @@ function initSetTypeSwitch() {
     });
 }
 
+// ── Своё фото упражнения для этого клиента (10.09) ─────────────────────
+// Фото в библиотеке — тренажёры зала тренера, общие для всех клиентов. Тем,
+// кто занимается в другом зале (клиентки Матвея из другой страны), тренер
+// кладёт фото ИХ тренажёра — видят его только они (ClientExercisePhoto в
+// api/models.py). Сохраняется сразу, мимо очереди «Сохранить изменения»: это
+// не правка плана, а отдельный файл, держать его в памяти незачем.
+function _renderOwnPhotoField(ex) {
+    var field = document.getElementById('ex-own-photo-field');
+    if (!field) return;
+    field.classList.toggle('hidden', !ex);
+    if (!ex) return;
+    var own = !!(ex.photoOwn && ex.photo1);
+    document.getElementById('ex-own-photo-preview').innerHTML = own
+        ? '<img src="' + _escHtmlAttr(String(ex.photo1)) + '" alt="">'
+        : _homeIcon('image');
+    document.getElementById('ex-own-photo-btn-txt').textContent = own ? 'Заменить фото' : 'Загрузить фото';
+    document.getElementById('ex-own-photo-clear').classList.toggle('hidden', !own);
+    document.getElementById('ex-own-photo-hint').textContent = own
+        ? 'Клиент видит это фото вместо фото из библиотеки. Остальные клиенты — как раньше.'
+        : 'Если клиент занимается в другом зале — загрузи фото его тренажёра. Увидит только он.';
+}
+
+// Метка «своё фото» у упражнения в программе — чтобы тренер видел, у кого
+// подменено, не открывая каждое.
+function _syncOwnPhotoBadge(rowIndex, on) {
+    var b = document.getElementById('cc-ownphoto-' + rowIndex);
+    if (b) b.classList.toggle('hidden', !on);
+}
+
+function _onOwnPhotoPicked(input) {
+    var file = input.files && input.files[0];
+    var row = currentEditingRow;
+    var ex = row && currentProgramExercisesByRow[row];
+    if (!file || !ex || !currentClientCard) { input.value = ''; return; }
+    document.getElementById('ex-own-photo-btn-txt').textContent = '⏳ Загружаю...';
+    _compressImageFile(file, 1280, 0.82, function(result) {
+        fetch(APPS_SCRIPT_URL + '?action=setClientExercisePhoto&chatId=' + encodeURIComponent(currentClientCard.chatId), {
+            method: 'POST',
+            body: JSON.stringify({ exercise: ex.exercise, photoBase64: result.base64, photoMime: result.mime })
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (!data.success) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось сохранить')); return; }
+            ex.photo1 = data.photo; ex.photo2 = ''; ex.photoOwn = true;
+            _syncOwnPhotoBadge(row, true);
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        }).catch(function() {
+            tg.showAlert('Ошибка соединения ❌');
+        }).then(function() {
+            input.value = '';
+            if (currentEditingRow === row) _renderOwnPhotoField(ex);
+        });
+    }, function(errMsg) {
+        input.value = '';
+        tg.showAlert('❌ ' + errMsg);
+        if (currentEditingRow === row) _renderOwnPhotoField(ex);
+    });
+}
+
+async function _clearOwnPhoto() {
+    var row = currentEditingRow;
+    var ex = row && currentProgramExercisesByRow[row];
+    if (!ex || !currentClientCard) return;
+    var ok = await tgConfirm('Убрать своё фото? Клиент снова будет видеть фото из библиотеки.');
+    if (!ok) return;
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=removeClientExercisePhoto' +
+            '&chatId=' + encodeURIComponent(currentClientCard.chatId) +
+            '&exercise=' + encodeURIComponent(ex.exercise));
+        var data = await resp.json();
+        if (!data.success) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
+        // Какое фото в библиотеке, узнаем при следующей загрузке программы —
+        // до неё превью просто пустое, а не чужое.
+        ex.photo1 = ''; ex.photoOwn = false;
+        _syncOwnPhotoBadge(row, false);
+        if (currentEditingRow === row) _renderOwnPhotoField(ex);
+    } catch (e) {
+        tg.showAlert('Ошибка соединения ❌');
+    }
+}
+
 function closeExerciseEditor() {
     document.getElementById('ex-editor-modal').classList.add('hidden');
     closeExerciseLibrary();
+    _renderOwnPhotoField(null);
     currentEditingRow = null;
 }
 
@@ -9659,6 +9777,7 @@ function openBlockModal(dayName, type, circuitCount) {
     currentBlockDay = dayName || '';
     // Чтобы библиотека упражнений знала, для какого дня показывать фильтр "Этот день"
     currentEditingMode = 'add';
+    _renderOwnPhotoField(null);
     currentAddDay = dayName || '';
     currentSetType = type; // 'superset' | 'triset' | 'circuit'
     // У круга размер задаёт тренер (обычно 5–6 упражнений), у остальных он
