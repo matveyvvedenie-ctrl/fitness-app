@@ -358,7 +358,7 @@ function _mapProgramDays(rawDays) {
                     // второй раз — прогресс вверху («2/21») завышался.
                     completed: !!(ex.weightFact || ex.repsFact), timestamp: '', comment: ex.comment,
                     photo1: ex.photo1 || '', photo2: ex.photo2 || '',
-                    photoOwn: !!ex.photoOwn
+                    photoOwn: !!ex.photoOwn, ownPhoto: ex.ownPhoto || ''
                 };
             })
         };
@@ -2658,6 +2658,27 @@ function _exIsDone(ex) {
     return !!(ex && (ex.weightFact || ex.repsFact));
 }
 
+// Фото «Твой тренажёр» на весь экран. Своё простое окно, а не открытие ссылки:
+// ссылка во встроенном браузере Telegram/VK уводит из мини-аппа. Закрывается
+// нажатием в любом месте; кнопка «Закрыть» внизу — вверху её перекрывают
+// кнопки самого Telegram.
+function openOwnPhoto(src) {
+    if (!src) return;
+    var box = document.getElementById('own-photo-viewer');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'own-photo-viewer';
+        box.className = 'own-photo-viewer hidden';
+        box.innerHTML = '<img alt="">' +
+            '<button type="button" class="own-photo-viewer-close">Закрыть</button>';
+        box.addEventListener('click', function() { box.classList.add('hidden'); });
+        document.body.appendChild(box);
+    }
+    box.querySelector('img').src = src;
+    box.classList.remove('hidden');
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+}
+
 function createExerciseCard(exercise, dayIndex, exIndex) {
     var card = document.createElement('div');
     card.className = 'exercise-card';
@@ -2735,6 +2756,22 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
             '</div>';
     }
 
+    // «Твой тренажёр» — фото тренажёра из зала самого клиента (тренер кладёт
+    // его в редакторе упражнения). Отдельной строкой ПОД фото техники, а не
+    // вместо них: техника показывает, как делать движение, тренажёр — на чём.
+    // Первая версия подменяла фото техники — клиент видел пустой тренажёр во
+    // весь экран и не видел, как выполнять (Matvey, 10.09).
+    var ownPhotoHtml = exercise.ownPhoto
+        ? '<button type="button" class="ex-own-row" data-src="' + _escHtmlAttr(String(exercise.ownPhoto)) + '" ' +
+              'onclick="openOwnPhoto(this.dataset.src)">' +
+              '<img src="' + _escHtmlAttr(String(exercise.ownPhoto)) + '" alt="" loading="lazy" ' +
+                  'onerror="this.style.visibility=\'hidden\'">' +
+              '<span class="ex-own-row-txt"><strong>Твой тренажёр</strong>' +
+                  '<small>нажми, чтобы открыть</small></span>' +
+              '<span class="ex-own-row-arrow">' + _homeIcon('chevron') + '</span>' +
+          '</button>'
+        : '';
+
     function _param(icon, label, value, cls) {
         return '<div class="param">' +
                    '<div class="param-label">' + _homeIcon(icon) + '<span>' + label + '</span></div>' +
@@ -2751,6 +2788,7 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
         '</button>' +
         mediaHtml +
         '<div class="exercise-body">' +
+            ownPhotoHtml +
             '<div class="exercise-name">' +
                 '<span>' + _escHtml(cleanExerciseName(exercise.exercise)) + '</span>' +
                 // Отметка «Сделано» — видна только у карточки с классом is-done
@@ -8956,9 +8994,9 @@ function _renderOwnPhotoField(ex) {
     if (!field) return;
     field.classList.toggle('hidden', !ex);
     if (!ex) return;
-    var own = !!(ex.photoOwn && ex.photo1);
+    var own = !!(ex.photoOwn && ex.ownPhoto);
     document.getElementById('ex-own-photo-preview').innerHTML = own
-        ? '<img src="' + _escHtmlAttr(String(ex.photo1)) + '" alt="">'
+        ? '<img src="' + _escHtmlAttr(String(ex.ownPhoto)) + '" alt="">'
         : _homeIcon('image');
     document.getElementById('ex-own-photo-btn-txt').textContent = own ? 'Заменить фото' : 'Загрузить фото';
     document.getElementById('ex-own-photo-clear').classList.toggle('hidden', !own);
@@ -8987,7 +9025,7 @@ function _onOwnPhotoPicked(input) {
             body: JSON.stringify({ exercise: ex.exercise, photoBase64: result.base64, photoMime: result.mime })
         }).then(function(r) { return r.json(); }).then(function(data) {
             if (!data.success) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось сохранить')); return; }
-            ex.photo1 = data.photo; ex.photo2 = ''; ex.photoOwn = true;
+            ex.ownPhoto = data.photo; ex.photoOwn = true;
             _syncOwnPhotoBadge(row, true);
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         }).catch(function() {
@@ -9016,9 +9054,7 @@ async function _clearOwnPhoto() {
             '&exercise=' + encodeURIComponent(ex.exercise));
         var data = await resp.json();
         if (!data.success) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
-        // Какое фото в библиотеке, узнаем при следующей загрузке программы —
-        // до неё превью просто пустое, а не чужое.
-        ex.photo1 = ''; ex.photoOwn = false;
+        ex.ownPhoto = ''; ex.photoOwn = false;
         _syncOwnPhotoBadge(row, false);
         if (currentEditingRow === row) _renderOwnPhotoField(ex);
     } catch (e) {

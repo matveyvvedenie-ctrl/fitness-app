@@ -7126,6 +7126,81 @@ body.theme-dark #workout-tab::after {
 }
 #workout-tab .ex-done-badge svg { width: 13px; height: 13px; stroke-width: 2.5; }
 #workout-tab .exercise-card.is-done .ex-done-badge { display: inline-flex; }
+
+/* 10.09. «Твой тренажёр» — фото тренажёра из зала клиента, строкой под фото
+   техники (см. ownPhotoHtml в createExerciseCard). Небольшая миниатюра, а не
+   большое фото: главное в карточке — техника, тренажёр — справка «на чём». */
+#workout-tab .ex-own-row {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-3);
+    width: 100%;
+    margin: 0 0 var(--gap-3);
+    padding: 8px;
+    border: 1px solid var(--ds-border-soft);
+    border-radius: var(--radius-md, 12px);
+    background: var(--ds-surface-2);
+    color: var(--ds-text);
+    font: inherit;
+    text-align: left;
+    box-shadow: none;
+    cursor: pointer;
+}
+#workout-tab .ex-own-row:active { background: var(--ds-surface-3); }
+#workout-tab .ex-own-row img {
+    flex: 0 0 56px;
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: var(--ds-surface-3);
+}
+#workout-tab .ex-own-row-txt {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+#workout-tab .ex-own-row-txt strong { font-size: 15px; font-weight: 700; }
+#workout-tab .ex-own-row-txt small { font-size: 12px; color: var(--ds-text-muted); }
+#workout-tab .ex-own-row-arrow { display: flex; color: var(--ds-text-muted); }
+/* Иконка chevron нарисована стрелкой вниз; строка открывает фото, а не
+   раскрывается — поворачиваем вправо. */
+#workout-tab .ex-own-row-arrow svg { width: 18px; height: 18px; transform: rotate(-90deg); }
+
+/* Просмотр «Твой тренажёр» на весь экран. Тёмный фон одинаков во всех темах —
+   это рамка для фото, а не часть интерфейса. */
+.own-photo-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 16px 88px;
+    background: rgba(0, 0, 0, 0.92);
+}
+.own-photo-viewer img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 10px;
+}
+.own-photo-viewer-close {
+    position: absolute;
+    left: 50%;
+    bottom: max(24px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    padding: 12px 28px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+}
 #workout-tab .ex-collapse svg { width: 16px; height: 16px; transform: rotate(180deg); }
 
 
