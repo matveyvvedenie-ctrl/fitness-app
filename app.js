@@ -1236,32 +1236,46 @@ var NEW_API_ACTIONS = {
     // в api/models.py. Название упражнения — в теле/параметре, не в адресе: в
     // названиях бывает «/» (история с днём «ВТ СПИНА/ГРУДЬ»). Повтор при обрыве
     // безопасен: сервер заменяет фото, а не добавляет второе.
+    // 10.09, вторая правка. Клиента ищем ТЕМ ЖЕ способом, что и программу
+    // (readClientProgram) и все прочие правки плана, — по имени карточки через
+    // _resolveChatIdByName, а не по chatId карточки напрямую. Первая версия
+    // брала chatId карточки, а программа читается через справочник «имя → id»,
+    // где при двух клиентах с одним именем выигрывает последний. Фото
+    // сохранялось одному, программа читалась у другого: сервер отвечал
+    // «сохранено», а после перезахода фото не было (Дина у Матвея). chatId
+    // карточки — запасной путь, если имени почему-то нет.
     setClientExercisePhoto: function(nativeFetch, params, init) {
         var body;
         try { body = JSON.parse((init && init.body) || '{}'); } catch (_) { body = {}; }
-        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
-            encodeURIComponent(params.get('chatId') || '') + '/exercise-photo';
-        return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
-            method: 'PUT', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({
-                exercise: body.exercise || '', photoBase64: body.photoBase64 || '',
-                photoMime: body.photoMime || 'image/jpeg'
-            })
-        }, 2).then(function(r) { return r.json().then(function(data) {
-            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
-            return _fakeJsonResponse(data, 200);
-        }); });
+        return _resolveChatIdByName(nativeFetch, params.get('sheetName') || '').then(function(resolved) {
+            var chatId = resolved || params.get('chatId') || '';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
+                encodeURIComponent(chatId) + '/exercise-photo';
+            return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
+                method: 'PUT', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({
+                    exercise: body.exercise || '', photoBase64: body.photoBase64 || '',
+                    photoMime: body.photoMime || 'image/jpeg'
+                })
+            }, 2).then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось сохранить' }, 200);
+                return _fakeJsonResponse(data, 200);
+            }); });
+        });
     },
     removeClientExercisePhoto: function(nativeFetch, params) {
-        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
-            encodeURIComponent(params.get('chatId') || '') + '/exercise-photo' +
-            '?exercise=' + encodeURIComponent(params.get('exercise') || '');
-        return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
-            method: 'DELETE', headers: _newApiHeaders()
-        }, 2).then(function(r) { return r.json().then(function(data) {
-            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
-            return _fakeJsonResponse({ success: true }, 200);
-        }); });
+        return _resolveChatIdByName(nativeFetch, params.get('sheetName') || '').then(function(resolved) {
+            var chatId = resolved || params.get('chatId') || '';
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
+                encodeURIComponent(chatId) + '/exercise-photo' +
+                '?exercise=' + encodeURIComponent(params.get('exercise') || '');
+            return _fetchNewApiWithRetry(nativeFetch, NEW_API_BASE + path, {
+                method: 'DELETE', headers: _newApiHeaders()
+            }, 2).then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                return _fakeJsonResponse({ success: true }, 200);
+            }); });
+        });
     },
     // Аналог action=write/writeWorkoutData — клиент завершает тренировочный
     // день (кнопка «Сохранить» в тренировке). ВАЖНО: этот экшен идёт через
@@ -8946,7 +8960,8 @@ function _onOwnPhotoPicked(input) {
     if (!file || !ex || !currentClientCard) { input.value = ''; return; }
     document.getElementById('ex-own-photo-btn-txt').textContent = '⏳ Загружаю...';
     _compressImageFile(file, 1280, 0.82, function(result) {
-        fetch(APPS_SCRIPT_URL + '?action=setClientExercisePhoto&chatId=' + encodeURIComponent(currentClientCard.chatId), {
+        fetch(APPS_SCRIPT_URL + '?action=setClientExercisePhoto&chatId=' + encodeURIComponent(currentClientCard.chatId) +
+              '&sheetName=' + encodeURIComponent(currentClientCard.sheetName || ''), {
             method: 'POST',
             body: JSON.stringify({ exercise: ex.exercise, photoBase64: result.base64, photoMime: result.mime })
         }).then(function(r) { return r.json(); }).then(function(data) {
@@ -8976,6 +8991,7 @@ async function _clearOwnPhoto() {
     try {
         var resp = await fetch(APPS_SCRIPT_URL + '?action=removeClientExercisePhoto' +
             '&chatId=' + encodeURIComponent(currentClientCard.chatId) +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName || '') +
             '&exercise=' + encodeURIComponent(ex.exercise));
         var data = await resp.json();
         if (!data.success) { tg.showAlert('Ошибка: ' + (data.error || 'не удалось')); return; }
