@@ -325,6 +325,19 @@ function _newApiCall(nativeFetch, path) {
 // список клиентов Романа меняется редко, а если что — просто обновит страницу.
 var _nameToChatIdCache = null;
 function _resolveChatIdByName(nativeFetch, name) {
+    // 10.09. Открыта карточка клиента с этим именем — берём её chatId, а не
+    // ищем по имени. Справочник «имя → id» при двух клиентах с одним именем
+    // оставляет ПОСЛЕДНЕГО, и все действия карточки (программа, правки, дни,
+    // недели, заметки, питание, история, фото — ~20 мест) уходили не к той
+    // строке, на которую нажал тренер, а к другой записи с тем же именем.
+    // Шапка карточки при этом бралась из строки списка — и расходилась с
+    // содержимым: у Дины Матвея «последняя тренировка 2 дня назад», а во
+    // вкладке «История» — один день, 15 августа (история другой «Дины»).
+    // Имя — только запасной путь, когда карточка не открыта.
+    if (currentClientCard && currentClientCard.chatId && name &&
+        (currentClientCard.sheetName === name || currentClientCard.name === name)) {
+        return Promise.resolve(currentClientCard.chatId);
+    }
     if (_nameToChatIdCache) return Promise.resolve(_nameToChatIdCache[name] || null);
     var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients';
     return _newApiCall(nativeFetch, path).then(function(res) {
@@ -7673,6 +7686,16 @@ async function handleDayReorder(container) {
 
 // Кэш истории по имени клиента (на случай переключения вкладок туда-сюда)
 var clientHistoryCache = {};
+// 10.09. Ключ кэша истории — chatId открытой карточки, а не имя: у двух
+// клиентов с одним именем история была бы общей (тот же корень, что в
+// _resolveChatIdByName). Имя — только если карточка не открыта.
+function _clientHistoryKey(clientName) {
+    if (currentClientCard && currentClientCard.chatId &&
+        (currentClientCard.name === clientName || currentClientCard.sheetName === clientName)) {
+        return currentClientCard.chatId;
+    }
+    return clientName;
+}
 var clientHistoryLoadedFor = '';
 
 async function loadClientHistory(clientName) {
@@ -7681,8 +7704,8 @@ async function loadClientHistory(clientName) {
     if (!container) return;
 
     // Если уже грузили для этого клиента — просто перерендерим из кэша
-    if (clientHistoryLoadedFor === clientName && clientHistoryCache[clientName]) {
-        renderClientHistory(clientHistoryCache[clientName]);
+    if (clientHistoryLoadedFor === _clientHistoryKey(clientName) && clientHistoryCache[_clientHistoryKey(clientName)]) {
+        renderClientHistory(clientHistoryCache[_clientHistoryKey(clientName)]);
         return;
     }
 
@@ -7697,8 +7720,8 @@ async function loadClientHistory(clientName) {
             container.innerHTML = '<div class="no-data">Ошибка: ' + data.error + '</div>';
             return;
         }
-        clientHistoryCache[clientName] = data.history || [];
-        clientHistoryLoadedFor = clientName;
+        clientHistoryCache[_clientHistoryKey(clientName)] = data.history || [];
+        clientHistoryLoadedFor = _clientHistoryKey(clientName);
         renderClientHistory(data.history || []);
     } catch (error) {
         console.error('Load history error:', error);
@@ -7915,10 +7938,10 @@ var statsProgressPhotos = []; // [{date, url}]
 
 async function loadClientStats(clientName, chatId) {
     if (!clientName) return;
-    if (statsLoadedFor === clientName) return; // уже посчитано
+    if (statsLoadedFor === _clientHistoryKey(clientName)) return; // уже посчитано
 
     // Сначала убеждаемся что есть история (для PR/объёма/consistency)
-    if (clientHistoryLoadedFor !== clientName) {
+    if (clientHistoryLoadedFor !== _clientHistoryKey(clientName)) {
         await loadClientHistory(clientName);
     }
     // Также подгружаем замеры (для графика веса тела и фото прогресса)
@@ -7973,7 +7996,7 @@ async function loadClientStats(clientName, chatId) {
         } catch (_) {}
     }
 
-    statsLoadedFor = clientName;
+    statsLoadedFor = _clientHistoryKey(clientName);
     renderClientStats();
 }
 
@@ -8001,7 +8024,7 @@ function _isoWeekKey(d) {
 }
 
 function renderClientStats() {
-    var history = (clientHistoryCache[currentClientCard.name] || []).slice();
+    var history = (clientHistoryCache[_clientHistoryKey(currentClientCard.name)] || []).slice();
     var now = Date.now();
     var msDay = 24 * 60 * 60 * 1000;
 
@@ -8550,7 +8573,7 @@ function _collectExerciseAttempts(history, exerciseName) {
 
 function openExerciseStats() {
     if (!currentClientCard) return;
-    var history = clientHistoryCache[currentClientCard.name] || [];
+    var history = clientHistoryCache[_clientHistoryKey(currentClientCard.name)] || [];
     if (history.length === 0) {
         tg.showAlert('Сначала открой вкладку «История» — нужно загрузить данные');
         return;
@@ -8596,7 +8619,7 @@ function closeExerciseStats() {
 }
 
 function renderExerciseStats(clientName, exerciseName) {
-    var history = clientHistoryCache[clientName] || [];
+    var history = clientHistoryCache[_clientHistoryKey(clientName)] || [];
     var attempts = _collectExerciseAttempts(history, exerciseName);
 
     // ── Личный рекорд ──
