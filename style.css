@@ -7096,6 +7096,36 @@ body.theme-dark #workout-tab::after {
     box-shadow: none;
 }
 #workout-tab .exercise-card.has-feedback .ex-collapse { display: flex; }
+
+/* 10.09. Сделанное упражнение (вписан вес или повторы — то же правило, что у
+   счётчика дня «2/7», см. _exIsDone в app.js) подсвечено зелёным: клиент сразу
+   видит, что уже выполнил, не вчитываясь в поля. Оттенок фона — смесь зелёного
+   с фоном самой карточки, а не готовый светлый tint: в тёмной теме светло-
+   зелёная плашка на чёрном была бы пятном, а так цвет подстраивается под
+   любую из трёх тем. Браузер без color-mix просто оставит обычный фон —
+   рамка и отметка «Сделано» останутся. */
+#workout-tab .exercise-card.is-done {
+    border-color: var(--ds-fg-success);
+    background: color-mix(in srgb, var(--ds-fg-success) 7%, var(--ds-surface));
+}
+#workout-tab .ex-done-badge {
+    display: none;
+    flex: 0 0 auto;
+    align-self: center;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    padding: 3px 9px 3px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ds-fg-success) 14%, var(--ds-surface));
+    color: var(--ds-fg-success);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+#workout-tab .ex-done-badge svg { width: 13px; height: 13px; stroke-width: 2.5; }
+#workout-tab .exercise-card.is-done .ex-done-badge { display: inline-flex; }
 #workout-tab .ex-collapse svg { width: 16px; height: 16px; transform: rotate(180deg); }
 
 

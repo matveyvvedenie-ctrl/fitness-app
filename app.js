@@ -352,7 +352,11 @@ function _mapProgramDays(rawDays) {
                     rowIndex: ex.id, exercise: ex.exercise, sets: ex.sets, reps: ex.reps,
                     weightPlan: ex.weightPlan, rpe: ex.rpe, video: ex.video || '', videoVk: ex.videoVk || '',
                     note: ex.note, weightFact: ex.weightFact, repsFact: ex.repsFact,
-                    completed: false, timestamp: '', comment: ex.comment,
+                    // 10.09. Было всегда false, хотя общий счётчик при загрузке
+                    // уже учитывал вписанные с сервера вес/повторы. Первая же
+                    // правка такого упражнения (handleInput) засчитывала его
+                    // второй раз — прогресс вверху («2/21») завышался.
+                    completed: !!(ex.weightFact || ex.repsFact), timestamp: '', comment: ex.comment,
                     photo1: ex.photo1 || '', photo2: ex.photo2 || '',
                     photoOwn: !!ex.photoOwn
                 };
@@ -2644,6 +2648,16 @@ function toggleExerciseCard(dayIndex, exIndex) {
 }
 
 
+// 10.09. Упражнение считается сделанным, когда вписан вес ИЛИ повторы — то
+// же правило, что у счётчика дня «2/7» (updateDayCounter) и общего прогресса.
+// По нему карточка подсвечивается (класс is-done), чтобы клиент сразу видел,
+// что уже выполнил. Правило одно на всех: если бы подсветка требовала и вес,
+// и повторы, упражнение с собственным весом не загоралось бы никогда, а
+// «2/7» и зелёные карточки расходились бы между собой.
+function _exIsDone(ex) {
+    return !!(ex && (ex.weightFact || ex.repsFact));
+}
+
 function createExerciseCard(exercise, dayIndex, exIndex) {
     var card = document.createElement('div');
     card.className = 'exercise-card';
@@ -2739,6 +2753,10 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
         '<div class="exercise-body">' +
             '<div class="exercise-name">' +
                 '<span>' + _escHtml(cleanExerciseName(exercise.exercise)) + '</span>' +
+                // Отметка «Сделано» — видна только у карточки с классом is-done
+                // (см. _exIsDone). Лежит в разметке всегда, чтобы при вводе веса
+                // не пересобирать карточку.
+                '<span class="ex-done-badge">' + _homeIcon('check') + '<span>Сделано</span></span>' +
                 // Кнопка «свернуть» есть в разметке всегда, но видна только у
                 // выполненных упражнений (класс has-feedback на карточке).
                 '<button type="button" class="ex-collapse" ' +
@@ -2784,6 +2802,7 @@ function createExerciseCard(exercise, dayIndex, exIndex) {
         card.classList.add('collapsed');
     }
     if (exercise.feedback) card.classList.add('has-feedback');
+    if (_exIsDone(exercise)) card.classList.add('is-done');
     return card;
 }
 
@@ -3112,6 +3131,8 @@ function handleInput(input) {
         }
         // Обновляем счётчик дня в заголовке
         updateDayCounter(parseInt(dayIndex));
+        var doneCard = document.getElementById('ex-card-' + dayIndex + '-' + exIndex);
+        if (doneCard) doneCard.classList.toggle('is-done', _exIsDone(exercise));
     }
 }
  
