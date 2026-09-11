@@ -6281,6 +6281,11 @@ body.theme-dark .save-btn.success {
     margin-bottom: 14px;
 }
 
+/* 11.09. Третий режим «Из другого клиента» — на всю ширину под двумя
+   первыми: сетка по два в ряд, и одна кнопка в половину строки смотрелась
+   бы недоделанной. */
+.nw-mode-btn-wide { grid-column: 1 / -1; }
+
 .nw-mode-btn {
     padding: 12px 10px;
     border-radius: 12px;

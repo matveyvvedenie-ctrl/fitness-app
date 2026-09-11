@@ -1153,6 +1153,21 @@ var NEW_API_ACTIONS = {
     // со старой ({stats, alerts, clients}) — реформатировать нечего. В
     // отличие от остального пилота, не завязан на конкретного клиента/
     // sheetName, поэтому резолвер имени не нужен.
+    // 11.09. Неделя из программы другого клиента — см. copy_week_between_clients
+    // в api/main.py. Оба chatId известны напрямую: карточка открыта, источник
+    // выбран из списка по chatId. Резолвер по имени здесь не нужен и был бы
+    // вреден — у тёзок именно он и привёл к тому, ради чего это сделано.
+    // Без повторов при сбое: это запись, повтор создал бы вторую неделю.
+    copyWeekFromClient: function(nativeFetch, params) {
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/copy-week';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ fromChatId: params.get('fromChatId') || '', toChatId: params.get('toChatId') || '' })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось скопировать' }, 200);
+            return _fakeJsonResponse({ success: true, newTitle: data.weekTitle, copied: data.copied, fromName: data.fromName }, 200);
+        }); });
+    },
     getFoodDashboard: function(nativeFetch) {
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/food-dashboard';
         return _newApiCall(nativeFetch, path).then(function(res) {
@@ -7311,7 +7326,7 @@ function renderExerciseRow(ex, label) {
 
 // Дублировать неделю — план остаётся, факты стираются, заголовок инкрементируется
 // (автоподбор весов временно отключён, подключим в следующей итерации через ИИ)
-var newWeekMode = 'copy';   // 'copy' — повторить прошлую, 'blank' — с чистого листа
+var newWeekMode = 'copy';   // 'copy' — повторить прошлую, 'blank' — с чистого листа, 'from' — из другого клиента
 
 function selectNewWeekMode(mode) {
     newWeekMode = mode;
@@ -7320,8 +7335,12 @@ function selectNewWeekMode(mode) {
     });
     document.getElementById('new-week-copy-options').classList.toggle('hidden', mode !== 'copy');
     document.getElementById('new-week-blank-hint').classList.toggle('hidden', mode !== 'blank');
+    var fromBox = document.getElementById('new-week-from-options');
+    if (fromBox) fromBox.classList.toggle('hidden', mode !== 'from');
     document.getElementById('new-week-create-btn').textContent =
-        mode === 'blank' ? '📄 Создать пустую неделю' : '📅 Создать неделю';
+        mode === 'blank' ? '📄 Создать пустую неделю'
+        : mode === 'from' ? '👥 Скопировать неделю'
+        : '📅 Создать неделю';
 }
 
 function duplicateWeekFlow() {
@@ -7329,6 +7348,19 @@ function duplicateWeekFlow() {
     var name = currentClientCard.name || 'клиента';
     document.getElementById('new-week-client-line').textContent = 'Для ' + name + '.';
     document.getElementById('new-week-autoprogress').checked = true;
+    // Список «чью неделю взять»: все клиенты тренера, кроме этого. В подписи —
+    // неделя, отметка «архив» и id: у тёзок (две «Дины») иначе не отличить.
+    var fromSel = document.getElementById('new-week-from-select');
+    if (fromSel) {
+        var others = (adminClients || []).filter(function(c) {
+            return c.chatId && c.chatId !== currentClientCard.chatId;
+        }).sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'ru'); });
+        fromSel.innerHTML = '<option value="">— выбери клиента —</option>' + others.map(function(c) {
+            var label = (c.name || 'Без имени') + ' · ' + (c.weekTitle || 'нет программы') +
+                (c.archived ? ' · архив' : '') + ' · id ' + c.chatId;
+            return '<option value="' + _escHtmlAttr(c.chatId) + '">' + _escHtml(label) + '</option>';
+        }).join('');
+    }
     selectNewWeekMode('copy');
     document.getElementById('new-week-modal').classList.remove('hidden');
     document.body.classList.add('no-scroll');
@@ -7347,10 +7379,25 @@ async function confirmNewWeek() {
     btn.disabled = true;
     btn.textContent = '⏳ Создание...';
 
+    var fromChatId = '';
+    if (newWeekMode === 'from') {
+        fromChatId = (document.getElementById('new-week-from-select') || {}).value || '';
+        if (!fromChatId) {
+            btn.disabled = false;
+            btn.textContent = origText;
+            tg.showAlert('Выбери клиента, чью неделю взять');
+            return;
+        }
+    }
+
     try {
         var url = newWeekMode === 'blank'
             ? (APPS_SCRIPT_URL + '?action=blankClientWeek' +
                '&sheetName=' + encodeURIComponent(currentClientCard.sheetName))
+            : newWeekMode === 'from'
+            ? (APPS_SCRIPT_URL + '?action=copyWeekFromClient' +
+               '&fromChatId=' + encodeURIComponent(fromChatId) +
+               '&toChatId=' + encodeURIComponent(currentClientCard.chatId))
             : (APPS_SCRIPT_URL + '?action=duplicateClientWeek' +
                '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
                '&autoProgress=' + (autoProgress ? 'true' : 'false'));
@@ -7372,6 +7419,8 @@ async function confirmNewWeek() {
         tg.showAlert('✅ Новая неделя создана: ' + (data.newTitle || '') +
             (newWeekMode === 'blank'
                 ? '\n\nОна пустая — добавь дни и упражнения.'
+                : newWeekMode === 'from'
+                ? '\n\nСкопировано упражнений: ' + (data.copied || 0) + ' — из программы «' + (data.fromName || '') + '».'
                 : (autoProgress ? '\n\nВеса подобраны автоматически — проверь и поправь при желании.' : '')));
     } catch (error) {
         console.error('Duplicate week error:', error);
