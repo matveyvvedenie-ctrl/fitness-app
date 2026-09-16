@@ -4985,6 +4985,19 @@ body.theme-dark .save-btn.success {
 
 .ex-editor-history-hint strong { color: var(--fg-success); }
 
+/* 16.09. Комментарий клиента к упражнению — отдельной строкой под цифрами:
+   он длинный («тяжеловато, первый подход 12, остальные 11»), в строку с
+   весом и повторами не встаёт. Тоньше и спокойнее цифр: это пояснение. */
+.ex-editor-history-hint .ex-hint-comment {
+    margin-top: 5px;
+    padding-top: 5px;
+    border-top: 1px solid rgba(67, 160, 71, 0.25);
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .ex-editor-history-hint .ex-hint-feedback {
     display: inline-block;
     font-size: 11px;

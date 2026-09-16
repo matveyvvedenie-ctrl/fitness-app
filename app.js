@@ -8856,6 +8856,7 @@ function openExerciseEditor(rowIndex) {
         weightFact: ex.weightFact,
         repsFact: ex.repsFact,
         rpe: ex.rpe,
+        comment: ex.comment,
         date: '' // в текущей программе нет даты
     });
     // Параллельно запрашиваем самое свежее из истории (если упражнение не пустое)
@@ -8889,10 +8890,17 @@ function showLastResultHint(data) {
         parts.push(data.feedback.emoji + ' ' + data.feedback.label);
     }
     var dateTxt = data.date ? ' (' + data.date + ')' : '';
+    // 16.09. Комментарий клиента к упражнению — тренеру он нужен как раз при
+    // правке («тяжеловато, первый подход 12, остальные 11»), а подсказка
+    // показывала только вес, повторы и оценку. Защита от ISO-даты — та же, что
+    // в карточке упражнения: иногда в поле комментария попадала дата.
+    var comment = (data.comment == null ? '' : String(data.comment)).trim();
+    if (/^\d{4}-\d{2}-\d{2}T/.test(comment) || /^\d{2}\.\d{2}\.\d{4}/.test(comment)) comment = '';
     hint.classList.remove('hidden');
     hint.classList.remove('ex-hint-empty');
     hint.classList.remove('ex-hint-loading');
-    hint.innerHTML = '💪 Последний раз: <strong>' + parts.join(' · ') + '</strong>' + dateTxt;
+    hint.innerHTML = '💪 Последний раз: <strong>' + parts.join(' · ') + '</strong>' + dateTxt +
+        (comment ? '<div class="ex-hint-comment">💬 ' + _escHtml(comment) + '</div>' : '');
 }
 
 // Сообщение «Это упражнение клиент ещё не выполнял»
@@ -8950,6 +8958,7 @@ function loadAndShowLastResult(exerciseName) {
                     repsFact: data.repsFact,
                     rpe: data.rpe,
                     feedback: data.feedback,
+                    comment: data.comment,
                     date: data.date
                 };
                 showLastResultHint(lastResultCache[key]);
