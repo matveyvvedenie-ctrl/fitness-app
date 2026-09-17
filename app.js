@@ -1309,6 +1309,20 @@ var NEW_API_ACTIONS = {
             }); });
         });
     },
+    // 17.09. Удаление упражнения из библиотеки (см. delete_exercise_from_library
+    // в api/main.py). Без повторов при сбое: удаление не идемпотентно на вид —
+    // повтор вернул бы «упражнение не найдено» и напугал бы тренера, хотя
+    // первое удаление прошло.
+    deleteExerciseFromLibrary: function(nativeFetch, params) {
+        var name = (params.get('name') || '').trim();
+        if (!name) return _fakeJsonResponse({ success: false, error: 'Не указано название упражнения' }, 200);
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/exercises/' + encodeURIComponent(name);
+        return nativeFetch(NEW_API_BASE + path, { method: 'DELETE', headers: _newApiHeaders() })
+            .then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось удалить' }, 200);
+                return _fakeJsonResponse({ success: true, name: data.name }, 200);
+            }); });
+    },
     // Аналог action=write/writeWorkoutData — клиент завершает тренировочный
     // день (кнопка «Сохранить» в тренировке). ВАЖНО: этот экшен идёт через
     // GET (см. save-btn обработчик — exercises кладутся в query string, не в
@@ -5341,6 +5355,9 @@ function openExerciseMediaEditor(name) {
         if (preview) preview.innerHTML = url ? '<img src="' + url + '">' : (slot === '1' ? '🏋️' : '💪');
     });
 
+    var delBtn = document.getElementById('ex-media-delete-btn');
+    if (delBtn) delBtn.classList.toggle('hidden', !ex);
+
     document.getElementById('ex-media-modal').classList.remove('hidden');
     document.body.classList.add('no-scroll');
 }
@@ -5389,6 +5406,39 @@ async function saveExerciseMediaEntry() {
         tg.showAlert('Не удалось сохранить ❌\n\n' + ((e && e.message) || 'нет связи с сервером'));
         btn.disabled = false;
         btn.textContent = origText;
+    }
+}
+
+// Удалить упражнение из библиотеки целиком. Предупреждаем честно: программы
+// клиентов не изменятся, но фото и видео техники у этого упражнения пропадут
+// у всех, у кого оно стоит в программе.
+async function deleteExerciseMediaEntry() {
+    var name = exerciseMediaEditingName;
+    if (!name) return;
+    var ok = await tgConfirm('Удалить «' + name + '» из библиотеки?\n\n' +
+        'Фото и видео техники пропадут у всех клиентов, у кого это упражнение стоит в программе. ' +
+        'Сами программы не изменятся.');
+    if (!ok) return;
+
+    var btn = document.getElementById('ex-media-delete-btn');
+    var origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Удаление...'; }
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=deleteExerciseFromLibrary&name=' + encodeURIComponent(name));
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось удалить'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        closeExerciseMediaEditor();
+        await loadExerciseMediaLibrary();
+        tg.showAlert('🗑 «' + name + '» удалено из библиотеки');
+    } catch (e) {
+        console.error('deleteExerciseMediaEntry error:', e);
+        tg.showAlert('Не удалось удалить ❌\n\n' + ((e && e.message) || 'нет связи с сервером'));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = origText; }
     }
 }
 

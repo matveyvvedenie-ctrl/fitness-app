@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260916a">
+    <link rel="stylesheet" href="style.css?v=20260917a">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -963,6 +963,8 @@
                 <div class="nc-hint">Видео проще всего загрузить в свою группу VK (Управление → Видео → Загрузить), а сюда просто вставить ссылку на него.</div>
             </div>
             <div class="ex-editor-actions">
+                <!-- 17.09. Видна только у существующего упражнения — см. openExerciseMediaEditor. -->
+                <button class="ex-editor-btn ex-editor-btn-delete hidden" id="ex-media-delete-btn" onclick="deleteExerciseMediaEntry()">🗑 Удалить</button>
                 <button class="ex-editor-btn ex-editor-btn-save" id="ex-media-save-btn" onclick="saveExerciseMediaEntry()">💾 Сохранить</button>
             </div>
         </div>
@@ -1923,6 +1925,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260916a" defer></script>
+    <script src="app.js?v=20260917a" defer></script>
 </body>
 </html>
