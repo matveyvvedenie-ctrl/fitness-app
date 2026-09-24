@@ -6205,7 +6205,12 @@ function renderAdminClients() {
                 '<td>' + (c.workouts7Days || 0) + '</td>' +
                 '<td class="admin-row-actions">' +
                     '<button class="admin-row-btn" title="Открыть" onclick="openClientCard(\'' + c.chatId + '\')">👁</button>' +
-                    '<button class="admin-row-btn" title="Написать" onclick="messageClient(\'' + c.chatId + '\', \'' + safeName + '\')">✉️</button>' +
+                    // 24.09. Кнопки «Сообщение» (тот текст, что клиент видит у себя на
+                    // главной) в таблице не было, хотя в карточках на телефоне она есть
+                    // с самого начала: на компьютере тренер её просто не находил.
+                    // Порядок кнопок тот же, что в карточках.
+                    '<button class="admin-row-btn" title="Сообщение на главной у клиента" onclick="editHomeMessage(\'' + c.chatId + '\', \'' + safeName + '\')">💬</button>' +
+                    '<button class="admin-row-btn" title="Написать клиенту" onclick="messageClient(\'' + c.chatId + '\', \'' + safeName + '\')">✉️</button>' +
                     archiveAction +
                 '</td>' +
             '</tr>';
