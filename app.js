@@ -2027,12 +2027,16 @@ if (vkLaunchUserId) {
     tg = {
         initDataUnsafe: { user: { id: 'vk_' + vkLaunchUserId } },
         showAlert: function(msg) {
-            // Snackbar есть только в приложении VK; во встроенном браузере он
-            // молча не работает, а alert() там заблокирован — показываем своё.
-            try {
-                window.vkBridge.send('VKWebAppShowSnackbar', { text: String(msg) })
-                    .catch(function() { appToast(msg); });
-            } catch (_) { appToast(msg); }
+            // 25.09. Раньше пробовали плашку VK (VKWebAppShowSnackbar), а своё
+            // сообщение показывали только если VK ОТВЕТИЛ отказом. В браузере
+            // (vk.ru на компьютере) этот метод не поддерживается и ответа может
+            // не прийти вообще — тогда не показывалось НИЧЕГО. Тренер жал
+            // «Сгенерировать план», ошибка приходила, а на экране не менялось
+            // ничего, и выглядело это как «висит и не работает» (жалоба Matvey).
+            // Теперь всегда своё сообщение — ровно так же раньше поступили с
+            // окнами подтверждения (см. tgConfirm): одинаково во VK, в Telegram
+            // и в браузере, и промолчать оно не может.
+            appToast(msg);
         },
         showConfirm: function(msg, callback) {
             try {
@@ -7148,6 +7152,8 @@ async function runMealPlanAiGeneration() {
     if (!currentClientCard) return;
     var btn = document.getElementById('mp-ai-generate-btn');
     var origText = btn.textContent;
+    var errBox = document.getElementById('mp-ai-error');
+    if (errBox) { errBox.textContent = ''; errBox.classList.add('hidden'); }
     btn.disabled = true;
     btn.textContent = '🤖 Генерирую... (~30 сек)';
 
@@ -7169,7 +7175,7 @@ async function runMealPlanAiGeneration() {
         btn.disabled = false;
         btn.textContent = origText;
         if (!data.success) {
-            tg.showAlert('Ошибка: ' + (data.error || 'не удалось сгенерировать'));
+            _mealPlanAiError(data.error || 'не удалось сгенерировать');
             return;
         }
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
@@ -7180,10 +7186,22 @@ async function runMealPlanAiGeneration() {
         openMealPlanEditor(Object.assign({}, data.plan));
     } catch (e) {
         console.error('runMealPlanAiGeneration error:', e);
-        tg.showAlert('Ошибка соединения ❌');
+        _mealPlanAiError(_humanErrorText(e));
         btn.disabled = false;
         btn.textContent = origText;
     }
+}
+
+// Ошибку генерации показываем ПРЯМО В ОКНЕ, а не только всплывающей плашкой:
+// окно остаётся открытым поверх всего, и сообщение под ним легко не заметить —
+// именно так выглядело «нажал, подождал, ничего не произошло».
+function _mealPlanAiError(text) {
+    var box = document.getElementById('mp-ai-error');
+    if (box) {
+        box.textContent = '❌ ' + text;
+        box.classList.remove('hidden');
+    }
+    tg.showAlert('Ошибка: ' + text);
 }
 
 function toggleArchiveFromCard() {

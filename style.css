@@ -5010,6 +5010,24 @@ body.theme-dark .save-btn.success {
 
 .ex-editor-history-hint.hidden { display: none; }
 
+/* 25.09. Ошибка генерации плана питания — строкой в самом окне, над кнопкой.
+   Всплывающую плашку под открытым окном не видно, и сбой выглядел как
+   «нажал, подождал, ничего не произошло». */
+.mp-ai-error {
+    margin: 0 18px 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border-left: 3px solid var(--fg-danger);
+    background: var(--tint-danger, rgba(211, 47, 47, 0.08));
+    color: var(--fg-danger);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.mp-ai-error.hidden { display: none; }
+
 .ex-editor-history-hint.ex-hint-empty {
     background: var(--surface-2);
     border-left-color: #bdbdbd;
