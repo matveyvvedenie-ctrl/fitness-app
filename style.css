@@ -7163,6 +7163,31 @@ body.theme-dark #workout-tab::after {
 #workout-tab .ex-done-badge svg { width: 13px; height: 13px; stroke-width: 2.5; }
 #workout-tab .exercise-card.is-done .ex-done-badge { display: inline-flex; }
 
+/* 26.09. Самочувствие тренировки и причина провала в истории — чтобы по
+   цифрам было видно не только «сколько», но и «почему так вышло». */
+.hh-wellness {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--tint-warning, rgba(245, 158, 11, 0.12));
+    color: var(--fg-warning, #b26a00);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+.hh-wellness svg { width: 13px; height: 13px; }
+
+.hh-ex-failreason {
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-danger);
+    line-height: 1.35;
+}
+
 /* 10.09. «Твой тренажёр» — фото тренажёра из зала клиента, строкой под фото
    техники (см. ownPhotoHtml в createExerciseCard). Небольшая миниатюра, а не
    большое фото: главное в карточке — техника, тренажёр — справка «на чём». */

@@ -297,6 +297,10 @@ function _formatHistoryDays(days) {
             exercises: (day.exercises || []).map(function(ex) {
                 var out = {};
                 for (var k in ex) out[k] = ex[k];
+                // feedbackFact — то, что нажал КЛИЕНТ (есть с 26.09).
+                // feedback — прежний бейдж, посчитанный из ПЛАНОВОГО RPE:
+                // оставляем для записей, сделанных раньше.
+                out.feedbackFact = ex.feedbackFact || '';
                 out.feedback = _rpeToFeedback(ex.rpe);
                 return out;
             })
@@ -1345,7 +1349,15 @@ var NEW_API_ACTIONS = {
                 exerciseId: parseInt(ex.r !== undefined ? ex.r : ex.rowIndex, 10),
                 weightFact: (ex.w !== undefined ? ex.w : ex.weightFact) || '',
                 repsFact: (ex.p !== undefined ? ex.p : ex.repsFact) || '',
-                comment: (ex.c !== undefined ? ex.c : ex.comment) || ''
+                comment: (ex.c !== undefined ? ex.c : ex.comment) || '',
+                // 26.09. Самочувствие (wn), оценка клиента (fb), её RPE (fr) и
+                // причина провала (fr2) отправлялись и раньше, но сервер их не
+                // принимал и в историю они не попадали — тренер видел только
+                // цифры. Теперь доезжают до базы, см. CompleteDayExercise.
+                wellness: ex.wn || '',
+                feedback: ex.fb || '',
+                rpeFact: ex.fr === undefined || ex.fr === null ? '' : String(ex.fr),
+                failReason: ex.fr2 || ''
             };
         }).filter(function(e) { return !isNaN(e.exerciseId); });
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/program/complete-day';
@@ -7931,20 +7943,30 @@ function renderClientHistory(history, containerId) {
                 if (ex.repsFact !== '' && ex.repsFact != null) fact += ' × ' + ex.repsFact;
             }
 
-            // Бейдж с фидбэком (Легко/Норм/Тяжело/Не вытянул) — приходит с бэка
+            // Бейдж оценки. 26.09: если клиент сам оценил упражнение
+            // (feedbackFact), показываем ЕГО ответ. Раньше бейдж всегда
+            // считался из ПЛАНОВОГО RPE — то есть показывал замысел тренера, а
+            // выглядел как мнение клиента («RPE 8 · НОРМ» у Sqeck). У записей
+            // до 26.09 ответа нет, там остаётся прежний расчёт.
             var feedbackHtml = '';
-            if (ex.feedback && ex.feedback.label) {
-                // Своя история — подпись в роде клиента. Тренеру оставляем
-                // прежнюю формулировку: там перечислены чужие тренировки.
-                var fbLabel = ex.feedback.label;
-                if (isClient && ex.feedback.code === 'failed') fbLabel = rpeLabel('failed');
-                feedbackHtml = '<span class="hh-ex-feedback hh-fb-' + ex.feedback.code + '">' +
-                    (isClient
-                        ? ico(HH_FB_ICONS[ex.feedback.code] || 'smile')
-                        : ex.feedback.emoji + ' ') +
+            var fromClient = !!ex.feedbackFact;
+            var fbCode = ex.feedbackFact || (ex.feedback && ex.feedback.code) || '';
+            if (fbCode) {
+                var fbInfo = RPE_FEEDBACK_MAP[fbCode] || {};
+                var fbLabel = fromClient
+                    ? (isClient ? rpeLabel(fbCode) : (fbInfo.label || fbCode))
+                    : (isClient && fbCode === 'failed' ? rpeLabel('failed') : ex.feedback.label);
+                var fbEmoji = fromClient ? (fbInfo.emoji || '') : ex.feedback.emoji;
+                feedbackHtml = '<span class="hh-ex-feedback hh-fb-' + fbCode + '" title="' +
+                        (fromClient ? 'Как оценил клиент' : 'Посчитано по плановому RPE') + '">' +
+                    (isClient ? ico(HH_FB_ICONS[fbCode] || 'smile') : fbEmoji + ' ') +
                     '<span>' + fbLabel + '</span>' +
                 '</span>';
             }
+            // Причина провала — её клиент выбирает окном после «Не вытянул».
+            var failHtml = (ex.failReason && FAIL_REASON_LABELS[ex.failReason])
+                ? '<div class="hh-ex-failreason">Причина: ' + _escHtml(FAIL_REASON_LABELS[ex.failReason]) + '</div>'
+                : '';
 
             var rpeText = (ex.rpe !== '' && ex.rpe != null) ? ' · RPE ' + ex.rpe : '';
 
@@ -7968,9 +7990,28 @@ function renderClientHistory(history, containerId) {
                     feedbackHtml +
                 '</div>' +
                 planText +
+                failHtml +
                 commentHtml +
             '</div>';
         }).join('');
+
+        // Самочувствие на эту тренировку — одно на весь день (см. wellness в
+        // ExerciseHistory). «Отлично» не показываем: интересны отклонения,
+        // иначе метка висела бы у каждой тренировки и перестала бы читаться.
+        var wellKey = '';
+        (day.exercises || []).some(function(e) {
+            if (e.wellness && e.wellness !== 'good') { wellKey = e.wellness; return true; }
+            return false;
+        });
+        var wellHtml = '';
+        if (wellKey && WELLNESS_MAP[wellKey]) {
+            var wInfo = WELLNESS_MAP[wellKey];
+            wellHtml = '<div class="hh-wellness">' +
+                (isClient ? ico(WELLNESS_ICONS[wellKey] || 'moon') : wInfo.emoji + ' ') +
+                '<span>' + _escHtml(wellnessLabel(wellKey)) +
+                    (wInfo.factor ? ' · веса ' + wInfo.factor : '') + '</span>' +
+            '</div>';
+        }
 
         return '<details class="hh-day"' + (isOpen ? ' open' : '') + '>' +
             '<summary class="hh-day-summary">' +
@@ -7979,6 +8020,7 @@ function renderClientHistory(history, containerId) {
                     '<div class="hh-ago">' + agoLabel + '</div>' +
                 '</div>' +
                 weekInfo +
+                wellHtml +
                 '<div class="hh-count">' + day.exercises.length + ' упр.</div>' +
             '</summary>' +
             '<div class="hh-day-body">' + exHtml + '</div>' +
