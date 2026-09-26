@@ -7163,6 +7163,16 @@ body.theme-dark #workout-tab::after {
 #workout-tab .ex-done-badge svg { width: 13px; height: 13px; stroke-width: 2.5; }
 #workout-tab .exercise-card.is-done .ex-done-badge { display: inline-flex; }
 
+/* 26.09. Дата замера — своей строкой над сеткой полей: она одна на всю
+   запись, а не такой же параметр, как обхват талии. */
+.meas-date-group {
+    margin-bottom: 12px;
+}
+.meas-date-group .meas-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
 /* 26.09. Самочувствие тренировки и причина провала в истории — чтобы по
    цифрам было видно не только «сколько», но и «почему так вышло». */
 .hh-wellness {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260926a">
+    <link rel="stylesheet" href="style.css?v=20260926b">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -404,6 +404,13 @@
             <!-- Input Form -->
             <div class="meas-form-section" id="meas-form-section">
                 <h3 class="section-title">Записать замеры</h3>
+                <!-- 26.09. Дата замера. По умолчанию сегодня, но её можно
+                     поменять: мерился вчера, а записал сегодня. Будущие даты
+                     не даём выбрать (max ставится в _measResetDate). -->
+                <div class="meas-input-group meas-date-group">
+                    <label class="meas-input-label" for="meas-date"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4" /> <path d="M16 2v4" /> <rect width="18" height="18" x="3" y="4" rx="2" /> <path d="M3 10h18" /></svg><span>Дата замера</span></label>
+                    <input type="date" class="meas-input meas-date-input" id="meas-date">
+                </div>
                 <div class="meas-form-grid">
                     <div class="meas-input-group">
                         <label class="meas-input-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="3" /> <path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z" /></svg><span>Вес, кг</span></label>
@@ -1929,6 +1936,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260926a" defer></script>
+    <script src="app.js?v=20260926b" defer></script>
 </body>
 </html>

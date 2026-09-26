@@ -686,6 +686,8 @@ var NEW_API_ACTIONS = {
         ['weight', 'shoulders', 'chest', 'waist', 'hips', 'bicep', 'thigh'].forEach(function(k) {
             if (body[k] !== undefined && body[k] !== '') payload[k] = parseFloat(body[k]);
         });
+        // Дата замера (26.09). Нет — сервер поставит сегодняшнюю, как раньше.
+        if (body.date) payload.date = body.date;
         var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' + encodeURIComponent(chatId) + '/measurements';
         return nativeFetch(NEW_API_BASE + path, {
             method: 'POST', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
@@ -10229,6 +10231,7 @@ var MEAS_UNITS = {
 };
 
 async function loadMeasurementsData() {
+    _measResetDate();
     try {
         var chatId = _myChatId();
         var url = APPS_SCRIPT_URL + '?action=getMeasurements&chatId=' + chatId;
@@ -10431,6 +10434,27 @@ function initMeasForm() {
 
 var measPhotoPending = { 1: null, 2: null, 3: null };
 
+// 26.09. Дата замера. Раньше её ставил сервер — всегда «сегодня по Москве», и
+// замер, сделанный вчера или в отпуске, ложился не на тот день, а график
+// прогресса врал. Сервер принимать дату умел с самого начала (MeasurementIn),
+// просто мини-апп её не спрашивал.
+function _measTodayIso() {
+    var d = new Date();
+    var p = function(n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+// force — поставить сегодняшнюю дату, даже если поле уже заполнено (после
+// сохранения). Без force дату, выбранную человеком, не трогаем: вкладка
+// перерисовывается и при возврате на неё, и при обновлении списка.
+function _measResetDate(force) {
+    var el = document.getElementById('meas-date');
+    if (!el) return;
+    var today = _measTodayIso();
+    el.max = today;  // будущие числа выбрать нельзя
+    if (force || !el.value) el.value = today;
+}
+
 // Исходная разметка кнопки «Сохранить замеры» — см. saveMeasurements ниже.
 var _MEAS_SAVE_HTML = '';
 
@@ -10450,6 +10474,14 @@ async function saveMeasurements() {
         thigh: document.getElementById('meas-thigh').value
     };
 
+    // Дата — ОТДЕЛЬНО от fields: она заполнена всегда и не должна считаться
+    // «заполненным полем», иначе можно сохранить пустой замер с одной датой.
+    var measDate = (document.getElementById('meas-date') || {}).value || '';
+    if (measDate && measDate > _measTodayIso()) {
+        tg.showAlert('Дата замера не может быть в будущем');
+        return;
+    }
+
     // Check at least one field filled (фото само по себе тоже считается записью)
     var hasAnyPhoto = !!(measPhotoPending[1] || measPhotoPending[2] || measPhotoPending[3]);
     var hasAny = Object.values(fields).some(function(v) { return v && v.trim() !== ''; }) || hasAnyPhoto;
@@ -10467,6 +10499,7 @@ async function saveMeasurements() {
     try {
         var chatId = _myChatId();
         var payload = Object.assign({}, fields);
+        if (measDate) payload.date = measDate;
         if (measPhotoPending[1]) {
             payload.photoBase64 = measPhotoPending[1].base64;
             payload.photoMime = measPhotoPending[1].mime;
@@ -10501,6 +10534,7 @@ async function saveMeasurements() {
                 input.value = '';
                 input.classList.remove('filled');
             });
+            _measResetDate(true);  // очистка выше стирает и дату — ставим сегодня
             [1, 2, 3].forEach(function(slot) {
                 measPhotoPending[slot] = null;
                 var slotEl = document.getElementById('meas-photo-slot-' + slot);
