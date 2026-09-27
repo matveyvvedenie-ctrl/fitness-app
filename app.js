@@ -1093,6 +1093,27 @@ var NEW_API_ACTIONS = {
                 }); });
         });
     },
+    // 27.09. Порядок ДНЕЙ в неделе (см. reorder_program_days в api/main.py).
+    // Дни не отдельная сущность: их порядок — это порядок упражнений, поэтому
+    // сервер переписывает position блоками. Шлём ВСЕ дни недели.
+    reorderClientDays: function(nativeFetch, params) {
+        var sheetName = params.get('sheetName') || '';
+        var days = [];
+        try { days = JSON.parse(params.get('days') || '[]'); } catch (_) { days = []; }
+        if (!days.length) return _fakeJsonResponse({ success: false, error: 'Пустой список дней' }, 200);
+        return _resolveChatIdByName(nativeFetch, sheetName).then(function(chatId) {
+            if (!chatId) return _fakeJsonResponse({ success: false, error: 'Клиент не найден: ' + sheetName }, 200);
+            var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
+                encodeURIComponent(chatId) + '/program/days-order';
+            return nativeFetch(NEW_API_BASE + path, {
+                method: 'PUT', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ days: days })
+            }).then(function(r) { return r.json().then(function(data) {
+                if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+                return _fakeJsonResponse({ success: true, days: data.days }, 200);
+            }); });
+        });
+    },
     // Старый API даёт только плоский список rowIndex без явного dayName —
     // все переставляемые строки уже гарантированно из одного дня (визуально
     // тащат только внутри одной секции), так что находим день по первому id.
@@ -7368,6 +7389,9 @@ function groupExercises(exercises) {
 
 // Кэш всех упражнений текущей программы (для лёгкого поиска по rowIndex)
 var currentProgramExercisesByRow = {};
+// Названия дней текущей программы по порядку — для перестановки стрелками
+// (см. moveClientDay). Заполняется при каждой отрисовке программы.
+var currentProgramDays = [];
 
 // Экранируем кавычки для безопасной вставки в onclick=""
 function escAttr(s) { return (s == null ? '' : s.toString()).replace(/"/g, '&quot;').replace(/'/g, "\\'"); }
@@ -7612,6 +7636,7 @@ function renderClientProgram(data) {
         var already = days.some(function(d) { return (d.day || '') === name; });
         if (!already) days.push({ day: name, exercises: [] });
     });
+    currentProgramDays = days.map(function(d) { return d.day || ''; });
     // Заполняем кэш rowIndex → упражнение, чтобы редактор мог быстро взять данные
     currentProgramExercisesByRow = {};
     days.forEach(function(day) {
@@ -7728,6 +7753,12 @@ function renderClientProgram(data) {
         return '<div class="cc-day-block">' +
             '<div class="cc-day-title-row">' +
                 '<div class="cc-day-title">' + _escHtml(day.day || 'Тренировка ' + (dayIdx + 1)) + '</div>' +
+                // 27.09. Порядок дней раньше можно было поменять только удалив
+                // день и набрав заново («идёт Ср/Пт/Пн, хочу Пн/Ср/Пт»).
+                '<button class="cc-day-move-btn"' + (dayIdx === 0 ? ' disabled' : '') +
+                    ' onclick="moveClientDay(\'' + safeDay + '\', -1)" title="Выше">↑</button>' +
+                '<button class="cc-day-move-btn"' + (dayIdx === days.length - 1 ? ' disabled' : '') +
+                    ' onclick="moveClientDay(\'' + safeDay + '\', 1)" title="Ниже">↓</button>' +
                 '<button class="cc-day-menu-btn" onclick="showDayActionsDialog(\'' + safeDay + '\')" title="Действия с днём">⋯</button>' +
             '</div>' +
             '<div class="cc-day-exercises" data-day-name="' + safeDay + '">' +
@@ -9911,30 +9942,56 @@ function closeDayActionsDialog() {
     document.getElementById('day-actions-modal').classList.add('hidden');
 }
 
-async function renameCurrentDay() {
+// 27.09. Переименование открывает ТО ЖЕ окно, что и создание дня: кнопки
+// дня недели и групп мышц. Раньше было поле свободного ввода — название
+// приходилось набирать целиком руками (просьба Matvey).
+function renameCurrentDay() {
     var modal = document.getElementById('day-actions-modal');
     var oldName = modal.dataset.dayName;
     closeDayActionsDialog();
     if (!oldName || !currentClientCard) return;
+    showAddDayDialog('rename', oldName);
+}
 
-    var newName = await tgPrompt('Новое название дня:', oldName, 'Сохранить');
-    if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+// 27.09. Перестановка дней местами. Раньше порядок можно было изменить
+// только удалив день и набрав заново («идёт Ср/Пт/Пн, хочу Пн/Ср/Пт»).
+async function moveClientDay(dayName, delta) {
+    if (!currentClientCard) return;
+    var order = (currentProgramDays || []).slice();
+    var norm = function(x) { return String(x || '').replace(/\s+/g, ' ').trim().toLowerCase(); };
+    var i = order.indexOf(dayName);
+    if (i === -1) {
+        for (var k = 0; k < order.length; k++) {
+            if (norm(order[k]) === norm(dayName)) { i = k; break; }
+        }
+    }
+    var j = i + delta;
+    if (i === -1 || j < 0 || j >= order.length) return;
+    var tmp = order[i]; order[i] = order[j]; order[j] = tmp;
 
-    try {
-        var url = APPS_SCRIPT_URL + '?action=renameClientDay' +
-            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
-            '&oldDayName=' + encodeURIComponent(oldName) +
-            '&newDayName=' + encodeURIComponent(newName.trim());
-        var resp = await fetch(url);
-        var data = await resp.json();
-        if (!data.success) {
-            tg.showAlert('Ошибка: ' + (data.error || 'не удалось'));
+    // Несохранённые правки упражнений сначала сливаем: перестановка
+    // перерисовывает программу, и очередь потерялась бы вместе с подсветкой.
+    if (Object.keys(pendingExerciseEdits).length > 0) {
+        var flushed = await flushPendingExerciseEdits();
+        if (!flushed) {
+            tg.showAlert('Не удалось сохранить прошлые изменения — порядок не менял');
             return;
         }
-        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    }
+
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL + '?action=reorderClientDays' +
+            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+            '&days=' + encodeURIComponent(JSON.stringify(order)));
+        var data = await resp.json();
+        if (!data.success) {
+            tg.showAlert('Ошибка: ' + (data.error || 'не удалось переставить'));
+            return;
+        }
+        if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         await loadClientProgram(currentClientCard.sheetName);
     } catch (error) {
-        console.error('Rename day error:', error);
+        console.error('Move day error:', error);
         tg.showAlert('Ошибка соединения ❌');
     }
 }
@@ -9977,10 +10034,19 @@ function _capitalizeMuscle(m) {
     return muscleLabel(m);
 }
 
-function showAddDayDialog() {
+// mode: 'add' (по умолчанию) или 'rename'. В режиме переименования кнопки
+// открываются уже отмеченными по текущему названию, а в поле остаётся само
+// название — что не распозналось, не теряется.
+var addDayMode = 'add';
+var addDayRenameFrom = '';
+
+function showAddDayDialog(mode, currentName) {
     if (!currentClientCard) return;
+    addDayMode = mode === 'rename' ? 'rename' : 'add';
+    addDayRenameFrom = addDayMode === 'rename' ? (currentName || '') : '';
     addDaySelectedWeekday = '';
     addDaySelectedMuscles = [];
+    if (addDayMode === 'rename') _addDayPrefillFrom(addDayRenameFrom);
 
     var weekdayRow = document.getElementById('add-day-weekday-row');
     weekdayRow.innerHTML = ADD_DAY_WEEKDAYS.map(function(d) {
@@ -9992,8 +10058,37 @@ function showAddDayDialog() {
         return '<button type="button" class="add-day-chip" data-muscle="' + m + '" onclick="toggleAddDayMuscle(\'' + m + '\')">' + _capitalizeMuscle(m) + '</button>';
     }).join('');
 
+    // Отмечаем кнопки, распознанные из текущего названия.
+    document.querySelectorAll('#add-day-weekday-row .add-day-chip').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.day === addDaySelectedWeekday);
+    });
+    document.querySelectorAll('#add-day-muscle-grid .add-day-chip').forEach(function(btn) {
+        btn.classList.toggle('active', addDaySelectedMuscles.indexOf(btn.dataset.muscle) !== -1);
+    });
+
     updateAddDayPreview();
+    if (addDayMode === 'rename') {
+        // Название берём как есть: в нём может быть то, чего нет в кнопках
+        // («Ср Ягодицы / ЗПБ-Спина»). Пересоберётся, только если тронуть кнопки.
+        document.getElementById('add-day-preview').value = addDayRenameFrom;
+    }
+    document.getElementById('add-day-title').textContent =
+        addDayMode === 'rename' ? '✏️ Переименовать день' : '+ Новый день тренировки';
+    document.getElementById('add-day-save-btn').textContent =
+        addDayMode === 'rename' ? '💾 Сохранить название' : '➕ Добавить день';
     document.getElementById('add-day-modal').classList.remove('hidden');
+}
+
+// Разбирает название дня на кнопки: день недели и группы мышц.
+function _addDayPrefillFrom(name) {
+    var lower = String(name || '').toLowerCase();
+    ADD_DAY_WEEKDAYS.forEach(function(d) {
+        if (!addDaySelectedWeekday && lower.indexOf(d.toLowerCase()) === 0) addDaySelectedWeekday = d;
+    });
+    KNOWN_MUSCLES.forEach(function(m) {
+        var hit = muscleAliases(m).some(function(a) { return lower.indexOf(a) !== -1; });
+        if (hit && addDaySelectedMuscles.indexOf(m) === -1) addDaySelectedMuscles.push(m);
+    });
 }
 
 function closeAddDayModal() {
@@ -10029,14 +10124,24 @@ async function submitAddDay() {
         tg.showAlert('Выбери день недели и хотя бы одну группу мышц (или впиши название вручную в поле выше)');
         return;
     }
+    // Переименование в то же название — просто закрываем, незачем дёргать сервер.
+    if (addDayMode === 'rename' && dayName === (addDayRenameFrom || '').trim()) {
+        closeAddDayModal();
+        return;
+    }
     var btn = document.getElementById('add-day-save-btn');
     var origText = btn.textContent;
     btn.disabled = true;
-    btn.textContent = '⏳ Добавление...';
+    btn.textContent = addDayMode === 'rename' ? '⏳ Сохранение...' : '⏳ Добавление...';
     try {
-        var url = APPS_SCRIPT_URL + '?action=addClientDay' +
-            '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
-            '&dayName=' + encodeURIComponent(dayName);
+        var url = addDayMode === 'rename'
+            ? (APPS_SCRIPT_URL + '?action=renameClientDay' +
+               '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+               '&oldDayName=' + encodeURIComponent(addDayRenameFrom) +
+               '&newDayName=' + encodeURIComponent(dayName))
+            : (APPS_SCRIPT_URL + '?action=addClientDay' +
+               '&sheetName=' + encodeURIComponent(currentClientCard.sheetName) +
+               '&dayName=' + encodeURIComponent(dayName));
         var resp = await fetch(url);
         var data = await resp.json();
         if (!data.success) {
@@ -10044,7 +10149,14 @@ async function submitAddDay() {
             return;
         }
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        if (pendingEmptyDays.indexOf(dayName) === -1) pendingEmptyDays.push(dayName);
+        // Пустой день живёт только в памяти мини-аппа, пока в нём нет
+        // упражнений (см. pendingEmptyDays) — при переименовании поправляем и там.
+        if (addDayMode === 'rename') {
+            var was = pendingEmptyDays.indexOf(addDayRenameFrom);
+            if (was !== -1) pendingEmptyDays[was] = dayName;
+        } else if (pendingEmptyDays.indexOf(dayName) === -1) {
+            pendingEmptyDays.push(dayName);
+        }
         closeAddDayModal();
         await loadClientProgram(currentClientCard.sheetName);
     } catch (error) {

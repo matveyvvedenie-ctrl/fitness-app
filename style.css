@@ -3334,6 +3334,24 @@ body.theme-dark .save-btn.success {
     transition: all 0.15s ease;
 }
 
+/* 27.09. Стрелки порядка дней — рядом с «⋯», тем же размером, но тише:
+   основное действие в заголовке дня — меню, а не перестановка. */
+.cc-day-move-btn {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+}
+.cc-day-move-btn:disabled { opacity: .25; cursor: default; }
+.cc-day-move-btn:not(:disabled):active { background: var(--surface-2); }
+
 .cc-day-menu-btn:hover { background: var(--surface-2); color: var(--color-primary); }
 .cc-day-menu-btn:active { transform: scale(0.92); }
 
