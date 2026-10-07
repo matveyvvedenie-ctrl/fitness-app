@@ -637,6 +637,37 @@ var NEW_API_ACTIONS = {
             return _fakeJsonResponse({ success: true }, 200);
         }); });
     },
+    // Второй вход клиента (07.10.2026) — тот же человек, другое приложение.
+    // Карточка остаётся одна, поэтому ничего, кроме самой привязки, трогать не
+    // нужно: программа, история, замеры и питание висят на карточке, а не на
+    // входе. Кэш имя→chatId сбрасываем — в нём лежат двери.
+    setClientSecondDoor: function(nativeFetch, params) {
+        var chatId = params.get('targetChatId') || '';
+        var second = params.get('secondChatId') || '';
+        var notifyDoor = params.get('notifyDoor') || '';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
+            encodeURIComponent(chatId) + '/second-door';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'PUT', headers: _newApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ secondChatId: second, notifyDoor: notifyDoor })
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            _nameToChatIdCache = null;
+            return _fakeJsonResponse({ success: true, chatIdAlt: data.chatIdAlt || '', notifyDoor: data.notifyDoor || '' }, 200);
+        }); });
+    },
+    removeClientSecondDoor: function(nativeFetch, params) {
+        var chatId = params.get('targetChatId') || '';
+        var path = '/trainers/' + encodeURIComponent(_newApiTrainerId()) + '/clients/' +
+            encodeURIComponent(chatId) + '/second-door';
+        return nativeFetch(NEW_API_BASE + path, {
+            method: 'DELETE', headers: _newApiHeaders()
+        }).then(function(r) { return r.json().then(function(data) {
+            if (!r.ok) return _fakeJsonResponse({ success: false, error: data.detail || 'Не удалось' }, 200);
+            _nameToChatIdCache = null;
+            return _fakeJsonResponse({ success: true }, 200);
+        }); });
+    },
     setClientArchived: function(nativeFetch, params) {
         var chatId = params.get('targetChatId') || params.get('clientChatId') || '';
         var archived = params.get('archived') === 'true';
@@ -8635,6 +8666,83 @@ function fillProfileForm(p) {
     });
     arr.forEach(function(v) { if (known.indexOf(v) < 0) other.push(v); });
     document.getElementById('prof-limit-other').value = other.join(', ');
+
+    _fillSecondDoorFields(p);
+}
+
+// Второй вход (07.10.2026). Храним значение, которое пришло с сервера, чтобы
+// «Сохранить» не дёргало сервер впустую, когда тренер ничего не менял.
+var _secondDoorLoaded = '';
+
+function _fillSecondDoorFields(p) {
+    var input = document.getElementById('prof-chatid-alt');
+    var notify = document.getElementById('prof-notify-alt');
+    var unlink = document.getElementById('prof-door-unlink');
+    _secondDoorLoaded = p.chatIdAlt || '';
+    if (input) input.value = _secondDoorLoaded;
+    if (notify) notify.checked = (p.notifyDoor === 'alt');
+    if (unlink) unlink.hidden = !_secondDoorLoaded;
+}
+
+async function saveClientSecondDoor() {
+    if (!currentClientCard) return;
+    var input = document.getElementById('prof-chatid-alt');
+    var notify = document.getElementById('prof-notify-alt');
+    var second = (input.value || '').trim();
+    if (!second) {
+        appToast('Впиши второй ID или нажми «Отвязать»');
+        return;
+    }
+    var notifyDoor = (notify && notify.checked) ? 'alt' : '';
+    try {
+        var url = APPS_SCRIPT_URL + '?action=setClientSecondDoor' +
+            '&targetChatId=' + encodeURIComponent(currentClientCard.chatId) +
+            '&secondChatId=' + encodeURIComponent(second) +
+            '&notifyDoor=' + encodeURIComponent(notifyDoor);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            appToast('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        _secondDoorLoaded = data.chatIdAlt || second;
+        if (input) input.value = _secondDoorLoaded;
+        var unlink = document.getElementById('prof-door-unlink');
+        if (unlink) unlink.hidden = false;
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        appToast('✅ Второй вход привязан');
+    } catch (e) {
+        appToast('Ошибка соединения ❌');
+    }
+}
+
+async function removeClientSecondDoor() {
+    if (!currentClientCard) return;
+    var ok = await tgConfirm(
+        'Отвязать второй вход? Данные клиента останутся на месте — он просто не сможет ' +
+        'заходить в свою карточку со второй стороны.'
+    );
+    if (!ok) return;
+    try {
+        var url = APPS_SCRIPT_URL + '?action=removeClientSecondDoor' +
+            '&targetChatId=' + encodeURIComponent(currentClientCard.chatId);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.success) {
+            appToast('Ошибка: ' + (data.error || 'не удалось'));
+            return;
+        }
+        _secondDoorLoaded = '';
+        var input = document.getElementById('prof-chatid-alt');
+        var notify = document.getElementById('prof-notify-alt');
+        var unlink = document.getElementById('prof-door-unlink');
+        if (input) input.value = '';
+        if (notify) notify.checked = false;
+        if (unlink) unlink.hidden = true;
+        appToast('Второй вход отвязан');
+    } catch (e) {
+        appToast('Ошибка соединения ❌');
+    }
 }
 
 function collectProfileForm() {

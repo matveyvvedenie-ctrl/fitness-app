@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Фитнес Тренер</title>
-    <link rel="stylesheet" href="style.css?v=20260927a">
+    <link rel="stylesheet" href="style.css?v=20261007a">
     <!-- defer вместо обычной блокирующей загрузки: раньше эти 4 скрипта грузились
          строго по очереди (следующий запрос уходил только после того как предыдущий
          и скачался, и выполнился), и это же держало HTML-парсинг страницы. На слабой
@@ -1382,6 +1382,21 @@
                     <button class="notes-save-btn" onclick="saveClientChatId()">💾 Сохранить ID</button>
                 </div>
             </div>
+
+            <!-- Второй вход (07.10.2026): тот же человек заходит и из Telegram, и
+                 из ВК. Карточка одна — программа, история, замеры и питание общие.
+                 Понадобилось, потому что тренироваться удобно в одном приложении,
+                 а еду фотографировать в другом: Telegram под рукой не всегда. -->
+            <div class="notes-new-card">
+                <div class="notes-card-title">🚪 Второй вход</div>
+                <div class="door-hint">Клиент заходит и из Телеграма, и из ВК? Впиши здесь второй ID — карточка останется одна, программа и питание общие.</div>
+                <input type="text" id="prof-chatid-alt" class="prof-input" placeholder="vk_123456789 или 123456789">
+                <label class="door-notify"><input type="checkbox" id="prof-notify-alt"> Уведомления присылать во второй вход</label>
+                <div class="notes-new-controls">
+                    <button class="notes-save-btn" onclick="saveClientSecondDoor()">💾 Сохранить</button>
+                    <button class="door-unlink-btn" id="prof-door-unlink" onclick="removeClientSecondDoor()">Отвязать</button>
+                </div>
+            </div>
         </div>
 
         <!-- Вкладка: План питания -->
@@ -1938,6 +1953,6 @@
          project_vk_hosting_migration в памяти — та же причина, что и раньше
          была с Telegram, bug_telegram_webview_cache). Урок: бампать ?v= при
          КАЖДОЙ правке app.js/style.css, даже если index.html не менялся. -->
-    <script src="app.js?v=20260927a" defer></script>
+    <script src="app.js?v=20261007a" defer></script>
 </body>
 </html>
